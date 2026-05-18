@@ -329,6 +329,39 @@ The `vocab` path segment is distinct from the `ontology.ttl` and `context.jsonld
 
 ---
 
+## ADR-012 — Repository visibility: public
+
+**Date:** 2026-05-18
+**Status:** Accepted
+
+### Context
+
+After initial setup, the repository was briefly made private and then returned to public. The episode surfaced a constraint not explicit in ADR-011: the canonical namespace URL (`https://bgiesbrecht.github.io/tessera/spec/v0/...`) only resolves anonymously when the repository is public.
+
+GitHub Pages on private repositories requires a paid plan and serves content only to authenticated users with repository read access. Anonymous fetches — by RDF reasoners, JSON-LD validators, third-party tooling, or any consumer that does not authenticate to GitHub — fail.
+
+### Decision
+
+The Tessera repository is **public**, and remains public as long as the published namespace URLs are expected to resolve anonymously.
+
+### Reasoning
+
+- The Tessera spec is meant to be consumable. Any tool that parses a Tessera policy file may fetch the `@context` URL during processing; failing those fetches breaks the basic flow.
+- The skunkworks posture (ADR-002) does not require privacy. The project is non-strategic from a competitive standpoint and benefits from being visible to potential customers and contributors.
+- The Apache 2.0 license (ADR-009) presumes public availability; a private repo under a permissive open-source license is an awkward posture.
+
+### Consequences
+
+- The repository remains public; any future change to private status requires a deliberate decision recorded as a new ADR superseding this one.
+- If the project ever requires a temporary private phase (embargo before an announcement, sensitive customer engagement, etc.), the corresponding plan must account for namespace-URL resolution — either by accepting that URLs will not resolve during the private phase, by mirroring spec files to a public location, or by routing through a custom domain on an independent host.
+- Customers and tools can safely fetch the published URLs without authentication.
+
+### Note on the alternative
+
+A more robust long-term posture would decouple the namespace URLs from GitHub entirely by routing them through a custom domain (e.g., `tessera.dev`) served from a host independent of the repository's visibility. This was considered in ADR-011 and deferred. The decision remains: GitHub Pages is the canonical host while the project is skunkworks; a custom domain becomes the right answer if the project's organizational posture changes.
+
+---
+
 ## How to use this document
 
 - Every new technical or stakeholder document begins by reading this file.

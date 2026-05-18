@@ -23,7 +23,7 @@ Tessera delivers **semantic interoperability of policy**: an agreement, encoded 
 
 - **Not a runtime policy enforcement engine.** Tessera compiles to and from the platforms that already do enforcement well. It does not insert itself into the query path.
 - **Not a replacement for platform-native governance.** Unity Catalog is the source of truth for governance inside a Databricks environment. Snowflake's governance is the source of truth inside Snowflake. Tessera is the lingua franca *between* governance estates, not a replacement for either of them.
-- **Not an official product of any vendor.** Tessera is a initiative to help solve a real and continuous governance problem. 
+- **Not an official product of any vendor.** Tessera is a skunkworks initiative by an engineer at Databricks, intended to help joint Databricks–Snowflake customers (and customers running other combinations) solve a real and continuous governance problem. It does not represent an official Databricks position, it is not coordinated with Snowflake, and it does not propose itself as an industry standard.
 - **Not a universal authorization language.** Tessera is scoped to data-platform governance and is intentionally narrower than general-purpose authorization tools like Cedar or OPA. Narrowness is a feature.
 
 ## Who Tessera is for

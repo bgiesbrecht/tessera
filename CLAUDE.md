@@ -29,7 +29,7 @@ For customers running only Databricks, Tessera is not applicable — Unity Catal
 
 When a user request conflicts with a recorded ADR, the right response is to flag the conflict and reference the ADR by number, not to silently override the decision. If the user wants to change a recorded decision, propose adding a new ADR that supersedes the old one — do not retroactively edit ADRs.
 
-Currently the recorded ADRs are 001 through 011:
+Currently the recorded ADRs are 001 through 012:
 
 - 001 — Project framing: semantic interoperability, not migration
 - 002 — Organizational posture: skunkworks, customer enablement
@@ -42,6 +42,7 @@ Currently the recorded ADRs are 001 through 011:
 - 009 — License: Apache 2.0
 - 010 — Repository at github.com/bgiesbrecht/tessera
 - 011 — Canonical namespace URL: GitHub Pages
+- 012 — Repository visibility: public
 
 ### When unsure, ask before drifting
 
