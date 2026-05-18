@@ -45,7 +45,7 @@ Currently the recorded ADRs are 001 through 011:
 
 ### When unsure, ask before drifting
 
-The skunkworks posture (ADR-002) is fragile and depends on the project not overreaching. If a request would push Tessera toward becoming a standards-body submission, an official Databricks product, or a runtime enforcement engine, surface the tension rather than implementing silently. The user (Bryan) makes those calls.
+The skunkworks posture (ADR-002) is fragile and depends on the project not overreaching. If a request would push Tessera toward becoming a standards-body submission, an official Databricks product, or a runtime enforcement engine, surface the tension rather than implementing silently. The user (Brice) makes those calls.
 
 ### Voice and tone
 
@@ -203,7 +203,7 @@ When working in this repository:
 
 ## Where the user is in the work
 
-The user (Bryan, github: `bgiesbrecht`) has just established the repository with the initial commits. The immediate context as of this handoff:
+The user (Brice, github: `bgiesbrecht`) has just established the repository with the initial commits. The immediate context as of this handoff:
 
 - Documents and spec artifacts are committed.
 - GitHub Pages is *not yet* enabled (or has just been enabled — verify).
