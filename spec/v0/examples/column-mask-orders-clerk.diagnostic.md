@@ -143,3 +143,13 @@ The Databricks adapter capability profile (when built) would declare a single ti
 | Cosmetic divergences (function name, GRANT EXECUTE, header comments) | **Accepted divergences** | Documented in the comparison; the GRANT EXECUTE is consistent with the policy-execute-grants v1 candidate (issue #10) already filed from the ACL exercise. |
 
 The exercise's value is in surfacing finding §4. The schema correction is small but real — without it, the natural shape for two-branch column masking (one rule + defaultBranch) cannot validate.
+
+---
+
+## Postscript — adapter coverage 2026-05-19
+
+The Unity Catalog adapter now emits this policy. The hand-derived SQL in `column-mask-orders-clerk.databricks.sql` was the empirical target during this exercise; on 2026-05-19 the same IR was lowered through `adapters/unity_catalog/emission.py` and produced byte-equivalent DDL (modulo the explanatory `-- Attach the mask` comment, which is documentation-only). Live-executed against `bg_rls_demo.tpch.orders.o_clerk`: the caller (not a member of `orders_full_access`) saw `'CLERK-REDACTED'` for every distinct value. Capability profile for `Capability.COLUMN_VISIBILITY` updated to record the live verification.
+
+Coverage scope of this emission path: `byIdentity` column targets; rules with `effect: allow` or `effect: transform`; `defaultBranch` with `effect: transform`; `Redact` transformation. `Mask` and `Hash` transformations have parameter-shape semantics settled in v0 but their SQL templates are queued. ABAC `byScope` column masking (the `abac-column-mask-policy-*` IR shapes) remains a separate emission path, not yet implemented.
+
+The hand-derived SQL file stays in this directory as historical record of the empirical target the exercise validated against.

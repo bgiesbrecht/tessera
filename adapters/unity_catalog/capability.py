@@ -22,7 +22,18 @@ UNITY_CATALOG_PROFILE = CapabilityProfile(
         ),
         Capability.COLUMN_VISIBILITY: (
             CapabilitySupport.SUPPORTED,
-            "Emitted via CREATE FUNCTION returning the masked value plus ALTER TABLE ... ALTER COLUMN ... SET MASK.",
+            "Emitted via CREATE OR REPLACE FUNCTION returning the masked value plus "
+            "ALTER TABLE ... ALTER COLUMN ... SET MASK. Live-verified 2026-05-19 against "
+            "bg_rls_demo.tpch.orders.o_clerk: the same IR that produced the hand-derived "
+            "spec/v0/examples/column-mask-orders-clerk.databricks.sql now emits byte-equivalent "
+            "DDL through the adapter; the mask enforces correctly for non-members of the "
+            "granted group (caller sees CLERK-REDACTED). Coverage: byIdentity column targets; "
+            "rules with effect=allow or effect=transform; defaultBranch with effect=transform; "
+            "Redact transformation (literal replacement). Mask and Hash transformations land in "
+            "future scaffold passes (the parameter-shape semantics are settled in v0; the SQL "
+            "templates are queued). ABAC byScope column masking remains UNIMPLEMENTED — the IR "
+            "shape exists in spec/v0/examples/abac-column-mask-policy-* but the adapter does not "
+            "yet handle byScope+matching for column visibility.",
         ),
         Capability.ATTRIBUTE_BASED_SCOPING: (
             CapabilitySupport.PARTIAL,
