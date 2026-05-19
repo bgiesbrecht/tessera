@@ -1,0 +1,28 @@
+# Tessera policy — table-grants Scenario B
+# Schema-level affirmative read grant with downward propagation.
+#
+# Uses byScope at schema-level. No matching block — applies to every resource
+# in scope. ADR-019's downward-propagation semantics are what produce the
+# "current and future tables" behavior; the diagnostic validates this is
+# observable in Phase 3.
+
+policy:
+  id: table-grants-scenario-b
+  version: 1.0.0
+  kind: RowVisibilityConstraint
+  description: |
+    Data engineering team can Read every table in bg_rls_demo.tpch_staging,
+    including tables added after the policy is applied. No explicit
+    enumeration; byScope at schema level propagates downward.
+
+  appliesTo:
+    selector: byScope
+    scope: schema:bg_rls_demo.tpch_staging
+
+  action: Read
+
+  rules:
+    - principal:
+        selector: byIdentity
+        resource: group:bg_rls_demo_data_engineering
+      effect: allow

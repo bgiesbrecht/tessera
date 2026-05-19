@@ -1,0 +1,29 @@
+{
+  "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
+  "@type": "Policy",
+  "@id": "policy:table-grants-scenario-a",
+  "version": "1.0.0",
+  "policyKind": "RowVisibilityConstraint",
+  "description": "Marketing analytics team can Read bg_rls_demo.tpch.orders. Purely affirmative; principals not in the group fall through to other policies or platform defaults.",
+
+  "appliesTo": {
+    "selector": "byIdentity",
+    "resource": "table:bg_rls_demo.tpch.orders"
+  },
+
+  "action": "Read",
+
+  "rules": [
+    {
+      "principal": {
+        "selector": "byIdentity",
+        "resource": "group:bg_rls_demo_marketing_analytics"
+      },
+      "effect": "allow"
+    }
+  ],
+
+  "provenance": {
+    "notes": "Scenario A of the table-grants exercise. Lowered as RowVisibilityConstraint+effect:allow; diagnostic records the AccessGrantConstraint alternative as an open design question."
+  }
+}

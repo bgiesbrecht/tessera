@@ -1,0 +1,564 @@
+# Tessera SHACL Shapes v0
+#
+# Semantic validation layer per technical-design v0.2 §7.2.
+# This file defines SHACL constraints that go beyond what JSON Schema
+# captures:
+#   - CURIE references resolve against the ontology (a `sensitivity: PII`
+#     reference must point to a known Classification subclass).
+#   - Axis-type-driven validation (hierarchical axes expect class
+#     references; flat axes expect named individuals).
+#   - Conditional dependencies expressed declaratively rather than
+#     structurally (the JSON Schema enforces the same via if/then/else;
+#     these shapes are the canonical statement of intent).
+#   - Closed shapes where appropriate (the IR vocabulary is closed in
+#     v0; documents that introduce unknown properties are rejected by
+#     SHACL even though JSON Schema may permit additional properties).
+#
+# This file is loaded by the linter alongside the ontology
+# (`spec/v0/ontology.ttl`) and applied to JSON-LD documents (expanded
+# to RDF first).
+#
+# Companion artifacts:
+#   - spec/v0/ontology.ttl        (the vocabulary these shapes validate)
+#   - spec/v0/context.jsonld      (the JSON-LD context documents reference)
+#   - spec/v0/schema.json         (structural JSON Schema validation; partial overlap)
+#   - docs/technical-design-v0.2.md §7.2 (the validation pipeline framing)
+#   - DECISIONS.md ADRs 013–023   (the design decisions these shapes encode)
+#
+# v0 is conditionally immutable per ADR-017; this file becomes immutable
+# with v0's public publication. Future versions are published at
+# parallel URLs (v1, v2) and may extend or supersede these shapes but do
+# not modify this file in place.
+
+@prefix tessera: <https://bgiesbrecht.github.io/tessera/spec/v0/vocab#> .
+@prefix sh:      <http://www.w3.org/ns/shacl#> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+#
+# Ontology header
+#
+
+<https://bgiesbrecht.github.io/tessera/spec/v0/shapes> a owl:Ontology ;
+    dcterms:title "Tessera SHACL Shapes"@en ;
+    dcterms:description
+        """Semantic validation shapes for Tessera policy documents. Validates CURIE resolution, axis-type-driven values, conditional field dependencies, and closed-vocabulary discipline."""@en ;
+    owl:versionInfo "0.0.1" ;
+    rdfs:seeAlso <https://bgiesbrecht.github.io/tessera/spec/v0/ontology.ttl> .
+
+
+#
+# ============================================================================
+# Policy container shape (ADR-014)
+# ============================================================================
+# A tessera:Policy must declare its kind, appliesTo, action, and have
+# at least one rule. The defaultStrategy conditional dependencies are
+# enforced here. The policyKind discriminator must reference one of the
+# known PolicyConstraint subclasses.
+#
+
+tessera:PolicyShape a sh:NodeShape ;
+    sh:targetClass tessera:Policy ;
+    rdfs:label "Policy shape"@en ;
+    rdfs:comment "Validates structural requirements of a tessera:Policy."@en ;
+
+    # policyKind is required and must reference a known constraint class.
+    sh:property [
+        sh:path tessera:policyKind ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in (
+            tessera:AccessConstraint
+            tessera:RowVisibilityConstraint
+            tessera:ColumnVisibilityConstraint
+            tessera:DistributionConstraint
+        ) ;
+        sh:message "policyKind must reference a known PolicyConstraint subclass (AccessConstraint, RowVisibilityConstraint, ColumnVisibilityConstraint, or DistributionConstraint)."@en ;
+    ] ;
+
+    # appliesTo is required and must structurally conform to ResourceSelectorShape.
+    sh:property [
+        sh:path tessera:appliesTo ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:node tessera:ResourceSelectorShape ;
+        sh:message "appliesTo is required and must conform to ResourceSelectorShape."@en ;
+    ] ;
+
+    # action is required.
+    sh:property [
+        sh:path tessera:action ;
+        sh:minCount 1 ;
+        sh:in (
+            tessera:Read tessera:Write tessera:Delete
+            tessera:Share tessera:Sample tessera:Aggregate
+            tessera:Execute
+        ) ;
+        sh:message "action is required and must be a known Action."@en ;
+    ] ;
+
+    # At least one rule, OR a defaultBranch.
+    sh:or (
+        [ sh:path tessera:rules ; sh:minCount 1 ]
+        [ sh:path tessera:defaultBranch ; sh:minCount 1 ]
+    ) ;
+
+    # Every rule in the rules list must conform to PolicyRuleShape. The rules list is
+    # an rdf:List (context.jsonld @container: @list), so the path traverses
+    # rules → (rdf:rest)* → rdf:first to land on each list member.
+    sh:property [
+        sh:path ( tessera:rules [ sh:zeroOrMorePath rdf:rest ] rdf:first ) ;
+        sh:node tessera:PolicyRuleShape ;
+    ] ;
+
+    # defaultBranch (when present, under negated-complement strategy) is structurally
+    # similar to a rule but does NOT carry a principal — by definition it applies to
+    # whichever principals matched no preceding rule. Its effect/condition/transformation
+    # fields are validated by the JSON Schema layer. SHACL does not invoke PolicyRuleShape
+    # here because PolicyRuleShape requires a principal selector and defaultBranch omits one.
+    sh:property [
+        sh:path tessera:defaultBranch ;
+        sh:maxCount 1 ;
+    ] ;
+
+    # defaultStrategy must be one of the three known values when present.
+    sh:property [
+        sh:path tessera:defaultStrategy ;
+        sh:maxCount 1 ;
+        sh:in (
+            tessera:explicitBaselineGroup
+            tessera:negatedComplement
+            tessera:none
+        ) ;
+        sh:message "defaultStrategy must be one of explicit-baseline-group, negated-complement, or none."@en ;
+    ] ;
+
+    # Conditional dependencies enforced at the JSON Schema layer (see spec/v0/schema.json):
+    #   * baselineGroup is required iff defaultStrategy: explicit-baseline-group (ADR-013).
+    #   * defaultBranch is required iff defaultStrategy: negated-complement (ADR-014).
+    # These could be expressed in standard SHACL via sh:or + sh:not biconditionals, but
+    # the JSON Schema validation layer already catches them structurally. SHACL's value-add
+    # is the semantic checks that the schema cannot perform (vocabulary closure, axis-type-
+    # aware value checking, IRI resolution). The conditional dependencies fall in the
+    # structural-validation category and are deliberately not duplicated here.
+    .
+
+
+#
+# ============================================================================
+# Rule shape (inside a Policy)
+# ============================================================================
+# Per ADR-022, the transformation requirement is effect-driven: required
+# iff effect is transform; forbidden otherwise. Applies to both rules
+# and the defaultBranch.
+#
+
+tessera:PolicyRuleShape a sh:NodeShape ;
+    rdfs:label "Policy rule shape"@en ;
+    rdfs:comment "Validates a single rule inside a Policy's rules list."@en ;
+
+    # principal is required and must structurally conform to PrincipalSelectorShape.
+    sh:property [
+        sh:path tessera:principal ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:node tessera:PrincipalSelectorShape ;
+        sh:message "Each rule must declare a principal selector conforming to PrincipalSelectorShape."@en ;
+    ] ;
+
+    # effect is required and must be a known value.
+    sh:property [
+        sh:path tessera:effect ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in (
+            tessera:allow tessera:deny tessera:transform
+            tessera:keepMatchingRows tessera:dropMatchingRows
+        ) ;
+        sh:message "effect is required and must be a known Effect."@en ;
+    ] ;
+
+    # If a condition is present, it must conform to ConditionShape (operator from v0
+    # condition algebra). JSON-LD does not assert @type on condition blank nodes, so
+    # the shape is invoked here via sh:node rather than relying on sh:targetClass.
+    sh:property [
+        sh:path tessera:condition ;
+        sh:maxCount 1 ;
+        sh:node tessera:ConditionShape ;
+    ] ;
+
+    # ADR-022 (transformation required iff effect: transform) is enforced at the JSON
+    # Schema layer. See note in PolicyShape above.
+    .
+
+
+#
+# ============================================================================
+# PolicyConstraint shape (backward-compat freestanding form)
+# ============================================================================
+# Pre-ADR-014 single-constraint shape. Same effect-driven transformation
+# constraint as PolicyRuleShape.
+#
+
+tessera:PolicyConstraintShape a sh:NodeShape ;
+    sh:targetClass tessera:PolicyConstraint ;
+    rdfs:label "Freestanding PolicyConstraint shape"@en ;
+
+    sh:property [
+        sh:path tessera:appliesTo ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:node tessera:ResourceSelectorShape ;
+    ] ;
+    sh:property [
+        sh:path tessera:principal ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:node tessera:PrincipalSelectorShape ;
+    ] ;
+    sh:property [
+        sh:path tessera:action ;
+        sh:minCount 1 ;
+        sh:in (
+            tessera:Read tessera:Write tessera:Delete
+            tessera:Share tessera:Sample tessera:Aggregate
+            tessera:Execute
+        ) ;
+    ] ;
+    sh:property [
+        sh:path tessera:effect ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in (
+            tessera:allow tessera:deny tessera:transform
+            tessera:keepMatchingRows tessera:dropMatchingRows
+        ) ;
+    ] ;
+
+    # ADR-022 (transformation required iff effect: transform) is enforced at the JSON
+    # Schema layer for freestanding constraints, same as inside the Policy container.
+    .
+
+
+#
+# ============================================================================
+# Resource selector shape (ADR-019 byScope + existing kinds)
+# ============================================================================
+# The selectorKind determines which fields are required.
+#
+
+tessera:ResourceSelectorShape a sh:NodeShape ;
+    rdfs:label "Resource selector shape"@en ;
+    rdfs:comment """Invoked via sh:node from PolicyShape's appliesTo property. Not declared with sh:targetClass because PrincipalSetFromTable / ResourceSetFromTable (which are ontology-level subclasses of PrincipalSelector / ResourceSelector) do not have selectorKind — they have tableRef + columns. Subclass-based auto-targeting would falsely fire on them. The shape is applied explicitly via sh:node from PolicyShape and PolicyConstraintShape."""@en ;
+
+    sh:property [
+        sh:path tessera:selectorKind ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in (
+            tessera:byIdentity tessera:byAttribute tessera:byClassification
+            tessera:byDataset tessera:byComposition tessera:byScope
+        ) ;
+        sh:message "selectorKind must be one of the known selector kinds."@en ;
+    ] ;
+
+    # Per-selectorKind field-requirement conditionals (byIdentity → resource;
+    # byClassification → classification; byDataset → dataset; byScope → scope;
+    # byComposition → criteria) are enforced at the JSON Schema layer via if/then/else
+    # branches on the selector value. SHACL would express these via sh:or + sh:not
+    # biconditionals (verbose); deferred to JSON Schema for conciseness.
+    .
+
+
+#
+# ============================================================================
+# Principal selector shape
+# ============================================================================
+# Same kind-based dispatch as ResourceSelector but with principal-specific
+# dataset shape (PrincipalSetFromTable).
+#
+
+tessera:PrincipalSelectorShape a sh:NodeShape ;
+    rdfs:label "Principal selector shape"@en ;
+    rdfs:comment "Same rationale as ResourceSelectorShape: invoked via sh:node, not via sh:targetClass."@en ;
+
+    sh:property [
+        sh:path tessera:selectorKind ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in (
+            tessera:byIdentity tessera:byAttribute
+            tessera:byDataset tessera:byComposition
+        ) ;
+        sh:message "Principal selectors use byIdentity, byAttribute, byDataset, or byComposition."@en ;
+    ] ;
+
+    # Same JSON-Schema-deferred pattern as ResourceSelectorShape above.
+    .
+
+
+#
+# ============================================================================
+# AttributeMatcher shape (ADR-020)
+# ============================================================================
+# The axis must be a known AttributeAxis. The value's RDF type must
+# match the axis's axisType (hierarchical → class reference;
+# flat → named individual).
+#
+
+tessera:AttributeMatcherShape a sh:NodeShape ;
+    sh:targetClass tessera:AttributeMatcher ;
+    rdfs:label "Attribute matcher shape"@en ;
+    rdfs:comment "Validates an attribute-matching leaf: axis must be a known AttributeAxis; value's type must match the axis's axisType."@en ;
+
+    sh:property [
+        sh:path tessera:axis ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class tessera:AttributeAxis ;
+        sh:message "axis must reference a known tessera:AttributeAxis (sensitivityAxis, dataSubjectAxis, regulatoryRegimeAxis, businessDomainAxis, or an adopter-namespaced extension)."@en ;
+    ] ;
+
+    sh:property [
+        sh:path tessera:axisValue ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "axisValue is required."@en ;
+    ] .
+
+
+#
+# ============================================================================
+# Per-axis value-type constraints
+# ============================================================================
+# The hierarchical sensitivity axis expects values that are Classification
+# subclasses. Flat axes expect named individuals of the corresponding kind.
+# These are property shapes targeting the per-axis predicates on Resource.
+#
+
+tessera:SensitivityAxisShape a sh:NodeShape ;
+    sh:targetSubjectsOf tessera:sensitivity ;
+    rdfs:label "Sensitivity axis value shape"@en ;
+    sh:property [
+        sh:path tessera:sensitivity ;
+        sh:nodeKind sh:IRI ;
+        sh:message """sensitivity axis values must be IRIs (typically tessera:Classification subclasses for well-known values like PII, PHI, Financial, Confidential, or adopter-namespaced subclasses for organization-specific values). Hierarchical axis; subsumption applies when the value is a well-known Classification."""@en ;
+    ] .
+
+# Flat-axis value shapes (dataSubject, regulatoryRegime, businessDomain).
+# Closed enumerations would be too restrictive (adopters extend); these
+# shapes check that values are NamedIndividuals declared with the
+# appropriate label-suffix discipline.
+
+tessera:DataSubjectAxisShape a sh:NodeShape ;
+    sh:targetSubjectsOf tessera:dataSubject ;
+    sh:property [
+        sh:path tessera:dataSubject ;
+        sh:nodeKind sh:IRI ;
+        sh:message "dataSubject values must be IRIs (typically NamedIndividuals: EUResident, USResident, Employee, Customer, Minor, or adopter extensions)."@en ;
+    ] .
+
+tessera:RegulatoryRegimeAxisShape a sh:NodeShape ;
+    sh:targetSubjectsOf tessera:regulatoryRegime ;
+    sh:property [
+        sh:path tessera:regulatoryRegime ;
+        sh:nodeKind sh:IRI ;
+        sh:message "regulatoryRegime values must be IRIs (typically: GDPR, HIPAA, PCI_DSS, SOX, CCPA, or adopter extensions)."@en ;
+    ] .
+
+tessera:BusinessDomainAxisShape a sh:NodeShape ;
+    sh:targetSubjectsOf tessera:businessDomain ;
+    sh:property [
+        sh:path tessera:businessDomain ;
+        sh:nodeKind sh:IRI ;
+        sh:message "businessDomain values must be IRIs (typically: CRM, Finance, HR, Engineering, MarketingDomain, or adopter extensions)."@en ;
+    ] .
+
+
+#
+# ============================================================================
+# TransformationInstance shape (ADR-016)
+# ============================================================================
+# Per-type parameter constraints: Redact requires replacement; Mask/Hash
+# forbid replacement; Hash's algorithm (if present) must be a known value.
+#
+
+tessera:TransformationInstanceShape a sh:NodeShape ;
+    sh:targetClass tessera:TransformationInstance ;
+    rdfs:label "TransformationInstance shape"@en ;
+
+    sh:property [
+        sh:path rdf:type ;
+        sh:minCount 1 ;
+        sh:in (
+            tessera:Mask tessera:Hash tessera:Tokenize
+            tessera:Redact tessera:Bucketize
+            tessera:TransformationInstance
+        ) ;
+        sh:message "TransformationInstance type must be Mask, Hash, Tokenize, Redact, or Bucketize."@en ;
+    ] ;
+
+    # Per-transformation parameter requirements (Redact requires replacement;
+    # Mask/Hash forbid replacement) are enforced at the JSON Schema layer per ADR-016
+    # / ADR-022. SHACL retains the value-type and range constraints below, which are
+    # semantically more than structural.
+
+    sh:property [
+        sh:path tessera:preserveFirst ;
+        sh:datatype xsd:nonNegativeInteger ;
+        sh:maxCount 1 ;
+        sh:message "preserveFirst must be a non-negative integer."@en ;
+    ] ;
+    sh:property [
+        sh:path tessera:preserveLast ;
+        sh:datatype xsd:nonNegativeInteger ;
+        sh:maxCount 1 ;
+        sh:message "preserveLast must be a non-negative integer."@en ;
+    ] ;
+    sh:property [
+        sh:path tessera:maskChar ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:maxLength 1 ;
+        sh:message "maskChar must be a single-character string."@en ;
+    ] ;
+
+    # Hash algorithm allowed values (per ADR-016).
+    sh:property [
+        sh:path tessera:algorithm ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:in ("sha256" "sha512" "sha1") ;
+        sh:message "Hash algorithm must be one of sha256, sha512, sha1 (ADR-016)."@en ;
+    ] .
+
+
+#
+# ============================================================================
+# Condition shape
+# ============================================================================
+# Conditions must reference a known operator from the v0 condition algebra.
+# Per-operator operand validation is deferred (the operand structure
+# varies; ADR-007 tracks the algebra-extensibility question).
+#
+
+tessera:ConditionShape a sh:NodeShape ;
+    rdfs:label "Condition shape"@en ;
+    rdfs:comment "Invoked via sh:node from PolicyRuleShape on the tessera:condition path."@en ;
+
+    sh:property [
+        sh:path tessera:operator ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in (
+            tessera:and tessera:or tessera:not
+            tessera:eq tessera:lt tessera:gt tessera:in
+            tessera:purposeIn tessera:locatedIn tessera:timeWindow
+            tessera:consentGranted tessera:existsInDataset
+        ) ;
+        sh:message "Condition operator must be a known operator from the v0 condition algebra."@en ;
+    ] .
+
+
+#
+# ============================================================================
+# Obligation shape
+# ============================================================================
+
+tessera:ObligationShape a sh:NodeShape ;
+    sh:targetClass tessera:Obligation ;
+    rdfs:label "Obligation shape"@en ;
+
+    sh:property [
+        sh:path rdf:type ;
+        sh:minCount 1 ;
+        sh:in (
+            tessera:AuditLog tessera:Notify tessera:Watermark
+            tessera:Obligation
+        ) ;
+        sh:message "Obligation type must be AuditLog, Notify, or Watermark."@en ;
+    ] .
+
+
+#
+# ============================================================================
+# AttributeAxis structural-type discipline
+# ============================================================================
+# Each AttributeAxis must declare an axisType. The framework distinguishes
+# hierarchical and flat axes; SHACL enforces that the declaration is
+# present.
+#
+
+tessera:AttributeAxisShape a sh:NodeShape ;
+    sh:targetClass tessera:AttributeAxis ;
+    rdfs:label "AttributeAxis shape"@en ;
+
+    sh:property [
+        sh:path tessera:axisType ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in ( tessera:hierarchical tessera:flat ) ;
+        sh:message "Each AttributeAxis must declare an axisType of hierarchical or flat (ADR-018)."@en ;
+    ] .
+
+
+#
+# ============================================================================
+# PrincipalSetFromTable / ResourceSetFromTable shape (ADR-003)
+# ============================================================================
+
+tessera:PrincipalSetFromTableShape a sh:NodeShape ;
+    sh:targetClass tessera:PrincipalSetFromTable ;
+    rdfs:label "PrincipalSetFromTable shape"@en ;
+
+    sh:property [
+        sh:path tessera:tableRef ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "PrincipalSetFromTable requires a table reference."@en ;
+    ] .
+
+tessera:ResourceSetFromTableShape a sh:NodeShape ;
+    sh:targetClass tessera:ResourceSetFromTable ;
+    rdfs:label "ResourceSetFromTable shape"@en ;
+
+    sh:property [
+        sh:path tessera:tableRef ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "ResourceSetFromTable requires a table reference."@en ;
+    ] .
+
+
+#
+# ============================================================================
+# End of v0 SHACL shapes
+# ============================================================================
+# What this file does NOT (yet) validate, deliberately:
+#
+#   - Cross-rule semantic invariants on Policy (e.g., "the rule keyed off
+#     baselineGroup must be the last rule in `rules`"). Expressing
+#     ordered-list constraints in SHACL is awkward; the linter handles
+#     this at the structural-validation pass instead.
+#
+#   - Adapter capability-profile compatibility ("the policy's
+#     capabilityRequirements must all be supported by the target adapter").
+#     This is a per-emission check, not a per-document check.
+#
+#   - Tag-taxonomy mapping integrity ("every axis-value referenced in the
+#     policy has a mapping for the target adapter"). Per-environment
+#     concern; lives in the adapter's emission diagnostic, not in SHACL.
+#
+#   - Condition algebra operand shape (per-operator operand validation).
+#     ADR-007 tracks the extensibility question; pinning down operand
+#     shapes per operator is deferred.
+#
+# These omissions are tracked; revisions in subsequent shapes versions
+# follow the immutability rule: v0 is fixed once published; v1 is a new
+# file at a parallel URL.

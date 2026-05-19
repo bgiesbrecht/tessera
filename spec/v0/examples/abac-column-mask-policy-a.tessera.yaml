@@ -1,0 +1,76 @@
+# ABAC column-mask Policy A — specific PIIClerk redact.
+#
+# Worked-example artifact for the ABAC Stage 3 exercise (scoping doc §9).
+# Companion files:
+#   abac-column-mask-policy-a.jsonld     — canonical (JSON-LD) form
+#   abac-column-mask-policy-b.tessera.yaml — companion overlapping policy
+#   abac-column-mask.databricks.sql      — both policies' DDL emission
+#   abac-column-mask.diagnostic.md       — per-element enforcement report
+#   abac-column-mask.comparison.md       — Phase 3 comparison stub
+#
+# Inputs: docs/exercises/abac-column-mask-inputs.md
+#
+# This exercise preserves the blind-derivation property of the worked-example
+# framework: the existing Databricks implementation Brice set up has NOT been
+# shared with Claude Code during Phase 2. Phase 3 comparison happens after
+# Phase 2 lands.
+#
+# Notes on the vocabulary used here:
+#   - This artifact uses the post-ABAC vocabulary as if ADRs 018–021's spec
+#     changes were in place. Those changes haven't landed in the v0 spec
+#     files yet (Stage 4). The artifact therefore will NOT validate against
+#     the current schema.json; that's expected. The artifact's role is to
+#     prefigure what the spec needs to support.
+#   - tessera:PIIClerk is used here as a sensitivity value to keep the
+#     example concrete. In production, an adopter would declare such
+#     specializations under their own namespace per ADR-018; the Tessera
+#     namespace is used here only because no adopter namespace is
+#     established for this exercise.
+
+"@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
+"@type": Policy
+"@id": policy:abac-column-mask-clerk-redact
+version: 1.0.0
+policyKind: ColumnVisibilityConstraint
+description: >
+  ABAC column-mask policy attached at catalog scope. Matches columns whose
+  sensitivity attribute is PIIClerk; redacts to the literal 'CLERK-REDACTED'
+  for principals outside bg_rls_demo_all_priority_ops.
+
+appliesTo:
+  selector: byScope
+  scope: catalog:bg_rls_demo
+  matching:
+    attributes:
+      sensitivity: PIIClerk
+
+action: Read
+
+defaultStrategy: negated-complement
+
+# One rule: members of bg_rls_demo_all_priority_ops pass through. Under
+# negated-complement, the default branch (below) handles everyone else.
+rules:
+  - principal:
+      selector: byIdentity
+      resource: group:bg_rls_demo_all_priority_ops
+    effect: allow
+
+defaultBranch:
+  effect: transform
+  transformation:
+    type: Redact
+    replacement: 'CLERK-REDACTED'
+
+# Capability requirements declared so the adapter capability profile can
+# validate support for ABAC-specific features.
+capabilityRequirements:
+  - scoped-policy-attachment
+  - attribute-axis-matching
+  - tag-taxonomy-mapping
+
+provenance:
+  notes: |
+    Hand-authored for the ABAC Stage 3 exercise. Brice deliberately
+    preserved the blind-derivation property; Phase 2 is independent of
+    the existing implementation. Phase 3 will compare.

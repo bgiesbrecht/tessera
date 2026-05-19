@@ -1,0 +1,28 @@
+# Tessera policy — table-grants Scenario A
+# Single-table affirmative read grant.
+#
+# Authoring decision: lowered as a RowVisibilityConstraint with effect: allow.
+# This squeezes an affirmative grant into a restriction-shaped policyKind; the
+# diagnostic (§3) records the awkwardness and sketches what an
+# AccessGrantConstraint would look like.
+
+policy:
+  id: table-grants-scenario-a
+  version: 1.0.0
+  kind: RowVisibilityConstraint
+  description: |
+    Marketing analytics team can Read bg_rls_demo.tpch.orders.
+    Purely affirmative; principals not in the group fall through to whatever
+    other policies or platform defaults apply (defaultStrategy omitted).
+
+  appliesTo:
+    selector: byIdentity
+    resource: table:bg_rls_demo.tpch.orders
+
+  action: Read
+
+  rules:
+    - principal:
+        selector: byIdentity
+        resource: group:bg_rls_demo_marketing_analytics
+      effect: allow

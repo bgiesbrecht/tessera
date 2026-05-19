@@ -1,0 +1,29 @@
+{
+  "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
+  "@type": "Policy",
+  "@id": "policy:table-grants-scenario-b",
+  "version": "1.0.0",
+  "policyKind": "RowVisibilityConstraint",
+  "description": "Data engineering team can Read every table in bg_rls_demo.tpch_staging, including future tables added to the schema. byScope at schema level produces the downward-propagation semantics per ADR-019.",
+
+  "appliesTo": {
+    "selector": "byScope",
+    "scope": "schema:bg_rls_demo.tpch_staging"
+  },
+
+  "action": "Read",
+
+  "rules": [
+    {
+      "principal": {
+        "selector": "byIdentity",
+        "resource": "group:bg_rls_demo_data_engineering"
+      },
+      "effect": "allow"
+    }
+  ],
+
+  "provenance": {
+    "notes": "Scenario B of the table-grants exercise. First exercise to use byScope without a matching block (the 'match all in scope' case). Phase 3 propagation test verifies that tables created after policy application inherit the grant."
+  }
+}

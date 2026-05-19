@@ -1,0 +1,39 @@
+{
+  "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
+  "@type": "Policy",
+  "@id": "policy:column-mask-orders-clerk",
+  "version": "1.0.0",
+  "policyKind": "ColumnVisibilityConstraint",
+  "description": "Column-visibility policy on bg_rls_demo.tpch.orders.o_clerk. Members of the `orders_full_access` group see the unredacted clerk value; everyone else sees the literal `'CLERK-REDACTED'`.",
+
+  "appliesTo": {
+    "selector": "byIdentity",
+    "resource": "column:bg_rls_demo.tpch.orders.o_clerk"
+  },
+
+  "action": "Read",
+
+  "defaultStrategy": "negated-complement",
+
+  "rules": [
+    {
+      "principal": {
+        "selector": "byIdentity",
+        "resource": "group:orders_full_access"
+      },
+      "effect": "allow"
+    }
+  ],
+
+  "defaultBranch": {
+    "effect": "transform",
+    "transformation": {
+      "type": "Redact",
+      "replacement": "CLERK-REDACTED"
+    }
+  },
+
+  "provenance": {
+    "notes": "Hand-authored for the column-mask worked example. Combined-input single-pass exercise: the existing implementation SQL was shared up front (see the comparison document). The Phase 2 derivation followed the intent described in the inputs document."
+  }
+}

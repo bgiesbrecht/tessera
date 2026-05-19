@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Tessera-specific
+# Local Snowflake credential file — never committed
+snowflake_auth.txt
+# Misc local downloads / archives that occasionally land in the repo root
+files*.zip
+# macOS Finder metadata
+.DS_Store

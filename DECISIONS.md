@@ -589,6 +589,593 @@ ADR-014's defensive note applies here too: this addition is acceptable because n
 
 ---
 
+## ADR-017 — Immutability bar suspended until external dependency
+
+**Date:** 2026-05-18
+**Status:** Accepted; supersedes the immutability claim in ADR-014's closing note
+
+### Context
+
+ADR-014's closing note stated: *"The expectation now is that no further v0 corrections will be made — the v0 immutability bar comes down with this commit chain. Subsequent IR changes require a v1 cut at `spec/v1/`."*
+
+That statement was anticipatory. It assumed publication of v0 would coincide with external adoption of v0 — that the commit chain landing ADR-014 was the moment after which v0 was depended upon by someone outside the project.
+
+In fact, no external consumer has built against v0 at any point. The published URLs at `https://bgiesbrecht.github.io/tessera/spec/v0/...` resolve, but resolving and being depended upon are different things. ADR-016 (transformation parameterization) landed after ADR-014's stated bar, and a substantial structural addition (ABAC support via attribute axes, scoped policy attachment, and composable selectors) is now under design and intended for v0.
+
+Continuing to amend v0 while claiming the immutability bar came down with ADR-014 produces a contradiction in the decision log. The honest framing is that the immutability bar was tied to a calendar event that did not occur, and the bar's actual condition — external dependency — has not been met.
+
+### Decision
+
+The v0 immutability bar is suspended until external dependency exists. "External dependency" means at least one of:
+
+- A customer policy file references the v0 context URL in production.
+- An adapter compiled against the v0 schema is deployed outside the project repository.
+- Third-party tooling depends on the v0 shape and is in use.
+- An external contributor commits to or builds against the spec.
+
+Until external dependency exists, v0 remains malleable. Spec changes that improve the shape of the IR are admissible. The discipline of recording each change as an ADR continues; the discipline of preserving backward compatibility within v0 lifecycle continues; but the "no further v0 corrections" claim of ADR-014 is rescinded.
+
+ADR-014's other content (the policy container backport itself, the design rationale, the consequences) remains in force. Only the closing note's immutability claim is superseded.
+
+### Quality thresholds for "core baseline"
+
+The project does not know in advance when external dependency will occur, but it can name what should be true *before* it occurs, so that what gets locked in is the better-shaped spec. Candidate thresholds:
+
+1. **A working adapter end-to-end.** The first real adapter (Unity Catalog) builds, emits policies, extracts policies, round-trips correctly.
+2. **A worked exercise that surfaces no spec additions.** Currently every exercise has driven an ADR; the threshold is when an exercise runs cleanly against the existing spec.
+3. **An external collaborator engages.** Someone other than the project's current participants builds against or contributes to the spec. *This is the definitional threshold; once met, immutability is no longer optional.*
+4. **A second platform's adapter is built.** Snowflake adapter alongside Databricks adapter. Cross-platform claims become evaluable, not just asserted.
+
+Thresholds 1, 2, and 4 are quality thresholds the project aims to cross before threshold 3 occurs. Threshold 3 is the gating event for immutability regardless of the others.
+
+### Consequences
+
+- `CLAUDE.md` is updated to remove the stale "immutability bar comes down with ADR-014" claim and replace it with the suspended-immutability framing.
+- The ABAC scoping work (in flight at time of this ADR) lands as v0 additions, not v1.
+- Future v0 additions remain disciplined: each is captured as an ADR; the test of admissibility is "does this improve the shape of v0 before it locks" rather than "is the change small enough."
+- A reader of the ADR sequence should understand: ADR-014's immutability claim was correct in spirit but premature in timing; ADR-017 corrects the timing.
+
+### Note on this kind of correction
+
+ADR-014's overreach was anticipating immutability before external dependency made it real. The lesson recorded here for future ADRs: claims about when a project's malleability ends should be conditioned on observable events, not on calendar moments. ADR-014's stated bar was a date; this ADR's stated bar is a condition. The condition is the better discipline.
+
+---
+
+## ADR-018 — AttributeAxis and the Classification refactor
+
+**Date:** 2026-05-18
+**Status:** Accepted, v0 addition per ADR-017
+
+### Context
+
+The existing `Classification` hierarchy in v0 handles the single-axis hierarchical case well — `PII ⊂ PersonalData` carries useful subsumption inference. What it does not handle is the orthogonal-dimensions case: a column may simultaneously be `sensitivity: PII`, `dataSubject: EUResident`, `regulatoryRegime: GDPR`, and `businessDomain: CRM` — four independent axes, each with its own value vocabulary.
+
+The ABAC scoping document (`docs/v1-candidates/abac-and-attribute-axes.md` §2) establishes that real-world classification across Databricks ABAC, Snowflake tagging, and W3C DPV consistently treats these as separate dimensions, not as a single hierarchy. Forcing them into one hierarchy produces combinatorial class names (`MarketingTeamGDPREmailPII`) that age badly.
+
+### Decision
+
+A new top-level concept, **`tessera:AttributeAxis`**, names an independent semantic dimension. Resources carry zero or more attribute assignments; each assignment names an axis and a value. The same resource may carry multiple axis values; values on different axes are orthogonal.
+
+Each axis declares its own **structural type**:
+
+- **Hierarchical axis.** Values form a subsumption hierarchy via `rdfs:subClassOf`. Inference applies: `sensitivity: PIIEmail` implies `sensitivity: PII`. Schema and SHACL expect class references.
+- **Flat axis.** Values are independent enumeration members. No subsumption. Schema expects scalar references.
+
+The type is per-axis because the underlying domain dictates it. Declaring it up front lets validators reject malformed references early.
+
+### v0 axes
+
+Four well-known axes ship with v0:
+
+| Axis | Type | Example values |
+|---|---|---|
+| `sensitivity` | Hierarchical | `PII ⊂ PersonalData ⊂ RegulatedData`; `PIIEmail ⊂ PII`; `Public`, `Confidential` as siblings. Existing `Classification` hierarchy lives here. Aligned with DPV `PersonalDataCategory`. |
+| `dataSubject` | Flat | `EUResident`, `USResident`, `Employee`, `Customer`, `Minor`. Aligned with DPV `DataSubject`. |
+| `regulatoryRegime` | Flat | `GDPR`, `HIPAA`, `PCI-DSS`, `SOX`, `CCPA`. |
+| `businessDomain` | Flat (adopter may extend hierarchically under their own namespace) | `CRM`, `Finance`, `HR`, `Engineering`, `Marketing`. |
+
+Adopters extend the axis set under their own namespace; each adopter-declared axis declares its own structural type.
+
+### Backward compatibility with existing Classification
+
+The refactor preserves the existing `Classification` subclass hierarchy. The mapping is:
+
+- `tessera:PII` becomes a value of the `sensitivity` axis. Existing references to `Classification: PII` (or the equivalent `byClassification` selector) continue to validate during the v0 lifecycle.
+- The canonical post-refactor form is `attributes.sensitivity: PII`. The schema accepts both shapes; the converter normalizes to the new form on YAML → JSON-LD. Bare-classification references in YAML are accepted with a deprecation note in the SHACL output.
+- The `byClassification` selector continues to work for bare-class references; new policies using attribute matching use the `matching:` shape (ADR-020).
+
+### Consequences
+
+- `spec/v0/ontology.ttl` gains `tessera:AttributeAxis`, an `tessera:axisType` property (with values `hierarchical`/`flat`), `tessera:axisValue` references, the four well-known axes as `AttributeAxis` individuals, and an `tessera:attributes` property on `tessera:Resource` of type `AttributeAssignment` collection.
+- `spec/v0/context.jsonld` gains short names for the new terms and a context mapping for the implicit-AND shortcut (ADR-020).
+- `spec/v0/schema.json` adds the attributes-on-resource shape and per-axis-type validation (hierarchical axes expect class references; flat axes expect strings or named individuals).
+- `docs/technical-design-v0.2.md` §3 (the vocabulary) gains attribute axes as a first-class concept; §4 (the IR) gains the resource-side `attributes:` field.
+- Adapter capability profiles declare which axes they support natively, partially, or not. The Databricks adapter (when built) maps axes to governed-tag taxonomies via the configuration pattern in ADR-021.
+
+### Note on what this is not
+
+ADR-018 introduces a vocabulary refactor, not a runtime change. The framework still does not enforce policies at runtime (ADR-001). Attribute axes are how policies *describe* the data they protect; the platform's enforcement mechanism (governed tags, object tags, classification tables) is the adapter's concern.
+
+This ADR does not introduce coordination labels (`team`, `cost-center`, `environment`) into the axis vocabulary. Those are operational metadata, not data attributes (CLAUDE.md anti-patterns; `docs/v1-candidates/abac-and-attribute-axes.md` §1).
+
+---
+
+## ADR-019 — Scoped policy attachment via `byScope`
+
+**Date:** 2026-05-18
+**Status:** Accepted, v0 addition per ADR-017
+
+### Context
+
+Tessera v0 attaches policies to specific resources via `appliesTo` with a `byIdentity` selector — the policy says "this applies to `bg_rls_demo.tpch.orders`." This is fine for table-specific policies but does not express ABAC's defining behavior: a policy attaches at a *level* in the resource hierarchy (catalog, schema, table) and automatically applies to anything within that scope matching its conditions.
+
+A single ABAC policy can protect every PII column in a catalog without enumerating tables. The IR needs a primitive for this.
+
+See scoping document §3 for the full design rationale.
+
+### Decision
+
+A new selector kind, **`tessera:byScope`**, attaches a policy at a level in the resource hierarchy. A `byScope` selector carries a `scope` (the resource at which the policy attaches), an optional `except` list (resources to exclude), and an optional `matching` block (attribute conditions narrowing which resources within the scope the policy applies to; see ADR-020).
+
+```yaml
+appliesTo:
+  selector: byScope
+  scope: catalog:bg_data
+  except:
+    - schema:bg_data.sandbox
+    - table:bg_data.metrics.staging_only
+  matching:
+    attributes:
+      sensitivity: PII
+```
+
+### Scope kinds are inferred from the resource IRI prefix
+
+The Tessera context defines URI prefixes for catalogs, schemas, tables, and columns. The `byScope` selector infers the scope kind from the resource's prefix:
+
+- `catalog:` → applies to all schemas, tables, and columns within the catalog.
+- `schema:` → applies to all tables and columns within the schema.
+- `table:` → applies to all columns within the table.
+- `column:` → applies only to the specific column (equivalent to today's `byIdentity` selector targeting a column).
+
+Inference avoids redundancy — the `kind` is recoverable from the IRI and does not need to live as a separate policy field.
+
+### Inheritance is implicit and downward
+
+A policy at catalog scope applies to schemas, tables, and columns within that catalog. The adapter handles platform-specific inheritance details (Databricks does not propagate tags from table to column by default; Snowflake does for certain tag types — these are mechanism differences, not policy differences).
+
+### Scope exclusion is distinct from principal exclusion
+
+The `except` list narrows the *resource set*. It is structurally different from principal exclusion (narrowing the principal set), which is handled by `byComposition` over principal selectors and by the policy container's ordered first-match (ADR-015). The two kinds of exclusion serve different purposes and are kept separate in the IR.
+
+The `except` facility is included in v0 because both Databricks ABAC and Snowflake tag policies support scope-level exclusion, and a v0 without it would force a follow-on amendment shortly after publication.
+
+### Deferred: cross-policy combining algorithm
+
+ABAC's multi-policy aspect — multiple policies attached at overlapping scopes — raises a question ADR-015 explicitly did not answer: what happens when two policies both apply to the same resource? Snowflake has explicit ordering rules; Databricks ABAC evaluates dynamically; the two differ.
+
+**ADR-019 does not prescribe a cross-policy combining algorithm.** The decision is held until the worked exercise (scoping doc §9 Stage 3) produces evidence. The three resolution paths under consideration are documented in scoping doc §8 Q3:
+
+- **α.** Tessera ignores cross-policy combination; adapters handle it per platform conventions.
+- **β.** Tessera adopts a single algorithm (deny-overrides, permit-overrides, or declared priority).
+- **γ.** Tessera declares it adapter-configurable per capability profile.
+
+A follow-on ADR (number TBD) records the choice once the exercise discriminates among them.
+
+### Consequences
+
+- `spec/v0/ontology.ttl` gains `tessera:byScope` as a `Selector` individual, `tessera:scope` and `tessera:exceptFromScope` properties.
+- `spec/v0/context.jsonld` gains short names for `byScope`, `scope`, `except`.
+- `spec/v0/schema.json` adds the `byScope` selector variant with `scope` required, `except` and `matching` optional.
+- `docs/technical-design-v0.2.md` §3.3 (selectors) and §4.2 (top-level shapes) incorporate `byScope` and the inheritance semantics.
+- The Databricks adapter (when built) maps `byScope` to `CREATE POLICY ON {CATALOG|SCHEMA|TABLE}`. Scope exclusion maps to per-adapter mechanisms (Databricks: `EXCEPT` patterns on the scope; Snowflake: tag-exemption patterns).
+- The cross-policy combining decision remains open and is targeted by Stage 3 of the ABAC work.
+
+---
+
+## ADR-020 — Composable attribute matching reuses `byComposition`
+
+**Date:** 2026-05-18
+**Status:** Accepted, v0 addition per ADR-017
+
+### Context
+
+ABAC policies need to match resources whose attributes satisfy boolean combinations of axis-value conditions: "sensitivity PII AND dataSubject EUResident," "sensitivity PII OR regulatoryRegime GDPR," "NOT sensitivity Public," etc.
+
+The existing `byComposition` selector already composes principal selectors via `match: and|or|not` over a `criteria` list. The composable-attribute-matching requirement has the same algebraic shape. Introducing a parallel composition vocabulary (`any:`, `not:`, implicit conjunction) would produce three shapes for one concept and propagate inconsistency into schema, SHACL, and adapter code.
+
+See scoping document §4 for the full discussion and the rejected parallel-shape alternative.
+
+### Decision
+
+The `matching:` block on a `byScope` selector (ADR-019) accepts the same composition algebra as the existing `byComposition` selector, with attribute leaves rather than principal-selector leaves.
+
+**Canonical form:**
+
+```yaml
+matching:
+  match: and
+  criteria:
+    - attribute:
+        axis: sensitivity
+        value: PII
+    - attribute:
+        axis: dataSubject
+        value: EUResident
+```
+
+Each leaf is an `attribute` reference naming an axis and a value. `match: and` requires all to hold; `match: or` requires any; `match: not` negates a single criterion (which may itself be a composed criterion via nesting).
+
+**Nesting:**
+
+```yaml
+matching:
+  match: or
+  criteria:
+    - attribute: { axis: sensitivity, value: PII }
+    - match: and
+      criteria:
+        - attribute: { axis: regulatoryRegime, value: GDPR }
+        - attribute: { axis: dataSubject, value: EUResident }
+```
+
+### Implicit-AND shortcut
+
+The most common case — conjunction over a small set of attributes — would read significantly worse in the canonical form than in shorthand. The schema accepts an implicit-conjunction shortcut:
+
+```yaml
+matching:
+  attributes:
+    sensitivity: PII
+    dataSubject: EUResident
+```
+
+This is **syntactic sugar that desugars to the canonical form with `match: and`**. The converter, the JSON Schema, and adapters all treat the two as equivalent. The canonical form is what reasoners and validators see; the shortcut exists for authoring ergonomics only.
+
+The desugaring is unambiguous because the keys of `attributes:` are axis names and the values are axis values. There is no overlap between the shortcut shape and the canonical shape; both are accepted, the canonical is normative.
+
+### Consequences
+
+- `spec/v0/ontology.ttl` gains `tessera:AttributeMatcher` as the leaf concept under matching, plus `tessera:axis` and `tessera:axisValue` properties.
+- `spec/v0/context.jsonld` gains short names for `matching`, `attribute`, `attributes`. The `attributes:` mapping is described as the implicit-AND shortcut.
+- `spec/v0/schema.json` accepts both shapes for the `matching` field (`oneOf` over the canonical and shortcut forms); semantic equivalence is enforced by the converter, not the schema.
+- Adapters compile the composition algebra directly to platform booleans: `match: and` → SQL `AND`, `match: or` → SQL `OR`, `match: not` → SQL `NOT`. The tag-taxonomy mapping (ADR-021) handles the leaf translation from `attribute.axis: sensitivity, value: PII` to platform-specific `has_tag_value` calls (Databricks) or `SYSTEM$GET_TAG_*` calls (Snowflake).
+
+### Note on extensibility
+
+The composition algebra is closed in v0 (and/or/not). The condition algebra (ADR-007's open extensibility question) is a separate algebra and is not affected by this ADR. Adopters who need more expressive matching beyond `and`/`or`/`not` describe their need as a v1 candidate; v0 stays closed.
+
+---
+
+## ADR-021 — Adapter configuration mapping pattern
+
+**Date:** 2026-05-18
+**Status:** Accepted, v0 addition per ADR-017
+
+### Context
+
+Adapters need to translate between platform-specific identifiers and Tessera's semantic vocabulary. The translation is per-environment because adopters use different tag taxonomies, identity providers, and naming conventions. The mapping is bidirectional: emission lowers Tessera identifiers to platform-specific ones; extraction lifts platform-specific identifiers back.
+
+Tessera has had one instance of this pattern from the beginning — **identity binding** (ADR-002, where principals in the IR are mapped to platform-native principals per-environment). The ABAC work introduces a second: **tag-taxonomy mapping** (Databricks governed-tag keys/values ↔ Tessera attribute axes/values; ADR-018). More instances are likely as the framework grows — classification-name mapping, group-hierarchy mapping, possibly more.
+
+Rather than treating each instance as a one-off, this ADR establishes the **adapter configuration mapping pattern** as the general shape, with tag-taxonomy and identity-binding as the first two named instances.
+
+See scoping document §5 for the full design.
+
+### Decision
+
+An adapter configuration mapping declares pairings between platform-specific identifiers and Tessera semantic identifiers, grouped by *kind*. Each kind determines the shape of the platform-specific side; the Tessera side always references a Tessera identifier in the IR's namespace.
+
+Configuration lives in adapter-side files (`adapters/<name>/configuration.yaml` or equivalent), not in the policy IR. A policy that says `sensitivity: PII` means the same thing on every platform; the policy author does not need to know whether the Databricks adapter expects this to emit as `has_tag('pii')`, `has_tag_value('classification', 'pii')`, or `has_tag('data_class')` with allowed value `PII`.
+
+### Two well-known instance kinds in v0
+
+**`identityBindings`** — per-adapter mapping between Tessera principal IRIs and platform-native principals. Pre-existing pattern (ADR-002), now formalized.
+
+```yaml
+identityBindings:
+  - tesseraPrincipal: group:data-stewards
+    platformGroup: bg_data_stewards
+  - tesseraPrincipal: user:brice@databricks.com
+    platformUser: brice.giesbrecht@databricks.com
+```
+
+**`tagTaxonomy`** — per-adapter mapping between Tessera attribute axes/values and platform-native tag keys/values. New with ABAC.
+
+```yaml
+tagTaxonomy:
+  - axis: sensitivity
+    axisValue: PII
+    tagKey: classification
+    tagValue: pii
+  - axis: dataSubject
+    axisValue: EUResident
+    tagKey: region
+    tagValue: EMEA
+```
+
+The structural shape is the same across kinds; platform-specific fields vary per adapter and per kind.
+
+### Default behavior on unmapped identifiers
+
+During extraction (or emission), the adapter may encounter a platform-specific identifier with no Tessera counterpart in the configuration, or a Tessera identifier with no platform counterpart. Three configurable behaviors, with **strict as the default**:
+
+- **Strict (default).** Unmapped identifier is an extraction/emission error. The adapter refuses to lift or lower without an explicit mapping. The IR stays clean of unknown identifiers. Adopters configuring strict accept that they must declare their mappings explicitly.
+- **Permissive.** Unmapped identifier is lifted onto a synthetic axis or principal namespace (e.g., `unknown:tagKey` for a tag key not mapped) with extraction confidence `low`. The IR carries the information; the policy semantics are not validated. Useful during migration.
+- **Pass-through.** Unmapped identifier is lifted verbatim with confidence `low`. Preserves round-trip fidelity at the cost of IR cleanliness. Useful for diagnostic scenarios.
+
+The strict default reflects the project's broader "honesty over completeness" disposition. Opting into looser semantics is explicit configuration.
+
+### Consequences
+
+- Adapter capability profiles declare which configuration-mapping kinds they support and which defaults they use.
+- The Databricks adapter (when built) ships with `identityBindings` and `tagTaxonomy` support out of the box, with strict default.
+- The Snowflake adapter (whenever built) follows the same pattern with Snowflake-specific platform fields (tag schema, tag name, role naming).
+- The adapter contract (`docs/technical-design-v0.2.md` §5) gains a sub-section describing the configuration-mapping pattern and the strict-default convention.
+- Future configuration-mapping kinds (classification-name mapping, group-hierarchy mapping) follow the same shape without requiring a new ADR per kind. The pattern is the general decision; individual kinds are local concerns.
+
+### Note on what this is not
+
+ADR-021 is *adapter contract*, not IR vocabulary. The IR has no `IdentityBinding` or `TagMapping` class. The mapping lives in adapter configuration, parsed by the adapter, not represented in the policy file. A reader of a Tessera policy never sees configuration mappings; a reader of an adapter deployment sees both the policy and the configuration but they remain structurally distinct.
+
+This separation is structural, not cosmetic. Conflating them would violate the §1 meaning-vs-mechanism principle from the ABAC scoping document. The IR carries meaning; the adapter configuration carries the per-environment mechanism. Both have their place; neither belongs in the other.
+
+---
+
+## ADR-022 — Transformation constraint is effect-driven, not policy-kind-driven
+
+**Date:** 2026-05-18
+**Status:** Accepted, v0 correction per ADR-017
+
+### Context
+
+ADR-016 introduced structured transformations: a `TransformationInstance` with `type` plus per-type parameters, referenced from policy rules. The decision text correctly framed `transformation` as the parameter shape carried *when a rule applies a transformation*. The technical-design §4.2.2 text and the JSON Schema implementation, however, took a tighter position: they required `transformation` on every rule in a `ColumnVisibilityConstraint` policy.
+
+The column-mask worked example (`spec/v0/examples/column-mask-orders-clerk-*`) surfaced the gap. The natural Tessera shape for two-branch column masking is one rule with `effect: allow` (pass-through for a privileged group) plus a `defaultBranch` with `effect: transform` and a `Redact` transformation (for everyone else). The pass-through rule has no transformation to declare because no transformation is applied — but the schema rejects it.
+
+The constraint as written is over-tight. The right rule is **effect-driven**, not policy-kind-driven: a rule (or `defaultBranch`) carries `transformation` iff its `effect` is `transform`.
+
+ADR-022 records the correction. This is admissible per ADR-017 (v0 immutability bar suspended until external dependency); the underlying ADR-016 decision is unchanged.
+
+### Decision
+
+The `transformation` field on a rule (and on a `defaultBranch`) is required if and only if `effect: transform`. For any other effect value (`allow`, `deny`, `keep-matching-rows`, `drop-matching-rows`, `tessera:allow`, etc.), `transformation` is forbidden.
+
+This constraint applies uniformly across:
+
+- Rules inside a `Policy` container (any `policyKind`).
+- The `defaultBranch` of a `Policy` (any `policyKind`).
+- Freestanding `PolicyConstraint` documents (backward-compat single-constraint shape, any `@type`).
+
+The previous policy-kind-driven conditional (every `ColumnVisibilityConstraint` rule must carry `transformation`) is rescinded.
+
+### Why effect-driven
+
+- **Matches ADR-016's actual intent.** Transformation is the parameter shape for applying a transformation; rules that don't apply one shouldn't carry it.
+- **Supports the natural shape for binary column masking.** "Privileged group sees the value, everyone else sees a masked value" is one rule + one default branch. The rule's effect is `allow`; the default branch's effect is `transform`. The schema must accept both.
+- **Composes correctly across policy kinds.** A `ColumnVisibilityConstraint` policy can mix transform rules and allow rules; an `AccessConstraint` can carry `transformation` if a rule's effect is `transform` (though this is rare). The constraint is local to the rule, not to the enclosing policy.
+- **Does not relax the structural constraints ADR-016 introduced.** A `transformation` that *is* present still must have a valid `type` and the appropriate per-type parameters (Redact requires `replacement`; Mask/Hash forbid it; etc.). ADR-016's per-transformation parameter requirements are unchanged.
+
+### Consequences
+
+- **`spec/v0/schema.json`** — the policy-level `if/then/else` requiring `transformation` for all `ColumnVisibilityConstraint` rules is replaced with a per-rule `allOf` conditional on `effect`. The same conditional applies to the `defaultBranch`. The freestanding `policyConstraint` shape's `@type`-based conditional becomes an `effect`-based one.
+- **`docs/technical-design-v0.2.md` §4.2.2** — the transformation bullet changes from "Required for `ColumnVisibilityConstraint` rules; forbidden otherwise" to "Required when `effect: transform`; forbidden otherwise." §4.2.3 (freestanding `PolicyConstraint`) inherits the same constraint.
+- **The column-mask worked-example artifacts** (`spec/v0/examples/column-mask-orders-clerk-*`) validate cleanly after the schema correction lands.
+- **The ontology (`spec/v0/ontology.ttl`)** does not change. The constraint was never an ontology axiom; it was a schema implementation choice.
+
+### Note on the implementation-vs-decision pattern
+
+The original constraint over-implemented ADR-016. The decision text said "transformations are parameterized via `TransformationInstance`"; the implementation said "every ColumnVis rule must have one." Those are not the same statement, and the implementation should mirror the decision, not impose tighter constraints than the decision justified.
+
+This is a useful pattern to record for future ADR implementations: when translating an ADR's decision into schema or code, double-check that the implementation's constraints match the ADR's declared scope. The column-mask exercise surfaced this gap because it produced the first artifact whose natural shape exceeded the over-tight constraint's bounds. The framework's "exercises drive design" principle catches these on the first valid example; the cost of correction now is small.
+
+---
+
+## ADR-023 — Cross-policy combination resolution: γ-with-refinement
+
+**Date:** 2026-05-19
+**Status:** Accepted, resolves the question deferred in ADR-019
+
+### Context
+
+ADR-019 (`byScope` + scoped attachment) deliberately did **not** prescribe a cross-policy combining algorithm. The decision named three candidate resolutions:
+
+- **α** — Tessera defers to platform conventions; adapters handle combination per-platform.
+- **β** — Tessera adopts a single combining algorithm (deny-overrides, permit-overrides, declared priority) and requires adapters to enforce it.
+- **γ** — Tessera declares it adapter-configurable per capability profile.
+
+The ABAC column-mask worked exercise (`spec/v0/examples/abac-column-mask-*`, Phase 3 observation 2026-05-19) produced the discriminating empirical result: **Databricks ABAC rejects multi-mask evaluation** when two column-mask policies resolve to the same column. The full error:
+
+```
+[COLUMN_MASKS_FEATURE_NOT_SUPPORTED.MULTIPLE_MASKS]
+Column mask policies for `bg_rls_demo`.`tpch`.`orders_abac` are not supported:
+Table has access control policies resulting in multiple column masks ...
+applying to the same column(s) `o_clerk`. Please contact the table owner or
+policy definer to resolve the issue by updating policies such that at most
+one mask appl[ies]
+```
+
+Both policies attached successfully (the rejection is at **query-evaluation time**, not at policy-creation time). The platform's response is neither α nor β: it rejects the configuration outright, naming both conflicting policies and the affected column, and asks the operator to resolve the conflict in the policy definitions.
+
+The companion ABAC row-filter exercise (`spec/v0/examples/abac-row-filter-priority-*`, 2026-05-19) reinforced this with a cross-mechanism finding: Brice's design notes confirm that ABAC row filter + legacy `SET ROW FILTER` on the same table coexist *unless* they resolve to different functions for the same table and user, in which case Databricks again blocks access. Same shape; different boundary.
+
+### Decision
+
+Tessera adopts **γ-with-refinement**: cross-policy combination is adapter-configurable, but the IR does **not** pick a combining algorithm. The refinement is that Tessera *names the platform's constraint* via the adapter capability profile rather than treating "adapter-configurable" as an open-ended invitation to pick an algorithm.
+
+Specifically:
+
+1. **The IR remains expressive.** Authors may declare multiple policies whose effective resource sets overlap. This is legitimate authored intent — for example, a redaction policy and a hashing policy on the same PII columns reflecting two different downstream consumers' needs. The IR does not preemptively reject this configuration.
+
+2. **The adapter capability profile declares platform constraints** as machine-readable vocabulary. Initial v0 vocabulary:
+   - `single-column-mask-per-column` — at most one ColumnVis policy may resolve to any given column on the platform.
+   - `single-row-filter-per-table` — at most one RowVis policy may resolve to any given table on the platform.
+   - `cross-mechanism-conflict-blocked` — ABAC policies and legacy `SET MASK` / `SET ROW FILTER` on the same column/table compose only if they resolve to the same function; otherwise the platform blocks access.
+
+   Databricks declares all three. Other platforms (Snowflake, custom adapters) declare their own constraints; the vocabulary is open per ADR-021's adapter-configuration pattern.
+
+3. **The adapter's emission diagnostic surfaces detected conflicts** at emit time, not at runtime. When the adapter compiles a set of policies and detects two whose effective resource sets overlap (in a way the platform constraint forbids), it emits a structured diagnostic naming both policies, the affected resources, and the constraint. The author resolves the conflict before deployment.
+
+4. **The author resolves conflicts before deployment.** Tessera does not pick a winner in the IR or pick a combining algorithm; the platform never sees an ambiguous configuration because the adapter refuses to emit one. Resolution mechanisms (merging policies, narrowing matchers, scoping one to a subset, splitting across catalog/schema/table scope levels) are author concerns guided by the diagnostic.
+
+### Why γ-with-refinement and not pure α or β
+
+- **Pure α** (defer to platform) would leave Tessera silent about conflicts that the platform will reject. The author would learn about conflicts only at runtime, after deployment. This contradicts the framework's "diagnostics at emit time" principle (technical design §5.3).
+- **Pure β** (pick an algorithm) would commit Tessera to enforcing a combining semantics — say, deny-overrides — that may not match any platform's actual behavior. Customers would write policies expecting one algorithm and the platform would enforce another. This is worse than silence.
+- **γ-with-refinement** names the platform's constraint without inventing one. The IR is honest about what the platform supports; the adapter is honest about what it can emit; the author is honest about what conflicts they're carrying. Each layer does its job.
+
+This framing also generalizes: as Tessera grows additional adapters with different constraints, each adapter declares its own capability vocabulary; the IR remains neutral; the framework's "meaning over mechanism" principle is preserved.
+
+### Consequences
+
+- **Adapter capability profile vocabulary** (per ADR-021) gains the three initial entries above. The Databricks adapter (when built) declares all three; future adapters declare their own.
+- **Adapter emission contract** (technical design §5) now explicitly requires a conflict-detection phase before SQL generation. The Tessera CLI / linter / converter surfaces detected conflicts as structured findings before any DDL is emitted.
+- **The capability-profile vocabulary itself remains open.** ADR-021's pattern (well-known instance kinds + adopter extensibility) applies here too. Future findings — for example, a platform that rejects multiple obligations on the same policy — extend the vocabulary; no new ADR per constraint kind.
+- **ADR-019's deferred decision is closed by this ADR.** ADR-019's "α / β / γ" framing now refers to this ADR for the canonical resolution.
+- **ADR-007's "policy-combining algorithm" open question is partially closed.** The specific case of cross-policy *conflict* on the same effective resource set is now resolved (Tessera defers to adapters; adapters declare and emit diagnostics). Cross-policy combination across *orthogonal* effects (column mask + row filter on the same table, for example) is a different question — addressed by the platform's natural composition, not by Tessera's IR — and remains correct under the v0 design.
+
+### What this ADR does not do
+
+- **Does not introduce an IR-level conflict-detection facility.** The detection is the adapter's job, not the IR's. The IR is expressive; the adapter is selective.
+- **Does not specify the diagnostic format.** Each adapter declares its diagnostic output shape; consistency across adapters is encouraged but not required.
+- **Does not preclude future addition of an IR-level "preferred algorithm" annotation.** If a real customer engagement surfaces the need for the author to declare an intended combining algorithm (independent of the platform's enforcement), a future ADR can add it. v0 stays neutral.
+
+### Note on the empirical-grounding pattern
+
+ADR-019 was honest about deferring this decision until evidence arrived. The evidence arrived in the ABAC column-mask exercise; the row-filter exercise generalized it. The framework's discipline of "exercises drive design, not speculation" produced a sharper resolution than ADR-019 could have chosen up-front — the γ-with-refinement framing required knowing what the platform actually does, and that knowledge required deployment, not just documentation.
+
+The lesson worth recording: deferring a design decision until empirical observation can ground it is a real practice, not just a procrastination. ADR-019's deferral was correct; ADR-023's resolution is sharper for having waited.
+
+---
+
+## ADR-024 — Adapter contract shape
+
+**Date:** 2026-05-19
+**Status:** Accepted
+
+### Context
+
+ADR-003 established that adapters are peers and that each adapter is responsible for four activities — discovery, extraction, emission, reconciliation — plus a capability profile declaring which IR concepts the platform supports. The technical design (§5) elaborated this in prose. But until a concrete adapter implementation exists, the contract between the IR and the platforms remains a sketch: the interface boundary, the result types, the configuration injection point, and the diagnostic vocabulary are all underspecified.
+
+Two adapter scaffolds were built simultaneously (Unity Catalog and Snowflake) precisely to pressure-test the contract. If only one adapter existed, the contract would inevitably specialize to that platform's idioms. With two implementations of the same interface emitting from the same IR, the contract has to express the platform-neutral surface explicitly.
+
+### Decision
+
+The adapter contract is defined by the types in `adapters/contract/`:
+
+- **`Adapter` ABC** — an abstract base class with four methods (`emit`, `discover`, `extract`, `reconcile`) and a `capability_profile` property. Adapters subclass `Adapter` and override what they implement; default implementations of the three non-emission methods return `NotImplemented`-style diagnostics so that callers can probe an adapter's surface without dispatching on adapter identity.
+- **`AdapterConfig`** — per-environment configuration mapping IR concepts to platform mechanisms. This is the implementation of ADR-021's adapter-configuration-mapping pattern. Concrete fields: `identity_bindings` (PrincipalRef IRI → platform principal id) and `tag_taxonomy` ((axis, value) → (tag key, tag value)). An `extras` dict carries per-adapter conventions (warehouse, default schema) without polluting the typed surface.
+- **`CapabilityProfile`** — per-adapter declaration of supported / partial / unsupported entries keyed by a closed `Capability` enum. The enum is normative: adding a value is a contract change. Diagnostic emission cites capability entries by enum value, so the gap between two platforms is comparable across adapters.
+- **`EmissionResult`, `DiscoveryResult`, `ExtractionResult`, `ReconciliationResult`** — every adapter method returns a structured Result, never a raw string or dict. Results carry `diagnostics: list[Diagnostic]` alongside their payload. Callers attach the diagnostic stream to whatever downstream surface (CLI output, JSON report, IDE annotation) is appropriate.
+- **`Diagnostic`** — severity (info / warning / error), short code (e.g., `UNIMPLEMENTED_POLICY_KIND`), human-readable message, optional location pointer into the source policy. Adapters declare their codes; cross-adapter code naming converges by convention, not enforcement.
+
+Emission lowers a parsed JSON-LD policy dict to platform-native DDL/SQL statements. **Adapters never execute** — execution is the caller's responsibility (the calling tool layers in the SDK, the Snowflake connector, audit-log handling, dry-run flags, etc.). This separation keeps adapters testable without platform credentials and keeps the contract synchronous and pure.
+
+### Rationale
+
+- **Two implementations from day one.** Building Unity Catalog alone would have produced a contract specialized to Databricks idioms (account groups, governed tags). The Snowflake scaffold immediately pressured the principal-binding axis (roles, not groups), the policy-attachment DDL (row-access policy vs row filter), and the naming convention (schema-qualified policy objects in Snowflake; function-named filters in Databricks). The `AdapterConfig.identity_bindings` mapping emerged from this pressure.
+- **Structured Results, not raw output.** Returning a bare list of SQL strings was rejected because it forecloses on capability-gap reporting, partial extraction confidence, and reconciliation diff output. The Result types are simple dataclasses — auditable, serializable, testable.
+- **Closed `Capability` enum.** A free-form string vocabulary for capability declarations would let each adapter invent its own gap names, defeating the cross-adapter comparison the profile is meant to support. The enum is small (eight entries today); future additions are deliberate.
+- **Emission separated from execution.** The same scaffold runs in unit tests with no platform credentials and in integration tests against real workspaces. Callers compose execution with their own logging, retry, dry-run, and audit policy without negotiating with the adapter.
+
+### Consequences
+
+- **Adapters are import-light.** Neither `databricks-sdk` nor `snowflake-connector-python` is imported at module load time. The Snowflake scaffold tolerates the connector being absent; a caller wanting to execute must install it.
+- **Capability profiles become a live document.** As emission paths fill in, capability entries move from `PARTIAL`/`UNSUPPORTED` to `SUPPORTED` with rationale text describing how the IR concept maps to platform DDL. The profile is the running record of how the abstract IR resolves into concrete mechanisms.
+- **The parity test in `adapters/tests/test_parity.py` is a structural fixture.** It asserts that the same IR produces different, platform-correct outputs. Adding adapters or adding emission paths means adding parity assertions; regressions surface immediately.
+- **The four-responsibility shape (ADR-003) is now concrete.** Discovery, extraction, reconciliation each have a stub method, a Result type, and a diagnostic code; the future work to fill them in is bounded by the contract rather than open-ended design.
+
+### What this ADR does not do
+
+- **Does not specify a DSL or YAML authoring layer for adapter configuration.** `AdapterConfig` is the Python type; how authors express it (TOML, YAML, environment variables) is a future deliberate choice tracked in the converter / linter work.
+- **Does not prescribe an execution framework.** Tessera's adapter contract terminates at structured emission output. A separate runner (CLI subcommand, library wrapper) composes execution.
+- **Does not address streaming or pagination of large extraction results.** For v0 the assumption is that extraction returns a finite policy dict per artifact and discovery returns a finite list. A streaming variant is deferrable until a real customer corpus surfaces the need.
+
+### Note on ordering
+
+ADR-024 lands together with the first concrete scaffolds (commit on 2026-05-19). Future adapters — `custom-acl/` per ADR-003's third-target customer — inherit the contract as it stands today; if their platform surfaces concepts that strain the current shape, those strains land as new ADRs amending or extending this one, not as silent edits.
+
+### Findings from the first live cross-platform exercise (2026-05-19)
+
+The scaffold was exercised end-to-end against both target platforms on the same day it landed. The same `spec/v0/examples/group-row-visibility-policy-a.jsonld` was lowered through both adapters and the resulting DDL was executed against:
+
+- **Databricks** — `bg_rls_demo.tpch.orders` (7.5M rows from `samples.tpch.orders`).
+- **Snowflake** — `BRICETEST.TESSERA.SNOW_ORDERS` (1.5M rows from `SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS`).
+
+Three findings worth recording — none reshape the contract but each refines the platform-specific surface:
+
+1. **Resource bindings are a real config gap.** The same IR target (`table:bg_rls_demo.tpch.orders`) lowers to two different platform identifiers (`bg_rls_demo.tpch.orders` on Databricks; `BRICETEST.TESSERA.SNOW_ORDERS` on Snowflake). `AdapterConfig.resource_bindings` was added during the live exercise as the natural counterpart to `identity_bindings`. The pattern (ADR-021) already supported this implicitly; the live run made it concrete.
+
+2. **Snowflake's role hierarchy is not flat group membership.** Snowflake roles inherit from each other (HIGH inherits PUBLIC ⇒ HIGH-active users satisfy PUBLIC's predicates). Databricks account groups are flat: `is_account_group_member('A')` and `is_account_group_member('B')` are independent. IR authors targeting both platforms see different effective row-set arithmetic from the same IR. This is now noted in the Snowflake adapter's capability profile.
+
+3. **Snowflake role-discrimination semantics — two distinct primitives, adapter chooses one (see issue #14).** Initial framing of the live-test observation as "DEFAULT_SECONDARY_ROLES = ('ALL') collapses policy discrimination" was sloppy. Snowflake offers two intentionally-distinct primitives: `CURRENT_ROLE()` (primary-role-only; strict semantics, useful for audit/compliance) and `IS_ROLE_IN_SESSION(X)` (any active role; permission-scope semantics, matches standard RBAC). The adapter currently emits `IS_ROLE_IN_SESSION` for byIdentity principal selectors, matching Snowflake's documented recommendation. Under that emission, `DEFAULT_SECONDARY_ROLES = ('ALL')` (the platform default since BCR-1692) is consistent and correct — secondary roles activate, the predicate sees them, permission-scope semantics hold. The "discrimination collapse" observation only manifests when a policy author *expects* primary-role-only semantics (Intent A) but the adapter *emits* permission-scope semantics (Intent B); that is an authoring/emission mismatch, not a platform misfeature. Verified empirically: `SHOW PARAMETERS LIKE '%SECONDARY%' IN SESSION` returns no rows (it is a user property, not a session parameter); `DESCRIBE USER` exposes `DEFAULT_SECONDARY_ROLES = ["ALL"]`. Operational implication for Tessera: be deliberate about which discrimination semantic the policy carries. The byDataset path sidesteps this entirely by gating on `CURRENT_USER()`, which is orthogonal to role activation; the byIdentity path inherits the adapter's current Intent B emission choice. Whether to extend the IR to express the Intent A vs Intent B distinction is deferred to a future exercise — see issue #14. This finding also sharpens the proposed `verify` adapter responsibility: only platform structural assumptions (table exists, column types match) are true verify territory; policy intent ambiguities are resolved at authoring time, not by adapter verification.
+
+These findings are pinned in `adapters/snowflake/capability.py` (entry: `ROW_VISIBILITY`). The scripts that produced them (`adapters/tests/live_snowflake.py`, `adapters/tests/live_databricks.py`) are committed alongside the scaffold and re-runnable for regression checks.
+
+---
+
+## ADR-025 — Add `Execute` to the v0 well-known action vocabulary
+
+**Date:** 2026-05-19
+**Status:** Accepted
+
+### Context
+
+The v0 well-known action vocabulary in `spec/v0/ontology.ttl` enumerates `Read`, `Write`, `Delete`, `Share`, `Sample`, and `Aggregate`. The table-grants worked exercise (Scenario C — gating who may invoke `bg_rls_demo.tpch.compute_customer_ltv`) required expressing "principal P may invoke business-logic function F." None of the existing six actions express that intent; the closest, `Read`, conflates retrieving rows with invoking computation.
+
+The migration use case (ADR-003's reference customer engagement) requires lifting Databricks `GRANT EXECUTE ON FUNCTION` statements and Snowflake `GRANT EXECUTE` / `GRANT USAGE ON FUNCTION` statements into IR with no information loss. Without an `Execute` action, the corpus cannot round-trip through Tessera.
+
+A Glean enumeration of Unity Catalog EXECUTE uses surfaced six concrete cases, which split into two semantically distinct categories:
+
+1. **Business-logic invocation** (semantic):
+   - Calling a UDF directly in SQL or PySpark.
+   - Databricks Apps invoking UC functions as service-principal-bound resources.
+   - AI agent tools backed by UC functions.
+
+2. **Policy-mechanism scaffolding** (mechanism):
+   - Policy author needs EXECUTE on a UDF to attach it as a row filter or column mask.
+   - EXECUTE required when assigning a function via `SET ROW FILTER` or `SET MASK`.
+   - Batch Python UC UDFs delegating service credentials.
+
+The two categories require different design treatment: the first is policy intent the IR should express; the second is the same kind of adapter-scaffolding consideration as the GRANT SELECT lesson from the column-mask exercise (where the worked-example diagnostic incorrectly framed deployment-time GRANTs as IR concerns, since corrected via Glean).
+
+### Decision
+
+`Execute` is added to v0 as the seventh well-known action across the four spec files:
+
+- `spec/v0/ontology.ttl` — `tessera:Execute a tessera:Action ; rdfs:label "Execute"@en ; rdfs:comment "Invoke a callable Resource (typically a user-defined function or stored procedure). Scoped to policy intent (gating who can invoke business-logic resources); platform-mechanism uses of EXECUTE (e.g., the grants required to attach a UDF to an enforcement policy) are adapter scaffolding, not modeled in the IR."@en .`
+- `spec/v0/context.jsonld` — `"Execute": "tessera:Execute"` short-name binding alongside the existing actions.
+- `spec/v0/schema.json` — `Execute` and `tessera:Execute` added to the `action` enum, with the inline description noting the addition's empirical grounding.
+- `spec/v0/shapes.ttl` — `tessera:Execute` added to both PolicyShape and PolicyConstraintShape `sh:in` action enumerations.
+
+The semantic-vs-mechanism boundary is explicit in the ontology comment: `Execute` is for policy intent (Glean's category 1). Mechanism uses (Glean's category 2) remain adapter scaffolding, modeled neither in the IR nor in capability profiles — the adapter handles them as part of emit-and-deploy hygiene, parallel to how `GRANT SELECT` on a newly-created table is adapter scaffolding (`feedback_glean_for_databricks_semantics` memory note).
+
+### Rationale
+
+- **Migration completeness.** Without `Execute`, the IR cannot lift `GRANT EXECUTE ON FUNCTION` corpus rows without information loss, breaking ADR-003's primary use case.
+- **Cross-platform applicability.** Both Databricks (`GRANT EXECUTE ON FUNCTION`) and Snowflake (`GRANT USAGE ON FUNCTION` / `GRANT EXECUTE ON PROCEDURE`) have the concept. `Execute` is platform-neutral.
+- **Closed enum hygiene.** v0 declared its action vocabulary closed for the v0 lifecycle. Suspended-immutability framing (ADR-017) admits this kind of empirically-grounded addition; the exercise's diagnostic is the empirical grounding.
+- **Boundary-keeping discipline.** Explicitly recording the semantic-vs-mechanism split prevents future contributors from accidentally pulling implementation-scaffolding uses of EXECUTE into the IR. This is the same boundary the GRANT-SELECT-is-not-policy lesson holds: the IR expresses meaning, not deployment mechanics.
+
+### Consequences
+
+- **All seven previously-committed worked examples re-validate.** No existing policy used `Execute`; the addition is purely additive.
+- **The Scenario C IR shape in the table-grants exercise validates cleanly** under schema and SHACL. The exercise's Phase 3 confirmed the Databricks DDL (`GRANT EXECUTE ON FUNCTION ... TO ...`) deploys and is observable via `SHOW GRANTS ON FUNCTION`.
+- **Issue [#10](https://github.com/bgiesbrecht/tessera/issues/10) (policy-execute-grants)** is substantively closed by this addition. The exercise's diagnostic records the boundary-keeping discipline; the issue may be closed on GitHub with a pointer to ADR-025 and the diagnostic.
+- **The semantic-vs-mechanism boundary documented here applies recursively to future additions.** Subsequent adoptions of platform-specific permission verbs (e.g., `Modify`, `Manage`, `Grant` itself) should follow the same discipline: declare the boundary explicitly in the ontology comment; do not pull mechanism uses into the IR.
+
+### What this ADR does not do
+
+- **Does not introduce `AccessGrantConstraint`** as a policyKind for affirmative grants. The table-grants exercise's Phase 2 surfaces this as an open design question (see the diagnostic §3.4); the decision is deferred to a follow-up ADR after at least one migration exercise touches the affirmative-grant space.
+- **Does not declare a `function:` IRI prefix in `context.jsonld`.** The prefix is used informally in the worked example's resource string (`function:bg_rls_demo.tpch.compute_customer_ltv`) but is not validated by the IR layer. Formalization queued alongside [#4](https://github.com/bgiesbrecht/tessera/issues/4) (iri-safety-convention).
+- **Does not address `USE SCHEMA`-style scaffolding privileges.** The Databricks emission of Scenario B requires both `GRANT USE SCHEMA` and `GRANT SELECT ON SCHEMA`. `USE SCHEMA` has no Tessera-action analog; the adapter emits it as scaffolding for `Read`. Whether to model it as an additional implicit grant is deferred.
+
+### Note on ordering
+
+ADR-025 lands alongside the table-grants exercise's Phase 2 commit on 2026-05-19. The exercise's Phase 3 results (the diagnostic) are committed in the same commit, demonstrating the exercises-drive-design discipline in action: the gap was discovered empirically, the boundary was sharpened by an external Glean check, and the addition was accepted with explicit scope.
+
+---
+
 ## How to use this document
 
 - Every new technical or stakeholder document begins by reading this file.

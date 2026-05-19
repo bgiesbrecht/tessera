@@ -101,11 +101,31 @@ Policies reference principals and resources through selectors, not enumeration:
 |---|---|
 | `byIdentity` | Specific named principal or resource |
 | `byAttribute` | Predicate over attributes ("Principals with role X", "Resources classified as PII") |
-| `byClassification` | Resources carrying a specific classification — the preferred form |
+| `byClassification` | Resources carrying a specific classification — the preferred form for sensitivity-only matching |
 | `byDataset` | Set membership computed from a data source (the form that supports custom ACL patterns) |
 | `byComposition` | Boolean combination of other selectors |
+| `byScope` | Scoped attachment at catalog/schema/table/column level with optional attribute matching (ADR-019) |
 
 The `byDataset` selector (ADR-003) is what enables the framework to express data-driven principal/resource sets, including the ACL-table-and-view pattern common in enterprises.
+
+The `byScope` selector (ADR-019) is what enables ABAC-style policy attachment: a policy attaches at a level in the resource hierarchy and automatically applies to anything within that scope matching its attribute predicates. The scope kind (catalog, schema, table, column) is inferred from the resource IRI's namespace prefix. `byScope` carries an optional `except` list (resources to exclude — narrowing the resource set; structurally distinct from principal exclusion) and an optional `matching` block (attribute predicates that further narrow which resources within the scope the policy applies to; see §4.9).
+
+### 3.3a Attribute axes (ADR-018)
+
+Resources carry zero or more **attribute assignments**, each on an independent semantic axis. v0 declares four well-known axes:
+
+| Axis | Type | Example values |
+|---|---|---|
+| `sensitivity` | Hierarchical (subsumption applies) | `PII`, `PHI`, `PIIEmail` (⊂ `PII`), `Financial`, `Public`, `Confidential`, `Restricted` |
+| `dataSubject` | Flat | `EUResident`, `USResident`, `Employee`, `Customer`, `Minor` |
+| `regulatoryRegime` | Flat | `GDPR`, `HIPAA`, `PCI-DSS`, `SOX`, `CCPA` |
+| `businessDomain` | Flat | `CRM`, `Finance`, `HR`, `Engineering`, `MarketingDomain` |
+
+Each axis declares its structural type. Hierarchical axes' values participate in `rdfs:subClassOf` subsumption — `sensitivity: PIIEmail` implies `sensitivity: PII`. Flat axes' values are independent enumeration members; no subsumption is inferred.
+
+Adopters extend the axis set by declaring new `AttributeAxis` instances under their own namespace (e.g., `bg:rowDiscriminator`). Each adopter-declared axis declares its own structural type.
+
+The existing `Classification` hierarchy is preserved as the value set of the `sensitivity` axis. Pre-ABAC references via the `byClassification` selector continue to validate; the post-ABAC canonical form references the value on the `sensitivity` axis.
 
 ### 3.4 What the vocabulary excludes
 
@@ -163,7 +183,7 @@ A rule is a structurally slimmer object than a freestanding PolicyConstraint. It
 - **Principal.** `principal` — a principal selector identifying the principals the rule applies to.
 - **Condition.** Optional, drawn from the condition algebra (§4.4).
 - **Effect.** What the rule does when it matches — `keep-matching-rows` and `drop-matching-rows` for RowVisibility; `allow`, `deny`, `transform` for AccessConstraint; etc.
-- **Transformation.** Required for `ColumnVisibilityConstraint` rules; forbidden otherwise. When present, the transformation field carries a structured `TransformationInstance` object — a `type` identifying the transformation kind, plus any parameters specific to that kind. See §4.8 for the parameter shapes formalized in v0.
+- **Transformation.** Required when `effect: transform`; forbidden otherwise (per ADR-022). When present, the transformation field carries a structured `TransformationInstance` object — a `type` identifying the transformation kind, plus any parameters specific to that kind. See §4.8 for the parameter shapes formalized in v0. The same effect-driven rule applies to the Policy's `defaultBranch`.
 
 Rules do not carry their own `@type`, `appliesTo`, or `action` — those are inherited from the containing Policy.
 
@@ -313,6 +333,63 @@ The parameter shapes formalized in v0 are:
 
 See ADR-016 for the design rationale and the choice of the uniform structured form.
 
+### 4.9 Attribute matching algebra (ABAC)
+
+When a Policy uses `byScope` selection (§3.3, ADR-019), the `appliesTo` block may carry an optional `matching` expression that narrows which resources within the scope the policy applies to. The matching algebra is the same `match: and|or|not` + `criteria: [...]` shape as `byComposition` (ADR-020) over attribute-leaf criteria.
+
+**Canonical form:**
+
+```yaml
+appliesTo:
+  selector: byScope
+  scope: catalog:bg_data
+  matching:
+    match: and
+    criteria:
+      - attribute: { axis: sensitivity, value: PII }
+      - attribute: { axis: dataSubject, value: EUResident }
+```
+
+Each leaf is an `attribute` reference naming an axis (from §3.3a) and a value. `match: and` requires all leaves to hold; `match: or` any; `match: not` negates a single (possibly composed) criterion. Composition nests.
+
+**Implicit-AND shortcut:** for the common case of conjunction over a small number of attributes, the IR accepts a map:
+
+```yaml
+appliesTo:
+  selector: byScope
+  scope: catalog:bg_data
+  matching:
+    attributes:
+      sensitivity: PII
+      dataSubject: EUResident
+```
+
+This desugars to the canonical form with `match: and`. The schema accepts both shapes; the converter normalizes to canonical for internal processing. Authors choose ergonomics; reasoners see one form.
+
+**Per-axis value semantics:**
+
+- On a **hierarchical axis** (`sensitivity` in v0), `axisValue` is a class reference; subsumption applies. `attribute: { axis: sensitivity, value: PII }` matches resources tagged with `PII` or any subclass (`PIIEmail`, `PHI`).
+- On a **flat axis** (`dataSubject`, `regulatoryRegime`, `businessDomain` in v0), `axisValue` is a named individual; exact match only.
+
+**Adapter responsibility:** the per-environment tag-taxonomy mapping (ADR-021; see §5.7) translates `attribute: { axis: X, value: Y }` into the platform's native predicate (e.g., `has_tag_value('classification', 'pii')` on Databricks; `SYSTEM$GET_TAG_ON_CURRENT_COLUMN(...)` on Snowflake). The policy IR remains platform-neutral.
+
+See ADRs 018 (axes), 019 (byScope), 020 (matching algebra) for the design history.
+
+### 4.10 Mechanism A vs Mechanism B for principal-bound transformations
+
+This is a design observation surfaced by the ABAC worked exercises, not a v0 vocabulary addition. Worth documenting so future contributors don't re-derive it.
+
+When emitting a column-mask or row-filter policy, the principal logic can live in two places:
+
+- **Mechanism A** — *policy header.* The principal binding (`TO ... EXCEPT ...`) splits principals into "applies to" / "does not apply to" groups. The UDF body is unconditional. Used for binary exempt/not-exempt cases.
+- **Mechanism B** — *UDF body.* The UDF body branches via `is_account_group_member(...)` calls in a `CASE` expression. The policy header's `TO` is broad. Used for three-or-more-branch cases that the binary `TO/EXCEPT` cannot express.
+
+Tessera's IR is opinionated toward Mechanism A for binary cases: a Policy with one rule (`effect: allow` on the privileged group) plus a `defaultBranch` (`effect: transform`) emits cleanly to `TO ... EXCEPT ...` plus an unconditional UDF. For multi-branch cases (the row-filter exercise's three-branch shape), Tessera's clean multi-rule IR compiles to a single Mechanism-B UDF with `CASE` branches.
+
+The IR's `defaultStrategy` distinction (`negated-complement` vs `explicit-baseline-group`) is preserved at the IR layer regardless of which mechanism the adapter chooses. For Mechanism A emissions, the strategy choice produces structurally different SQL. For Mechanism B emissions on platforms where principal binding is binary (Databricks ABAC), both strategies collapse to the same UDF — the IR's richer expressivity than platform emission is the right relationship.
+
+See the ABAC column-mask comparison and the ABAC row-filter diagnostic for the worked-example evidence.
+
 ---
 
 ## 5. The adapter contract
@@ -365,9 +442,62 @@ The "unrecognized" category exists because honest reporting of unknown is part o
 
 Adapters are versioned independently of the spec. An adapter declares the spec version it implements, the vocabulary version it understands, and its own version. The compatibility matrix is published.
 
-### 5.6 Identity binding
+### 5.6 Adapter configuration mappings (the general pattern)
 
-Adapters interacting with principals require an identity binding configuration, separate from policy IR. The configuration maps IR principal URIs to native principals in the target system. The same policy artifact, emitted to two different organizations' Snowflake accounts, binds to different native roles. The policy is portable; the bindings are local.
+Adapters need to translate between platform-specific identifiers and Tessera's semantic vocabulary. The translation is per-environment because adopters use different naming conventions, different tag taxonomies, different principal identity systems. **Configuration lives in adapter-side files, not in the policy IR.** A policy that says `sensitivity: PII` should mean the same thing on every platform; the policy author should not need to know that the Databricks adapter expects this to emit as `has_tag_value('classification', 'pii')` while the Snowflake adapter expects a different tag name.
+
+Per ADR-021, configuration mappings follow a uniform shape:
+
+```yaml
+# adapters/<name>/configuration.yaml (illustrative)
+
+identityBindings:
+  - tesseraPrincipal: group:data-stewards
+    platformGroup: bg_data_stewards
+  - tesseraPrincipal: user:alice@example.com
+    platformUser: alice.smith@example.com
+
+tagTaxonomy:
+  - axis: sensitivity
+    axisValue: PII
+    tagKey: classification
+    tagValue: pii
+  - axis: dataSubject
+    axisValue: EUResident
+    tagKey: region
+    tagValue: EMEA
+```
+
+Two well-known instance kinds ship with v0:
+
+- **`identityBindings`** — maps Tessera principal IRIs to platform-native principals (groups, users, roles). The same policy artifact, emitted to two different organizations, binds to different native principals. Identity binding is bidirectional: emission lowers Tessera IRIs to platform principals; extraction lifts platform principals back to Tessera IRIs.
+- **`tagTaxonomy`** — maps Tessera attribute axis-values to platform-native tag keys/values. Same bidirectional shape; same per-environment scoping.
+
+Future configuration-mapping kinds (classification-name mapping, group-hierarchy mapping) follow the same pattern without requiring a new ADR per kind.
+
+**Default behavior on unmapped identifiers** — three configurable behaviors, with **strict as the default**:
+
+- **Strict (default).** Unmapped identifier is an extraction/emission error. The IR stays clean of unknown identifiers. Adopters configuring strict must declare their mappings explicitly.
+- **Permissive.** Unmapped identifier lifted onto a synthetic axis or principal namespace (e.g., `unknown:tagKey`) with confidence marker `low`. Useful during migration.
+- **Pass-through.** Unmapped identifier lifted verbatim with confidence `low`. Useful for diagnostic scenarios where round-trip fidelity matters more than IR cleanliness.
+
+The strict default keeps the IR honest by default; opt-in to looser semantics is explicit configuration.
+
+### 5.7 Cross-policy conflict detection (ADR-023)
+
+Some platforms reject configurations where multiple policies resolve to the same effective resource (e.g., two column-mask policies on the same column, or an ABAC policy alongside a legacy `SET MASK` on the same column). Per ADR-023, **Tessera does not pick a combining algorithm in the IR**; instead, adapter capability profiles declare platform constraints, and adapter emission diagnostics surface conflicts at emit time so the author resolves them before deployment.
+
+Initial v0 capability-profile vocabulary:
+
+- **`single-column-mask-per-column`** — at most one ColumnVis policy may resolve to any given column. Databricks ABAC declares this.
+- **`single-row-filter-per-table`** — at most one RowVis policy may resolve to any given table. Databricks ABAC declares this.
+- **`cross-mechanism-conflict-blocked`** — ABAC policies and legacy `SET MASK` / `SET ROW FILTER` compose on the same column/table only if they resolve to the same function; otherwise the platform blocks access. Databricks declares this.
+
+Other platforms (Snowflake, custom adapters) declare their own constraints; the vocabulary is open per the configuration-mapping pattern of §5.6.
+
+When the adapter detects a potential conflict during emission (two policies whose effective resource sets overlap in a way the platform constraint forbids), it emits a structured diagnostic naming both policies, the affected resources, and the constraint. The author resolves the conflict (merging policies, narrowing matchers, scoping one to a subset, splitting across catalog/schema/table scope levels) and re-emits; the platform never sees an ambiguous configuration.
+
+See ADR-023 for the design rationale (γ-with-refinement framing) and the empirical grounding from the ABAC column-mask worked example.
 
 ---
 

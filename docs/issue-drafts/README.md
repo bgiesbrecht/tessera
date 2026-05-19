@@ -24,8 +24,12 @@ Staging area for issues queued to be filed against `bgiesbrecht/tessera`. Keepin
 | 2026-05-18 | [#7](https://github.com/bgiesbrecht/tessera/issues/7) | principal-set-from-joined-tables — multi-table support for data-driven principal sets | open (ACL exercise) |
 | 2026-05-18 | [#8](https://github.com/bgiesbrecht/tessera/issues/8) | principal-set-match-modifiers — case-insensitive / trim match flag on PrincipalSetFromTable | open (ACL exercise) |
 | 2026-05-18 | [#9](https://github.com/bgiesbrecht/tessera/issues/9) | exists-in-dataset-operand-formalization — formal operand shape for the existsInDataset operator | open (ACL exercise) |
-| 2026-05-18 | [#10](https://github.com/bgiesbrecht/tessera/issues/10) | policy-execute-grants — declare function-execute grants in the IR | open (both exercises) |
+| 2026-05-18 | [#10](https://github.com/bgiesbrecht/tessera/issues/10) | policy-execute-grants — declare function-execute grants in the IR | closed by ADR-025 (table-grants exercise) |
 | 2026-05-18 | [#11](https://github.com/bgiesbrecht/tessera/issues/11) | acl-integrity-checks — surface silent failure modes in data-driven access patterns | open (ACL exercise, lower priority) |
+| 2026-05-19 | [#12](https://github.com/bgiesbrecht/tessera/issues/12) | policy-two-axis-attribute-matching — table-level + column-level attribute predicates | open (ABAC row-filter exercise) |
+| 2026-05-19 | [#13](https://github.com/bgiesbrecht/tessera/issues/13) | resourcecolumn-conflation — ResourceSetFromTable.resourceColumn carries two distinct identifiers | open (Snowflake byDataset exercise) |
+| 2026-05-19 | [#14](https://github.com/bgiesbrecht/tessera/issues/14) | snowflake-role-discrimination-semantics — primary vs active role discrimination | open (reframing of secondary-roles finding per claude.ai) |
+| 2026-05-19 | [#15](https://github.com/bgiesbrecht/tessera/issues/15) | access-grant-constraint-policykind — affirmative-grant policyKind missing from v0 | open (table-grants exercise) |
 
 ## Queued
 

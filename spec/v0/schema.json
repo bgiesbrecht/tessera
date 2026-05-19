@@ -64,21 +64,7 @@
           "else": { "not": { "required": ["defaultBranch"] } }
         },
         {
-          "description": "ColumnVisibility policies: each rule must declare a transformation.",
-          "if": {
-            "properties": { "policyKind": { "const": "ColumnVisibilityConstraint" } },
-            "required": ["policyKind"]
-          },
-          "then": {
-            "properties": {
-              "rules": { "items": { "required": ["transformation"] } }
-            }
-          },
-          "else": {
-            "properties": {
-              "rules": { "items": { "not": { "required": ["transformation"] } } }
-            }
-          }
+          "description": "ADR-022: per-rule and per-defaultBranch transformation constraints are effect-driven and enforced inside the rule / defaultBranchRule $defs, not at the policy level."
         }
       ]
     },
@@ -133,7 +119,7 @@
 
     "rule": {
       "title": "Policy rule",
-      "description": "A single rule inside a Policy's `rules` list. Carries the principal-and-condition pair plus the effect for that match. The transformation field is required for ColumnVisibility kind and forbidden for others; this is enforced at the Policy level via if/then on policyKind, not on the rule alone.",
+      "description": "A single rule inside a Policy's `rules` list. Carries the principal-and-condition pair plus the effect for that match. Per ADR-022, the transformation field is required iff effect is transform, regardless of the enclosing policy's kind.",
       "type": "object",
       "required": ["principal", "effect"],
       "properties": {
@@ -142,19 +128,42 @@
         "condition":   { "$ref": "#/$defs/condition" },
         "effect":      { "$ref": "#/$defs/effect" },
         "transformation": { "$ref": "#/$defs/TransformationInstance" }
-      }
+      },
+      "allOf": [
+        {
+          "description": "ADR-022: transformation is required iff effect is transform.",
+          "if": {
+            "properties": { "effect": { "enum": ["transform", "tessera:transform"] } },
+            "required": ["effect"]
+          },
+          "then": { "required": ["transformation"] },
+          "else": { "not": { "required": ["transformation"] } }
+        }
+      ]
     },
 
     "defaultBranchRule": {
       "title": "Default-branch rule",
-      "description": "The default branch under defaultStrategy: negated-complement. A slimmer rule with no principal selector (it applies to principals matching no other rule).",
+      "description": "The default branch under defaultStrategy: negated-complement. A slimmer rule with no principal selector (it applies to principals matching no other rule). Per ADR-022, transformation is required iff effect is transform.",
       "type": "object",
       "required": ["effect"],
       "properties": {
-        "condition": { "$ref": "#/$defs/condition" },
-        "effect":    { "$ref": "#/$defs/effect" }
+        "condition":      { "$ref": "#/$defs/condition" },
+        "effect":         { "$ref": "#/$defs/effect" },
+        "transformation": { "$ref": "#/$defs/TransformationInstance" }
       },
-      "not": { "required": ["principal"] }
+      "not": { "required": ["principal"] },
+      "allOf": [
+        {
+          "description": "ADR-022: transformation is required iff effect is transform.",
+          "if": {
+            "properties": { "effect": { "enum": ["transform", "tessera:transform"] } },
+            "required": ["effect"]
+          },
+          "then": { "required": ["transformation"] },
+          "else": { "not": { "required": ["transformation"] } }
+        }
+      ]
     },
 
     "policyConstraint": {
@@ -195,9 +204,10 @@
           }
         },
         {
+          "description": "ADR-022: transformation is required iff effect is transform (regardless of @type).",
           "if": {
-            "properties": { "@type": { "const": "ColumnVisibilityConstraint" } },
-            "required": ["@type"]
+            "properties": { "effect": { "enum": ["transform", "tessera:transform"] } },
+            "required": ["effect"]
           },
           "then": { "required": ["transformation"] },
           "else": { "not": { "required": ["transformation"] } }
@@ -220,11 +230,11 @@
     },
 
     "action": {
-      "description": "Action vocabulary per ontology v0. ADR-007 tracks the extensibility question; for v0 the set is closed.",
+      "description": "Action vocabulary per ontology v0. ADR-007 tracks the extensibility question; for v0 the set is closed. Execute added 2026-05-19 via table-grants exercise (scoped to semantic policy intent; platform-mechanism uses of EXECUTE remain adapter scaffolding).",
       "enum": [
-        "Read", "Write", "Delete", "Share", "Sample", "Aggregate",
+        "Read", "Write", "Delete", "Share", "Sample", "Aggregate", "Execute",
         "tessera:Read", "tessera:Write", "tessera:Delete",
-        "tessera:Share", "tessera:Sample", "tessera:Aggregate"
+        "tessera:Share", "tessera:Sample", "tessera:Aggregate", "tessera:Execute"
       ]
     },
 
@@ -247,15 +257,80 @@
 
     "selectorKind": {
       "enum": [
-        "byIdentity", "byAttribute", "byClassification", "byDataset", "byComposition",
+        "byIdentity", "byAttribute", "byClassification", "byDataset", "byComposition", "byScope",
         "tessera:byIdentity", "tessera:byAttribute", "tessera:byClassification",
-        "tessera:byDataset", "tessera:byComposition"
+        "tessera:byDataset", "tessera:byComposition", "tessera:byScope"
       ]
+    },
+
+    "matching": {
+      "title": "Attribute matching expression",
+      "description": "Predicate over resource attributes per ADR-020. Accepts either the canonical form (match + criteria over the byComposition algebra) or the implicit-AND sugar (attributes map keyed by axis short-name).",
+      "type": "object",
+      "oneOf": [
+        {
+          "title": "Canonical (match + criteria)",
+          "required": ["match", "criteria"],
+          "properties": {
+            "match": { "$ref": "#/$defs/booleanMatch" },
+            "criteria": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/matchingCriterion" }
+            }
+          }
+        },
+        {
+          "title": "Implicit-AND sugar (attributes map)",
+          "required": ["attributes"],
+          "properties": {
+            "attributes": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "description": "Axis value. String for flat-axis named individuals or sensitivity-class short names; the schema does not enforce axis-value-domain pairing (SHACL does, when shapes.ttl exists).",
+                "type": ["string", "number", "boolean"]
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    "matchingCriterion": {
+      "title": "A leaf or nested expression inside a canonical matching criteria list",
+      "oneOf": [
+        { "$ref": "#/$defs/attributeMatcher" },
+        { "$ref": "#/$defs/matching" }
+      ]
+    },
+
+    "attributeMatcher": {
+      "title": "Attribute matcher (axis-value leaf)",
+      "type": "object",
+      "required": ["attribute"],
+      "properties": {
+        "attribute": {
+          "type": "object",
+          "required": ["axis", "value"],
+          "properties": {
+            "axis": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Axis short-name (e.g., sensitivity, dataSubject) or CURIE (e.g., bg:rowDiscriminator). Adopter-namespaced axes use the prefix:name form."
+            },
+            "value": {
+              "type": ["string", "number", "boolean"],
+              "description": "Axis value. For sensitivity (hierarchical), a Classification class short-name. For flat axes, a named-individual short-name. Adopter values follow the same pattern."
+            }
+          }
+        }
+      }
     },
 
     "resourceSelector": {
       "title": "Resource selector",
-      "description": "Identifies the resource(s) the policy applies to.",
+      "description": "Identifies the resource(s) the policy applies to. byScope per ADR-019 enables scoped (catalog/schema/table/column) attachment with optional attribute matching.",
       "type": "object",
       "required": ["selector"],
       "properties": {
@@ -268,7 +343,13 @@
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/resourceSelector" }
-        }
+        },
+        "scope":  { "type": "string", "minLength": 1 },
+        "except": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "matching": { "$ref": "#/$defs/matching" }
       },
       "oneOf": [
         {
@@ -286,6 +367,10 @@
         {
           "properties": { "selector": { "enum": ["byComposition", "tessera:byComposition"] } },
           "required": ["match", "criteria"]
+        },
+        {
+          "properties": { "selector": { "enum": ["byScope", "tessera:byScope"] } },
+          "required": ["scope"]
         },
         {
           "properties": { "selector": { "enum": ["byAttribute", "tessera:byAttribute"] } }

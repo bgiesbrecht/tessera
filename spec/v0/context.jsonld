@@ -208,6 +208,96 @@
       "@type": "@vocab"
     },
 
+    "_comment_abac_selector_properties": "byScope + matching + attribute axes — see ADRs 018-021.",
+
+    "scope": {
+      "@id": "tessera:scope",
+      "@type": "xsd:string"
+    },
+    "except": {
+      "@id": "tessera:exceptFromScope",
+      "@type": "xsd:string",
+      "@container": "@set"
+    },
+    "matching": {
+      "@id": "tessera:matching",
+      "@type": "@id"
+    },
+    "attribute": {
+      "@id": "tessera:attribute",
+      "@type": "@id",
+      "_comment": "An AttributeMatcher leaf in the canonical matching algebra. Carries {axis, value}."
+    },
+    "attributes": {
+      "@id": "tessera:attributesMap",
+      "_comment": "Implicit-AND shortcut for attribute matching: a map from axis short-name to axis value. Desugars to a canonical match: and / criteria: [{attribute: {axis, value}}, ...] form. See ADR-020."
+    },
+    "axisValue": {
+      "@id": "tessera:axisValue",
+      "@type": "@vocab"
+    },
+
+    "_comment_well_known_attribute_axes": "The four v0 axes per ADR-018. Adopters extend under their own namespaces.",
+
+    "AttributeAxis": "tessera:AttributeAxis",
+    "AttributeMatcher": "tessera:AttributeMatcher",
+    "sensitivityAxis":      "tessera:sensitivityAxis",
+    "dataSubjectAxis":      "tessera:dataSubjectAxis",
+    "regulatoryRegimeAxis": "tessera:regulatoryRegimeAxis",
+    "businessDomainAxis":   "tessera:businessDomainAxis",
+
+    "_comment_axis_short_names": "Per-axis predicates on Resource. The same short names appear as keys of the attributes map.",
+
+    "sensitivity": {
+      "@id": "tessera:sensitivity",
+      "@type": "@id",
+      "_comment": "Hierarchical axis. Values are Classification subclasses (PII, PHI, Financial, etc.)."
+    },
+    "dataSubject": {
+      "@id": "tessera:dataSubject",
+      "@type": "@vocab"
+    },
+    "regulatoryRegime": {
+      "@id": "tessera:regulatoryRegime",
+      "@type": "@vocab"
+    },
+    "businessDomain": {
+      "@id": "tessera:businessDomain",
+      "@type": "@vocab"
+    },
+    "axis": {
+      "@id": "tessera:axis",
+      "@type": "@vocab"
+    },
+    "axisType": {
+      "@id": "tessera:axisType",
+      "@type": "@vocab"
+    },
+
+    "hierarchical": "tessera:hierarchical",
+    "flat":         "tessera:flat",
+
+    "_comment_well_known_data_subject_values": "Starter set for the dataSubject (flat) axis.",
+    "EUResident": "tessera:EUResident",
+    "USResident": "tessera:USResident",
+    "Employee":   "tessera:Employee",
+    "Customer":   "tessera:Customer",
+    "Minor":      "tessera:Minor",
+
+    "_comment_well_known_regulatory_regime_values": "Starter set for the regulatoryRegime (flat) axis.",
+    "GDPR":    "tessera:GDPR",
+    "HIPAA":   "tessera:HIPAA",
+    "PCI-DSS": "tessera:PCI_DSS",
+    "SOX":     "tessera:SOX",
+    "CCPA":    "tessera:CCPA",
+
+    "_comment_well_known_business_domain_values": "Starter set for the businessDomain (flat) axis. Marketing-the-domain is distinct from Marketing-the-purpose (already in v0).",
+    "CRM":         "tessera:CRM",
+    "Finance":     "tessera:Finance",
+    "HR":          "tessera:HR",
+    "Engineering": "tessera:Engineering",
+    "MarketingDomain": "tessera:MarketingDomain",
+
     "_comment_classification_properties": "Classification hierarchy uses rdfs:subClassOf in the ontology; documents reference classifications by IRI",
 
     "classification": {
@@ -290,6 +380,7 @@
     "Share":     "tessera:Share",
     "Sample":    "tessera:Sample",
     "Aggregate": "tessera:Aggregate",
+    "Execute":   "tessera:Execute",
 
     "_comment_well_known_effects": "Effects a policy may declare",
 
@@ -312,6 +403,7 @@
     "byClassification":  "tessera:byClassification",
     "byDataset":         "tessera:byDataset",
     "byComposition":     "tessera:byComposition",
+    "byScope":           "tessera:byScope",
 
     "_comment_well_known_condition_operators": "Condition algebra operators",
 

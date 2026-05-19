@@ -1,0 +1,59 @@
+# ABAC column-mask Policy B — same matcher as Policy A, Hash transformation.
+#
+# Worked-example artifact (companion to Policy A). The matching predicate
+# is identical to Policy A's; the only difference is the transformation.
+# The deliberate overlap surfaces the cross-policy combination question
+# (ADR-019's α/β/γ resolution paths).
+#
+# Companion files: same set as Policy A.
+#
+# See abac-column-mask-policy-a.tessera.yaml for the prefatory notes on
+# vocabulary, namespace conventions, and the blind-derivation property.
+
+"@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
+"@type": Policy
+"@id": policy:abac-column-mask-clerk-hash
+version: 1.0.0
+policyKind: ColumnVisibilityConstraint
+description: >
+  ABAC column-mask policy attached at catalog scope. Matches the same
+  PIIClerk-tagged columns as Policy A; replaces values with their
+  SHA-256 hash for principals outside bg_rls_demo_all_priority_ops.
+
+appliesTo:
+  selector: byScope
+  scope: catalog:bg_rls_demo
+  matching:
+    attributes:
+      sensitivity: PIIClerk
+
+action: Read
+
+defaultStrategy: negated-complement
+
+# One rule: same privileged group as Policy A. The deliberate overlap
+# is the entire point — both policies share matching and exception;
+# they differ only in transformation.
+rules:
+  - principal:
+      selector: byIdentity
+      resource: group:bg_rls_demo_all_priority_ops
+    effect: allow
+
+defaultBranch:
+  effect: transform
+  transformation:
+    type: Hash
+    algorithm: sha256
+
+capabilityRequirements:
+  - scoped-policy-attachment
+  - attribute-axis-matching
+  - tag-taxonomy-mapping
+
+provenance:
+  notes: |
+    Hand-authored as the companion to Policy A. The deliberate same-
+    matcher / different-transformation overlap is the design Stage 3
+    uses to surface ADR-019's deferred cross-policy combination
+    decision (α/β/γ).

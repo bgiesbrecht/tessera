@@ -37,10 +37,7 @@
 <https://bgiesbrecht.github.io/tessera/spec/v0/vocab> a owl:Ontology ;
     dcterms:title "Tessera Vocabulary"@en ;
     dcterms:description
-        "A vocabulary for expressing data governance policies portably across "
-        "heterogeneous data platforms. Tessera captures intent (classification, "
-        "purpose, principal, conditions, obligations) in a form independent of "
-        "any specific platform's enforcement mechanisms."@en ;
+        """A vocabulary for expressing data governance policies portably across heterogeneous data platforms. Tessera captures intent (classification, purpose, principal, conditions, obligations) in a form independent of any specific platform's enforcement mechanisms."""@en ;
     owl:versionInfo "0.0.1" ;
     rdfs:seeAlso <https://github.com/bgiesbrecht/tessera> .
 
@@ -54,9 +51,7 @@
 tessera:Entity a owl:Class ;
     rdfs:label "Entity"@en ;
     rdfs:comment
-        "Abstract superclass of all Tessera vocabulary entities. Not "
-        "instantiated directly; exists to give downstream tooling a single "
-        "type hierarchy root."@en .
+        """Abstract superclass of all Tessera vocabulary entities. Not instantiated directly; exists to give downstream tooling a single type hierarchy root."""@en .
 
 
 #
@@ -71,8 +66,7 @@ tessera:Principal a owl:Class ;
     rdfs:subClassOf tessera:Entity ;
     rdfs:label "Principal"@en ;
     rdfs:comment
-        "An identifiable actor who may take an Action on a Resource. "
-        "Subclasses specialize by kind of actor."@en .
+        """An identifiable actor who may take an Action on a Resource. Subclasses specialize by kind of actor."""@en .
 
 tessera:User a owl:Class ;
     rdfs:subClassOf tessera:Principal ;
@@ -83,8 +77,7 @@ tessera:Group a owl:Class ;
     rdfs:subClassOf tessera:Principal ;
     rdfs:label "Group"@en ;
     rdfs:comment
-        "A collection of principals treated as a single principal for "
-        "policy purposes. Membership is resolved by the identity provider."@en .
+        """A collection of principals treated as a single principal for policy purposes. Membership is resolved by the identity provider."""@en .
 
 tessera:ServiceAccount a owl:Class ;
     rdfs:subClassOf tessera:Principal ;
@@ -95,10 +88,7 @@ tessera:Role a owl:Class ;
     rdfs:subClassOf tessera:Principal ;
     rdfs:label "Role"@en ;
     rdfs:comment
-        "A named capability claim that principals may hold. Distinct from "
-        "Group: a role is a logical capability; a group is a collection of "
-        "principals. Many systems conflate the two; Tessera preserves the "
-        "distinction at the vocabulary level even when adapters collapse it."@en .
+        """A named capability claim that principals may hold. Distinct from Group: a role is a logical capability; a group is a collection of principals. Many systems conflate the two; Tessera preserves the distinction at the vocabulary level even when adapters collapse it."""@en .
 
 
 #
@@ -119,8 +109,7 @@ tessera:DataProduct a owl:Class ;
     rdfs:subClassOf tessera:Resource ;
     rdfs:label "Data product"@en ;
     rdfs:comment
-        "A logical grouping of data assets treated as a unit for governance "
-        "purposes. Aligned with the Data Mesh notion of a data product."@en .
+        """A logical grouping of data assets treated as a unit for governance purposes. Aligned with the Data Mesh notion of a data product."""@en .
 
 tessera:Schema a owl:Class ;
     rdfs:subClassOf tessera:Resource ;
@@ -144,10 +133,7 @@ tessera:RowSet a owl:Class ;
     rdfs:subClassOf tessera:Resource ;
     rdfs:label "Row set"@en ;
     rdfs:comment
-        "A logical subset of rows in a Table or View, defined by a predicate. "
-        "RowSet is the resource targeted by RowVisibilityConstraint. It is "
-        "logical: a RowSet has no independent existence beyond the predicate "
-        "that defines it."@en .
+        """A logical subset of rows in a Table or View, defined by a predicate. RowSet is the resource targeted by RowVisibilityConstraint. It is logical: a RowSet has no independent existence beyond the predicate that defines it."""@en .
 
 
 #
@@ -191,10 +177,7 @@ tessera:Classification a owl:Class ;
     rdfs:subClassOf tessera:Entity ;
     rdfs:label "Classification"@en ;
     rdfs:comment
-        "A label applied to a Resource indicating its sensitivity, regulatory "
-        "status, or business category. Classifications form a hierarchy "
-        "under rdfs:subClassOf; reasoners propagate policies across the "
-        "hierarchy automatically."@en .
+        """A label applied to a Resource indicating its sensitivity, regulatory status, or business category. Classifications form a hierarchy under rdfs:subClassOf; reasoners propagate policies across the hierarchy automatically."""@en .
 
 # --- Privacy classifications (aligned with DPV) ---
 
@@ -208,9 +191,7 @@ tessera:PII a owl:Class ;
     rdfs:subClassOf tessera:PersonalData ;
     rdfs:label "Personally identifiable information"@en ;
     rdfs:comment
-        "Personal data that directly or indirectly identifies a specific individual. "
-        "Tessera treats PII as a subclass of PersonalData; in some regulatory "
-        "frameworks the terms are synonymous."@en .
+        """Personal data that directly or indirectly identifies a specific individual. Tessera treats PII as a subclass of PersonalData; in some regulatory frameworks the terms are synonymous."""@en .
 
 tessera:PHI a owl:Class ;
     rdfs:subClassOf tessera:PII ;
@@ -244,6 +225,111 @@ tessera:Restricted a owl:Class ;
     rdfs:subClassOf tessera:Confidential ;
     rdfs:label "Restricted"@en ;
     rdfs:comment "Data whose disclosure is restricted under stronger controls than ordinary Confidential."@en .
+
+
+#
+# ============================================================================
+# AttributeAxis: orthogonal semantic dimensions for resource attributes
+# ============================================================================
+# Introduced in ADR-018. Each axis names an independent semantic dimension
+# (sensitivity, data subject, regulatory regime, business domain). Resources
+# carry zero or more attribute assignments — one value per axis they
+# participate in. Axes are orthogonal: a column may simultaneously be
+# `sensitivity: PIIEmail`, `dataSubject: EUResident`, `regulatoryRegime: GDPR`.
+#
+# Each axis declares its structural type:
+#   - hierarchical: values form a subsumption hierarchy (rdfs:subClassOf)
+#   - flat:         values are independent enumeration members (no subsumption)
+#
+# Adopters extend with their own axes under their own namespace.
+#
+
+tessera:AttributeAxis a owl:Class ;
+    rdfs:subClassOf tessera:Entity ;
+    rdfs:label "Attribute axis"@en ;
+    rdfs:comment
+        """Names an independent semantic dimension for resource attributes. Resources carry zero or more attribute values, one per axis. See ADR-018."""@en .
+
+# Axis structural type markers
+tessera:hierarchical a owl:NamedIndividual ; rdfs:label "hierarchical"@en ;
+    rdfs:comment "Axis values form a subsumption hierarchy via rdfs:subClassOf."@en .
+tessera:flat a owl:NamedIndividual ; rdfs:label "flat"@en ;
+    rdfs:comment "Axis values are independent enumeration members; no subsumption."@en .
+
+tessera:axisType a owl:ObjectProperty ;
+    rdfs:label "axis type"@en ;
+    rdfs:comment
+        """Declares whether an axis is hierarchical (values participate in subClassOf subsumption) or flat (values are independent enumeration members)."""@en ;
+    rdfs:domain tessera:AttributeAxis .
+
+# The four well-known v0 axes
+tessera:sensitivityAxis a tessera:AttributeAxis ;
+    rdfs:label "sensitivity axis"@en ;
+    tessera:axisType tessera:hierarchical ;
+    rdfs:comment
+        """Sensitivity classification. Values form a hierarchy (PIIEmail ⊂ PII ⊂ PersonalData; Public, Confidential as siblings). Existing tessera:Classification subclasses are the values on this axis. Aligned with DPV PersonalDataCategory."""@en .
+
+tessera:dataSubjectAxis a tessera:AttributeAxis ;
+    rdfs:label "data subject axis"@en ;
+    tessera:axisType tessera:flat ;
+    rdfs:comment
+        """Identifies who the data is about. Values are independent enumeration members (EUResident, USResident, Employee, Customer, Minor). Aligned with DPV DataSubject."""@en .
+
+tessera:regulatoryRegimeAxis a tessera:AttributeAxis ;
+    rdfs:label "regulatory regime axis"@en ;
+    tessera:axisType tessera:flat ;
+    rdfs:comment
+        """Regulatory framework under which the data is protected. Values are independent (GDPR, HIPAA, PCI-DSS, SOX, CCPA)."""@en .
+
+tessera:businessDomainAxis a tessera:AttributeAxis ;
+    rdfs:label "business domain axis"@en ;
+    tessera:axisType tessera:flat ;
+    rdfs:comment
+        """Organizational classification (CRM, Finance, HR, Engineering, Marketing). v0 declares this axis flat; adopters who model org hierarchies may declare a hierarchical extension under their own namespace."""@en .
+
+# Per-axis properties on Resource. Each axis is its own property; values are
+# either classes (hierarchical axis) or named individuals (flat axis).
+tessera:sensitivity a owl:ObjectProperty ;
+    rdfs:label "sensitivity"@en ;
+    rdfs:comment
+        """Relates a Resource to its sensitivity value. Hierarchical axis: values are tessera:Classification subclasses. Subsumption applies."""@en ;
+    rdfs:domain tessera:Resource ;
+    rdfs:range tessera:Classification .
+
+tessera:dataSubject a owl:ObjectProperty ;
+    rdfs:label "data subject"@en ;
+    rdfs:comment "Relates a Resource to its data-subject classification (flat axis)."@en ;
+    rdfs:domain tessera:Resource .
+
+tessera:regulatoryRegime a owl:ObjectProperty ;
+    rdfs:label "regulatory regime"@en ;
+    rdfs:comment "Relates a Resource to its applicable regulatory regime(s) (flat axis)."@en ;
+    rdfs:domain tessera:Resource .
+
+tessera:businessDomain a owl:ObjectProperty ;
+    rdfs:label "business domain"@en ;
+    rdfs:comment "Relates a Resource to its business domain (flat axis)."@en ;
+    rdfs:domain tessera:Resource .
+
+# Well-known values for the flat axes (starter set). Adopters extend.
+tessera:EUResident a owl:NamedIndividual ; rdfs:label "EU resident"@en .
+tessera:USResident a owl:NamedIndividual ; rdfs:label "US resident"@en .
+tessera:Employee   a owl:NamedIndividual ; rdfs:label "Employee"@en .
+tessera:Customer   a owl:NamedIndividual ; rdfs:label "Customer"@en .
+tessera:Minor      a owl:NamedIndividual ; rdfs:label "Minor"@en .
+
+tessera:GDPR    a owl:NamedIndividual ; rdfs:label "GDPR"@en .
+tessera:HIPAA   a owl:NamedIndividual ; rdfs:label "HIPAA"@en .
+tessera:PCI_DSS a owl:NamedIndividual ; rdfs:label "PCI-DSS"@en .
+tessera:SOX     a owl:NamedIndividual ; rdfs:label "SOX"@en .
+tessera:CCPA    a owl:NamedIndividual ; rdfs:label "CCPA"@en .
+
+tessera:CRM         a owl:NamedIndividual ; rdfs:label "CRM"@en .
+tessera:Finance     a owl:NamedIndividual ; rdfs:label "Finance"@en .
+tessera:HR          a owl:NamedIndividual ; rdfs:label "HR"@en .
+tessera:Engineering a owl:NamedIndividual ; rdfs:label "Engineering"@en .
+tessera:MarketingDomain a owl:NamedIndividual ; rdfs:label "Marketing domain"@en ;
+    rdfs:comment "Disambiguated from tessera:Marketing (a Purpose) by the 'Domain' suffix."@en .
 
 
 #
@@ -293,40 +379,31 @@ tessera:PolicyConstraint a owl:Class ;
     rdfs:subClassOf tessera:Entity ;
     rdfs:label "Policy constraint"@en ;
     rdfs:comment
-        "Abstract superclass of all policies. A policy constrains how a "
-        "Principal may interact with a Resource, optionally subject to "
-        "Conditions and producing Obligations."@en .
+        """Abstract superclass of all policies. A policy constrains how a Principal may interact with a Resource, optionally subject to Conditions and producing Obligations."""@en .
 
 tessera:AccessConstraint a owl:Class ;
     rdfs:subClassOf tessera:PolicyConstraint ;
     rdfs:label "Access constraint"@en ;
     rdfs:comment
-        "Constrains whether a Principal may take an Action on a Resource. "
-        "Typical enforcement mechanisms: grants, denials, role assignments."@en .
+        """Constrains whether a Principal may take an Action on a Resource. Typical enforcement mechanisms: grants, denials, role assignments."""@en .
 
 tessera:RowVisibilityConstraint a owl:Class ;
     rdfs:subClassOf tessera:PolicyConstraint ;
     rdfs:label "Row visibility constraint"@en ;
     rdfs:comment
-        "Constrains which rows of a Resource a Principal may see. Typical "
-        "enforcement mechanisms: row-level security, row access policies, "
-        "view filters, ACL joins."@en .
+        """Constrains which rows of a Resource a Principal may see. Typical enforcement mechanisms: row-level security, row access policies, view filters, ACL joins."""@en .
 
 tessera:ColumnVisibilityConstraint a owl:Class ;
     rdfs:subClassOf tessera:PolicyConstraint ;
     rdfs:label "Column visibility constraint"@en ;
     rdfs:comment
-        "Constrains whether a Principal sees a Column's true value, a "
-        "transformed value, or no value. Typical enforcement mechanisms: "
-        "column masking, dynamic data masking, view projections."@en .
+        """Constrains whether a Principal sees a Column's true value, a transformed value, or no value. Typical enforcement mechanisms: column masking, dynamic data masking, view projections."""@en .
 
 tessera:DistributionConstraint a owl:Class ;
     rdfs:subClassOf tessera:PolicyConstraint ;
     rdfs:label "Distribution constraint"@en ;
     rdfs:comment
-        "Constrains whether and how a Resource may be shared beyond its "
-        "origin. Typical enforcement mechanisms: secure shares, listings, "
-        "Delta Sharing, replication controls."@en .
+        """Constrains whether and how a Resource may be shared beyond its origin. Typical enforcement mechanisms: secure shares, listings, Delta Sharing, replication controls."""@en .
 
 
 #
@@ -350,11 +427,7 @@ tessera:Policy a owl:Class ;
     rdfs:subClassOf tessera:Entity ;
     rdfs:label "Policy"@en ;
     rdfs:comment
-        "A container holding an ordered set of rules plus policy-level "
-        "metadata (appliesTo, defaultStrategy, baselineGroup, defaultBranch, "
-        "policyKind). A Policy is not a subclass of PolicyConstraint; it "
-        "contains constraints rather than refining the constraint concept. "
-        "See ADR-014 for the introduction of this class."@en .
+        """A container holding an ordered set of rules plus policy-level metadata (appliesTo, defaultStrategy, baselineGroup, defaultBranch, policyKind). A Policy is not a subclass of PolicyConstraint; it contains constraints rather than refining the constraint concept. See ADR-014 for the introduction of this class."""@en .
 
 
 #
@@ -372,34 +445,22 @@ tessera:DefaultStrategy a owl:Class ;
     rdfs:subClassOf tessera:Entity ;
     rdfs:label "Default strategy"@en ;
     rdfs:comment
-        "Names the mechanism by which a policy handles principals who do not "
-        "match its affirmative-grant rules. Captures intent: same observable "
-        "behavior can be produced by different strategies, and the choice "
-        "between them is part of the policy's meaning."@en .
+        """Names the mechanism by which a policy handles principals who do not match its affirmative-grant rules. Captures intent: same observable behavior can be produced by different strategies, and the choice between them is part of the policy's meaning."""@en .
 
 tessera:explicitBaselineGroup a tessera:DefaultStrategy ;
     rdfs:label "explicit baseline group"@en ;
     rdfs:comment
-        "The policy asserts a specific group is the universal baseline. "
-        "A companion field, baselineGroup, names the group. The framework "
-        "treats the rule keyed off this group as the default branch. The "
-        "default is grounded in explicit group membership."@en .
+        """The policy asserts a specific group is the universal baseline. A companion field, baselineGroup, names the group. The framework treats the rule keyed off this group as the default branch. The default is grounded in explicit group membership."""@en .
 
 tessera:negatedComplement a tessera:DefaultStrategy ;
     rdfs:label "negated complement"@en ;
     rdfs:comment
-        "The policy asserts no baseline group. The default branch applies "
-        "to principals who do not match any affirmative-grant rule. The "
-        "framework treats the negation as inherent to the policy structure. "
-        "The default is grounded in the absence of restrictive memberships."@en .
+        """The policy asserts no baseline group. The default branch applies to principals who do not match any affirmative-grant rule. The framework treats the negation as inherent to the policy structure. The default is grounded in the absence of restrictive memberships."""@en .
 
 tessera:none a tessera:DefaultStrategy ;
     rdfs:label "none"@en ;
     rdfs:comment
-        "The policy has no default branch. Principals matching no rule see "
-        "nothing. This is the framework's fail-closed disposition stated "
-        "explicitly. Equivalent to omitting the defaultStrategy field, but "
-        "preferred when the policy author wants to assert the choice."@en .
+        """The policy has no default branch. Principals matching no rule see nothing. This is the framework's fail-closed disposition stated explicitly. Equivalent to omitting the defaultStrategy field, but preferred when the policy author wants to assert the choice."""@en .
 
 
 #
@@ -427,6 +488,9 @@ tessera:ResourceSelector a owl:Class ;
 # Selector kinds, used as values of the selectorKind property
 tessera:byIdentity       a owl:NamedIndividual ; rdfs:label "by identity"@en .
 tessera:byAttribute      a owl:NamedIndividual ; rdfs:label "by attribute"@en .
+tessera:byScope          a owl:NamedIndividual ; rdfs:label "by scope"@en ;
+    rdfs:comment
+        """Selector kind for scoped (catalog/schema/table/column) policy attachment per ADR-019. A byScope selector carries a scope (a resource IRI), an optional except list, and an optional matching block (attribute predicates that narrow which resources within the scope the policy applies to)."""@en .
 tessera:byClassification a owl:NamedIndividual ; rdfs:label "by classification"@en .
 tessera:byDataset        a owl:NamedIndividual ; rdfs:label "by dataset"@en .
 tessera:byComposition    a owl:NamedIndividual ; rdfs:label "by composition"@en .
@@ -438,10 +502,7 @@ tessera:PrincipalSetFromTable a owl:Class ;
     rdfs:subClassOf tessera:PrincipalSelector ;
     rdfs:label "Principal set from table"@en ;
     rdfs:comment
-        "A principal set computed from rows in a data table. The table is "
-        "joined at policy-evaluation time (or materialized at emit time, "
-        "depending on adapter capability) against the principal taking the "
-        "action. Supports the custom ACL-table pattern."@en .
+        """A principal set computed from rows in a data table. The table is joined at policy-evaluation time (or materialized at emit time, depending on adapter capability) against the principal taking the action. Supports the custom ACL-table pattern."""@en .
 
 tessera:ResourceSetFromTable a owl:Class ;
     rdfs:subClassOf tessera:ResourceSelector ;
@@ -498,9 +559,7 @@ tessera:Obligation a owl:Class ;
     rdfs:subClassOf tessera:Entity ;
     rdfs:label "Obligation"@en ;
     rdfs:comment
-        "An action that must occur as a consequence of a policy applying. "
-        "Distinct from Conditions: conditions gate whether a policy applies; "
-        "obligations are consequences when it does."@en ;
+        """An action that must occur as a consequence of a policy applying. Distinct from Conditions: conditions gate whether a policy applies; obligations are consequences when it does."""@en ;
     skos:closeMatch odrl:Duty .
 
 tessera:AuditLog a owl:Class ;
@@ -533,9 +592,7 @@ tessera:Transformation a owl:Class ;
     rdfs:subClassOf tessera:Entity ;
     rdfs:label "Transformation"@en ;
     rdfs:comment
-        "A function applied to data on read. Subclasses name the function "
-        "(Mask, Hash, Redact, etc.); the parameters of a specific application "
-        "of that function live on a TransformationInstance."@en .
+        """A function applied to data on read. Subclasses name the function (Mask, Hash, Redact, etc.); the parameters of a specific application of that function live on a TransformationInstance."""@en .
 
 tessera:Mask       a owl:Class ; rdfs:subClassOf tessera:Transformation ; rdfs:label "Mask"@en .
 tessera:Hash       a owl:Class ; rdfs:subClassOf tessera:Transformation ; rdfs:label "Hash"@en .
@@ -553,52 +610,39 @@ tessera:TransformationInstance a owl:Class ;
     rdfs:subClassOf tessera:Entity ;
     rdfs:label "Transformation instance"@en ;
     rdfs:comment
-        "A specific application of a Transformation, carrying any parameters "
-        "required. The `type` property identifies the Transformation subclass; "
-        "additional properties carry per-transformation parameters. See ADR-016 "
-        "for the parameter shapes formalized in v0."@en .
+        """A specific application of a Transformation, carrying any parameters required. The `type` property identifies the Transformation subclass; additional properties carry per-transformation parameters. See ADR-016 for the parameter shapes formalized in v0."""@en .
 
 tessera:replacement a owl:DatatypeProperty ;
     rdfs:label "replacement"@en ;
     rdfs:comment
-        "The literal value to substitute for the column's content when a "
-        "Redact transformation is applied. Accepts JSON-encodable values: "
-        "strings, numbers, booleans, or null. The adapter is responsible "
-        "for type-compatibility with the column at emission time."@en ;
+        """The literal value to substitute for the column's content when a Redact transformation is applied. Accepts JSON-encodable values: strings, numbers, booleans, or null. The adapter is responsible for type-compatibility with the column at emission time."""@en ;
     rdfs:domain tessera:TransformationInstance .
 
 tessera:maskChar a owl:DatatypeProperty ;
     rdfs:label "mask character"@en ;
     rdfs:comment
-        "The character used for masked positions in a Mask transformation. "
-        "Single character; default 'X' if omitted."@en ;
+        """The character used for masked positions in a Mask transformation. Single character; default 'X' if omitted."""@en ;
     rdfs:domain tessera:TransformationInstance ;
     rdfs:range xsd:string .
 
 tessera:preserveFirst a owl:DatatypeProperty ;
     rdfs:label "preserve first N characters"@en ;
     rdfs:comment
-        "Non-negative integer. The first N Unicode code points of the value "
-        "pass through unchanged in a Mask transformation. Default 0."@en ;
+        """Non-negative integer. The first N Unicode code points of the value pass through unchanged in a Mask transformation. Default 0."""@en ;
     rdfs:domain tessera:TransformationInstance ;
     rdfs:range xsd:nonNegativeInteger .
 
 tessera:preserveLast a owl:DatatypeProperty ;
     rdfs:label "preserve last N characters"@en ;
     rdfs:comment
-        "Non-negative integer. The last N Unicode code points of the value "
-        "pass through unchanged in a Mask transformation. Default 0. If the "
-        "sum of preserveFirst and preserveLast meets or exceeds the value's "
-        "character length, the value is returned unchanged."@en ;
+        """Non-negative integer. The last N Unicode code points of the value pass through unchanged in a Mask transformation. Default 0. If the sum of preserveFirst and preserveLast meets or exceeds the value's character length, the value is returned unchanged."""@en ;
     rdfs:domain tessera:TransformationInstance ;
     rdfs:range xsd:nonNegativeInteger .
 
 tessera:algorithm a owl:DatatypeProperty ;
     rdfs:label "hash algorithm"@en ;
     rdfs:comment
-        "The hash algorithm for a Hash transformation. One of 'sha256', "
-        "'sha512', 'sha1'. Default 'sha256'. Salted hashing is deferred to "
-        "v1 pending secret-reference vocabulary."@en ;
+        """The hash algorithm for a Hash transformation. One of 'sha256', 'sha512', 'sha1'. Default 'sha256'. Salted hashing is deferred to v1 pending secret-reference vocabulary."""@en ;
     rdfs:domain tessera:TransformationInstance ;
     rdfs:range xsd:string .
 
@@ -652,10 +696,7 @@ tessera:confidenceLow    a tessera:ExtractionConfidence ; rdfs:label "low"@en .
 tessera:appliesTo a owl:ObjectProperty ;
     rdfs:label "applies to"@en ;
     rdfs:comment
-        "Relates a policy (Policy container, or a standalone PolicyConstraint) "
-        "to the resource selector identifying the resources it constrains. "
-        "On a Policy, appliesTo is policy-wide and shared across all rules. "
-        "See ADR-014 for the property's extension to Policy."@en ;
+        """Relates a policy (Policy container, or a standalone PolicyConstraint) to the resource selector identifying the resources it constrains. On a Policy, appliesTo is policy-wide and shared across all rules. See ADR-014 for the property's extension to Policy."""@en ;
     rdfs:domain [
         a owl:Class ;
         owl:unionOf ( tessera:Policy tessera:PolicyConstraint )
@@ -689,10 +730,7 @@ tessera:condition a owl:ObjectProperty ;
 tessera:transformation a owl:ObjectProperty ;
     rdfs:label "transformation"@en ;
     rdfs:comment
-        "Relates a column visibility constraint to the transformation instance "
-        "applied to matching data. Per ADR-016, every reference is a structured "
-        "TransformationInstance carrying the transformation type and any "
-        "applicable parameters."@en ;
+        """Relates a column visibility constraint to the transformation instance applied to matching data. Per ADR-016, every reference is a structured TransformationInstance carrying the transformation type and any applicable parameters."""@en ;
     rdfs:domain tessera:ColumnVisibilityConstraint ;
     rdfs:range tessera:TransformationInstance .
 
@@ -711,11 +749,7 @@ tessera:requiresCapability a owl:DatatypeProperty ;
 tessera:defaultStrategy a owl:ObjectProperty ;
     rdfs:label "default strategy"@en ;
     rdfs:comment
-        "Relates a policy (Policy container, or a standalone PolicyConstraint) "
-        "to the strategy by which it handles principals who match no "
-        "affirmative rule. Optional; when omitted, the framework treats the "
-        "policy as fail-closed (equivalent to tessera:none). See ADR-013 for "
-        "the property's introduction and ADR-014 for its extension to Policy."@en ;
+        """Relates a policy (Policy container, or a standalone PolicyConstraint) to the strategy by which it handles principals who match no affirmative rule. Optional; when omitted, the framework treats the policy as fail-closed (equivalent to tessera:none). See ADR-013 for the property's introduction and ADR-014 for its extension to Policy."""@en ;
     rdfs:domain [
         a owl:Class ;
         owl:unionOf ( tessera:Policy tessera:PolicyConstraint )
@@ -725,11 +759,7 @@ tessera:defaultStrategy a owl:ObjectProperty ;
 tessera:baselineGroup a owl:DatatypeProperty ;
     rdfs:label "baseline group"@en ;
     rdfs:comment
-        "Names the group treated as the universal baseline when "
-        "defaultStrategy is tessera:explicitBaselineGroup. Required if and "
-        "only if that strategy is in use. Value is the platform-native group "
-        "identifier (e.g., 'account users' on Databricks). See ADR-013 for "
-        "the property's introduction and ADR-014 for its extension to Policy."@en ;
+        """Names the group treated as the universal baseline when defaultStrategy is tessera:explicitBaselineGroup. Required if and only if that strategy is in use. Value is the platform-native group identifier (e.g., 'account users' on Databricks). See ADR-013 for the property's introduction and ADR-014 for its extension to Policy."""@en ;
     rdfs:domain [
         a owl:Class ;
         owl:unionOf ( tessera:Policy tessera:PolicyConstraint )
@@ -739,31 +769,21 @@ tessera:baselineGroup a owl:DatatypeProperty ;
 tessera:policyKind a owl:ObjectProperty ;
     rdfs:label "policy kind"@en ;
     rdfs:comment
-        "Discriminator selecting the policy domain (e.g., "
-        "tessera:RowVisibilityConstraint) for a Policy. Determines the legal "
-        "shape of rules within the Policy. See ADR-014."@en ;
+        """Discriminator selecting the policy domain (e.g., tessera:RowVisibilityConstraint) for a Policy. Determines the legal shape of rules within the Policy. See ADR-014."""@en ;
     rdfs:domain tessera:Policy ;
     rdfs:range rdfs:Class .
 
 tessera:rules a owl:ObjectProperty ;
     rdfs:label "rules"@en ;
     rdfs:comment
-        "Ordered list of rules in a Policy. Order is semantically meaningful: "
-        "rules are evaluated in order under first-match combining (ADR-015). "
-        "Each rule is a structurally slimmer constraint with principal, "
-        "optional condition, and effect (and kind-specific extras such as "
-        "transformation for ColumnVisibility)."@en ;
+        """Ordered list of rules in a Policy. Order is semantically meaningful: rules are evaluated in order under first-match combining (ADR-015). Each rule is a structurally slimmer constraint with principal, optional condition, and effect (and kind-specific extras such as transformation for ColumnVisibility)."""@en ;
     rdfs:domain tessera:Policy ;
     rdfs:range rdf:List .
 
 tessera:defaultBranch a owl:ObjectProperty ;
     rdfs:label "default branch"@en ;
     rdfs:comment
-        "The default branch of a Policy under defaultStrategy: "
-        "negated-complement. Applies when no rule in `rules` matches. "
-        "A slimmer rule (no principal selector; effect and optional "
-        "condition only). Required iff defaultStrategy is "
-        "tessera:negatedComplement; forbidden otherwise. See ADR-014."@en ;
+        """The default branch of a Policy under defaultStrategy: negated-complement. Applies when no rule in `rules` matches. A slimmer rule (no principal selector; effect and optional condition only). Required iff defaultStrategy is tessera:negatedComplement; forbidden otherwise. See ADR-014."""@en ;
     rdfs:domain tessera:Policy .
 
 # --- Resource classification ---
@@ -778,13 +798,53 @@ tessera:classification a owl:ObjectProperty ;
 
 tessera:selectorKind a owl:ObjectProperty ;
     rdfs:label "selector kind"@en ;
-    rdfs:comment "Identifies the kind of a Selector (byIdentity, byClassification, byDataset, etc.)."@en ;
+    rdfs:comment "Identifies the kind of a Selector (byIdentity, byClassification, byDataset, byScope, etc.)."@en ;
     rdfs:domain tessera:Selector .
 
 tessera:resourceRef a owl:DatatypeProperty ;
     rdfs:label "resource reference"@en ;
     rdfs:comment "URI of a specific resource, used by byIdentity selectors."@en ;
     rdfs:range xsd:string .
+
+# --- byScope selector and ABAC attribute matching (ADRs 019, 020) ---
+
+tessera:scope a owl:DatatypeProperty ;
+    rdfs:label "scope"@en ;
+    rdfs:comment
+        """The resource IRI at which a byScope selector attaches. The kind (catalog/schema/table/column) is inferred from the IRI's prefix per ADR-019."""@en ;
+    rdfs:domain tessera:ResourceSelector ;
+    rdfs:range xsd:string .
+
+tessera:exceptFromScope a owl:DatatypeProperty ;
+    rdfs:label "except from scope"@en ;
+    rdfs:comment
+        """Optional list of resource IRIs to exclude from a byScope selector's scope. Narrows the resource set; structurally distinct from principal exclusion. See ADR-019."""@en ;
+    rdfs:domain tessera:ResourceSelector ;
+    rdfs:range xsd:string .
+
+tessera:matching a owl:ObjectProperty ;
+    rdfs:label "matching"@en ;
+    rdfs:comment
+        """Optional attribute-matching expression on a byScope selector. Narrows which resources within the scope the policy applies to. Composes via the byComposition algebra (match: and|or|not, criteria: [...]) over AttributeMatcher leaves. See ADR-020."""@en ;
+    rdfs:domain tessera:ResourceSelector .
+
+tessera:AttributeMatcher a owl:Class ;
+    rdfs:subClassOf tessera:Entity ;
+    rdfs:label "Attribute matcher"@en ;
+    rdfs:comment
+        """A leaf in the matching expression. Names an attribute axis and a value; matches resources whose attribute on that axis is the named value (with hierarchical subsumption applied per axisType). See ADR-020."""@en .
+
+tessera:axis a owl:ObjectProperty ;
+    rdfs:label "axis"@en ;
+    rdfs:comment "Relates an AttributeMatcher to the axis it tests against."@en ;
+    rdfs:domain tessera:AttributeMatcher ;
+    rdfs:range tessera:AttributeAxis .
+
+tessera:axisValue a owl:ObjectProperty ;
+    rdfs:label "axis value"@en ;
+    rdfs:comment
+        """Relates an AttributeMatcher to the value it tests for. For hierarchical axes, this is a class reference; for flat axes, a named individual."""@en ;
+    rdfs:domain tessera:AttributeMatcher .
 
 tessera:tableRef a owl:DatatypeProperty ;
     rdfs:label "table reference"@en ;

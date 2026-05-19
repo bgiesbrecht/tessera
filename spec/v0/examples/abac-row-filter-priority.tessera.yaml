@@ -1,0 +1,106 @@
+# ABAC row-filter policy — three-branch priority visibility.
+#
+# Worked-example artifact for the ABAC RLS exercise. Companion files:
+#   abac-row-filter-priority.jsonld        — canonical (JSON-LD) form
+#   abac-row-filter-priority.databricks.sql — adapter emission target
+#   abac-row-filter-priority.diagnostic.md — per-element enforcement report
+#   abac-row-filter-priority.comparison.md — Phase 3 deployment + comparison
+#
+# Inputs: docs/exercises/abac-row-filter-priority-inputs.md
+#
+# Three-branch row visibility driven by ABAC tag-matching:
+#   1. Members of bg_rls_demo_all_priority_ops see all rows.
+#   2. Members of bg_rls_demo_high_priority_ops see rows with priority 1, 2.
+#   3. Everyone else (the default branch) sees rows with priority 3, 4, 5.
+#
+# defaultStrategy is negated-complement: principals matching neither
+# restrictive rule fall through to the defaultBranch, which carries the
+# default-priority predicate.
+#
+# Notes on the vocabulary used here:
+#   - Post-ABAC vocabulary (byScope, matching, attribute-axis matching)
+#     is used as if ADRs 018–021's spec changes were in place. Stage 4
+#     hasn't landed yet; this artifact will NOT validate against the
+#     current schema.json.
+#   - The matching axis `bg:rowDiscriminator` is an adopter-namespaced
+#     axis declared specifically for this exercise. v0's four
+#     well-known axes (sensitivity, dataSubject, regulatoryRegime,
+#     businessDomain) don't fit "row-classification-key column." The
+#     diagnostic captures this as a finding.
+#   - Per-rule conditions reference `column:$matched` — a convention
+#     for "the value of the MATCH COLUMNS-aliased column at row
+#     evaluation time." v0's condition algebra doesn't formalize this;
+#     the diagnostic captures it as a second finding.
+
+"@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
+"@type": Policy
+"@id": policy:abac-row-filter-priority
+version: 1.0.0
+policyKind: RowVisibilityConstraint
+description: >
+  Three-branch row visibility on tables in bg_rls_demo whose
+  o_orderpriority column is tagged for ABAC row filtering. Members of
+  bg_rls_demo_all_priority_ops see all rows; members of
+  bg_rls_demo_high_priority_ops see priority 1-URGENT and 2-HIGH only;
+  everyone else sees priority 3-MEDIUM, 4-NOT SPECIFIED, 5-LOW.
+
+appliesTo:
+  selector: byScope
+  scope: catalog:bg_rls_demo
+  matching:
+    attributes:
+      bg:rowDiscriminator: orderpriority
+
+action: Read
+
+defaultStrategy: negated-complement
+
+# Rules are evaluated in order (first-match wins per ADR-015). Most
+# permissive first; second-most-permissive second; default branch
+# below handles everyone matching neither rule.
+rules:
+
+  # Rule 1 — all_priority_ops sees every row.
+  - principal:
+      selector: byIdentity
+      resource: group:bg_rls_demo_all_priority_ops
+    effect: keep-matching-rows
+    # No condition — every row is kept for matching principals.
+
+  # Rule 2 — high_priority_ops sees the high-priority rows only.
+  - principal:
+      selector: byIdentity
+      resource: group:bg_rls_demo_high_priority_ops
+    effect: keep-matching-rows
+    condition:
+      op: in
+      operands:
+        - column:$matched
+      values:
+        - "1-URGENT"
+        - "2-HIGH"
+
+# defaultBranch — everyone else sees the lower-priority rows.
+defaultBranch:
+  effect: keep-matching-rows
+  condition:
+    op: in
+    operands:
+      - column:$matched
+    values:
+      - "3-MEDIUM"
+      - "4-NOT SPECIFIED"
+      - "5-LOW"
+
+capabilityRequirements:
+  - scoped-policy-attachment
+  - attribute-axis-matching
+  - tag-taxonomy-mapping
+  - matched-column-reference
+
+provenance:
+  notes: |
+    Hand-authored for the ABAC RLS exercise. Blind derivation from
+    docs/exercises/abac-row-filter-priority-inputs.md; Brice's existing
+    implementation has not been shared. Phase 3 comparison happens
+    after Phase 2 commits.

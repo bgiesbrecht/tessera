@@ -1,0 +1,28 @@
+# Tessera policy — table-grants Scenario C
+# Function execute grant.
+#
+# First exercise using the Execute action (added to v0 prior to Phase 2).
+# First use of the function: IRI prefix (informal convention, surfaced in
+# the diagnostic).
+
+policy:
+  id: table-grants-scenario-c
+  version: 1.0.0
+  kind: RowVisibilityConstraint
+  description: |
+    Marketing analytics team can Execute the compute_customer_ltv function.
+    Gates who may invoke the business-logic function. Scoped to policy intent;
+    platform-mechanism uses of EXECUTE (UDFs as policy-enforcement vehicles)
+    remain adapter scaffolding, not modeled here.
+
+  appliesTo:
+    selector: byIdentity
+    resource: function:bg_rls_demo.tpch.compute_customer_ltv
+
+  action: Execute
+
+  rules:
+    - principal:
+        selector: byIdentity
+        resource: group:bg_rls_demo_marketing_analytics
+      effect: allow
