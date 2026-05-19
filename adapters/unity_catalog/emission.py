@@ -55,20 +55,28 @@ def emit_policy(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult
 
 
 def _emit_row_visibility(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult:
+    applies_to = policy.get("appliesTo") or {}
+    selector = applies_to.get("selector")
+
+    # byScope dispatches to the ABAC row-filter emission path: CREATE POLICY ...
+    # ROW FILTER ... MATCH COLUMNS has_tag_value(...) AS alias USING COLUMNS (alias).
+    # See _emit_row_visibility_by_scope.
+    if selector == "byScope":
+        return _emit_row_visibility_by_scope(policy, config)
+
     diagnostics: list[Diagnostic] = []
     policy_id = policy.get("@id")
-    applies_to = policy.get("appliesTo") or {}
     raw_resource = applies_to.get("resource") or ""
     target_table = config.bind_resource(raw_resource) or _strip_iri(raw_resource)
     rules = policy.get("rules") or []
 
-    if applies_to.get("selector") != "byIdentity":
+    if selector != "byIdentity":
         diagnostics.append(Diagnostic(
             severity=DiagnosticSeverity.WARNING,
             code="UNIMPLEMENTED_SELECTOR_FOR_ROW_VISIBILITY",
             message=(
                 "scaffold currently emits row filters only for byIdentity table targets. "
-                f"Got selector={applies_to.get('selector')!r}."
+                f"Got selector={selector!r}."
             ),
             location="appliesTo.selector",
         ))
@@ -110,6 +118,268 @@ def _emit_row_visibility(policy: dict[str, Any], config: AdapterConfig) -> Emiss
         statements=statements,
         diagnostics=diagnostics,
     )
+
+
+def _emit_row_visibility_by_scope(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult:
+    """Lower a byScope+matching RowVisibilityConstraint to Databricks ABAC DDL.
+
+    Emission target (Mechanism B — CASE inside the UDF, the only natural choice
+    when there are more than two branches):
+
+        CREATE OR REPLACE FUNCTION <fn>(<param> STRING) RETURNS BOOLEAN
+        RETURN
+          CASE
+            WHEN is_account_group_member('A') THEN TRUE
+            WHEN is_account_group_member('B') THEN <param> IN (...)
+            ELSE <param> IN (...)
+          END;
+
+        GRANT EXECUTE ON FUNCTION <fn> TO `account users`;
+
+        CREATE OR REPLACE POLICY <policy>
+          ON <CATALOG|SCHEMA|TABLE> <id>
+          ROW FILTER <fn>
+            TO `account users`
+            FOR TABLES
+            MATCH COLUMNS has_tag_value('<tag_key>', '<tag_value>') AS <alias>
+            USING COLUMNS (<alias>);
+
+    The Tessera->platform tag translation comes from config.tag_taxonomy (ADR-021).
+    `column:$matched` in IR rule conditions substitutes the function parameter
+    name at emit time — the IR's per-policy abstraction over the matched column.
+    """
+    diagnostics: list[Diagnostic] = []
+    policy_id = policy.get("@id")
+    applies_to = policy.get("appliesTo") or {}
+    raw_scope = applies_to.get("scope") or ""
+    scope_kind, scope_id = _split_scope_iri(raw_scope)
+    if not scope_kind or not scope_id:
+        return EmissionResult(
+            policy_id=policy_id, target_artifacts=[], statements=[],
+            diagnostics=[Diagnostic(
+                severity=DiagnosticSeverity.ERROR,
+                code="MALFORMED_SCOPE",
+                message=(
+                    f"byScope appliesTo.scope must be of the form <kind>:<id> "
+                    f"(catalog: / schema: / table: / column:); got {raw_scope!r}."
+                ),
+                location="appliesTo.scope",
+            )],
+        )
+
+    # Resolve the matching predicate to a Databricks tag.
+    matching = applies_to.get("matching") or {}
+    tag_clauses, tag_value_for_alias, tag_diags = _render_match_columns(matching, config)
+    diagnostics.extend(tag_diags)
+
+    # Use the tag-value-derived alias as the function parameter name. This is
+    # arbitrary but consistent (the hand-derived target uses the value verbatim).
+    alias = tag_value_for_alias or "matched_col"
+    param_name = alias
+
+    # Build the CASE body. Rules + defaultBranch combine in IR-declared order.
+    case_lines: list[str] = []
+    rules = policy.get("rules") or []
+    for idx, rule in enumerate(rules):
+        line, rule_diags = _render_abac_case_branch(rule, config, idx, param_name)
+        diagnostics.extend(rule_diags)
+        if line:
+            case_lines.append(line)
+
+    default_branch = policy.get("defaultBranch") or {}
+    if default_branch:
+        else_predicate = _render_abac_condition_predicate(
+            default_branch.get("condition") or {}, param_name, "default", diagnostics,
+        )
+        if else_predicate:
+            case_lines.append(f"ELSE {else_predicate}")
+        else:
+            # Effect alone determines outcome when no condition.
+            case_lines.append("ELSE TRUE" if default_branch.get("effect") in ("keep-matching-rows", "allow") else "ELSE FALSE")
+    else:
+        case_lines.append("ELSE FALSE")
+
+    case_body = "\n    ".join(case_lines)
+
+    # Function emitted into the bg_rls_demo.tpch schema by convention; the
+    # adapter cannot know which schema to use without per-policy config. The
+    # `extras["abac_function_schema"]` setting overrides; default uses the
+    # scope catalog plus a conventional `tpch` schema. A real deployment
+    # should pin this explicitly.
+    function_schema = config.extras.get("abac_function_schema")
+    if not function_schema:
+        if scope_kind == "CATALOG":
+            function_schema = f"{scope_id}.tpch"
+        elif scope_kind == "SCHEMA":
+            function_schema = scope_id
+        else:
+            function_schema = scope_id.rsplit(".", 1)[0] if "." in scope_id else scope_id
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.INFO,
+            code="ABAC_FUNCTION_SCHEMA_INFERRED",
+            message=(
+                f"Function schema inferred as {function_schema!r}; override via "
+                "config.extras['abac_function_schema'] for production deployments."
+            ),
+        ))
+
+    slug = (policy_id or "policy").split(":")[-1].replace("-", "_")
+    function_name = f"{function_schema}.tessera__{slug}__filter"
+    policy_name = f"tessera__{slug}"
+    grantee = config.extras.get("row_filter_grantee", "account users")
+
+    statements = [
+        f"CREATE OR REPLACE FUNCTION {function_name}({param_name} STRING)\n"
+        f"RETURNS BOOLEAN\n"
+        f"RETURN\n"
+        f"  CASE\n"
+        f"    {case_body}\n"
+        f"  END;",
+        f"GRANT EXECUTE ON FUNCTION {function_name} TO `{grantee}`;",
+        f"CREATE OR REPLACE POLICY {policy_name}\n"
+        f"  ON {scope_kind} {scope_id}\n"
+        f"  ROW FILTER {function_name}\n"
+        f"    TO `{grantee}`\n"
+        f"    FOR TABLES\n"
+        f"    {tag_clauses} AS {alias}\n"
+        f"    USING COLUMNS ({alias});",
+    ]
+
+    return EmissionResult(
+        policy_id=policy_id,
+        target_artifacts=[f"{scope_kind.lower()}:{scope_id}"],
+        statements=statements,
+        diagnostics=diagnostics,
+    )
+
+
+def _split_scope_iri(scope_iri: str) -> tuple[str | None, str | None]:
+    """Convert 'catalog:foo' / 'schema:foo.bar' / 'table:a.b.c' into (KIND, identifier)."""
+    if ":" not in scope_iri:
+        return None, None
+    prefix, ident = scope_iri.split(":", 1)
+    mapping = {
+        "catalog": "CATALOG", "schema": "SCHEMA",
+        "table": "TABLE", "column": "COLUMN",
+    }
+    return mapping.get(prefix.lower()), ident
+
+
+def _render_match_columns(
+    matching: dict[str, Any], config: AdapterConfig,
+) -> tuple[str, str | None, list[Diagnostic]]:
+    """Build the MATCH COLUMNS clause body from the IR's matching predicate.
+
+    Returns (clause_string, alias_hint, diagnostics).
+    """
+    diagnostics: list[Diagnostic] = []
+    attributes = matching.get("attributes") or {}
+    if not attributes:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="EMPTY_MATCHING",
+            message="byScope without matching attributes attaches the policy to every resource in scope; "
+                    "MATCH COLUMNS clause omitted.",
+        ))
+        return "MATCH COLUMNS TRUE", None, diagnostics
+
+    predicates: list[str] = []
+    last_value: str | None = None
+    for axis, value in attributes.items():
+        # ADR-021 tag-taxonomy lookup: (axis, value) → (tag_key, tag_value).
+        binding = config.tag_taxonomy.get((axis, str(value)))
+        if binding:
+            tag_key, tag_value = binding
+        else:
+            # Fallback: use the IR's axis IRI suffix as the tag key, value verbatim.
+            # Surface as a warning so operators know to declare the binding.
+            tag_key = axis.split(":")[-1] if ":" in axis else axis
+            tag_value = str(value)
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNBOUND_TAG_ATTRIBUTE",
+                message=(
+                    f"matching attribute ({axis!r}, {value!r}) has no tag_taxonomy entry; "
+                    f"falling back to has_tag_value({tag_key!r}, {tag_value!r}). Configure "
+                    "config.tag_taxonomy for production."
+                ),
+            ))
+        predicates.append(f"has_tag_value('{tag_key}', '{tag_value}')")
+        last_value = tag_value
+
+    # When the IR has multiple matching attributes, the simplest combinator on
+    # Databricks is AND. The IR's canonical form supports OR via the `match`
+    # property; the sugar form is implicit AND.
+    body = " AND ".join(predicates)
+    return f"MATCH COLUMNS {body}", last_value, diagnostics
+
+
+def _render_abac_case_branch(
+    rule: dict[str, Any], config: AdapterConfig, idx: int, param_name: str,
+) -> tuple[str, list[Diagnostic]]:
+    diagnostics: list[Diagnostic] = []
+    principal = rule.get("principal") or {}
+    effect = rule.get("effect")
+    if principal.get("selector") != "byIdentity":
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="UNSUPPORTED_PRINCIPAL_SELECTOR",
+            message=f"rule {idx}: ABAC row-filter scaffold supports only byIdentity principal selectors.",
+            location=f"rules[{idx}].principal.selector",
+        ))
+        return "", diagnostics
+
+    principal_ref = principal.get("resource") or ""
+    bound = config.bind_principal(principal_ref) or _strip_iri(principal_ref)
+    membership = f"is_account_group_member('{bound}')"
+
+    predicate = _render_abac_condition_predicate(
+        rule.get("condition") or {}, param_name, idx, diagnostics,
+    )
+    if effect in ("keep-matching-rows", "allow"):
+        then_expr = predicate or "TRUE"
+    elif effect in ("drop-matching-rows", "deny"):
+        then_expr = f"NOT ({predicate})" if predicate else "FALSE"
+    else:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="UNSUPPORTED_EFFECT_FOR_ABAC_ROW_FILTER",
+            message=f"rule {idx}: effect {effect!r} unsupported by ABAC row-filter emission.",
+            location=f"rules[{idx}].effect",
+        ))
+        return "", diagnostics
+
+    return f"WHEN {membership} THEN {then_expr}", diagnostics
+
+
+def _render_abac_condition_predicate(
+    condition: dict[str, Any], param_name: str, idx: Any, diagnostics: list[Diagnostic],
+) -> str:
+    """Render a condition's predicate body using `param_name` for any column:$matched reference."""
+    if not condition:
+        return ""
+    op = condition.get("op")
+    if op != "in":
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="UNIMPLEMENTED_CONDITION_OP",
+            message=f"rule {idx}: ABAC row-filter emission currently supports op=in; got {op!r}.",
+            location=f"rules[{idx}].condition.op",
+        ))
+        return ""
+    operands = condition.get("operands") or []
+    values = condition.get("values") or []
+    if len(operands) != 1:
+        return ""
+    operand = operands[0] if isinstance(operands[0], str) else ""
+    # column:$matched is the per-policy abstraction for the matched column; the
+    # adapter substitutes the function parameter name at emit time.
+    if operand in ("column:$matched", "$matched") or operand.endswith(":$matched"):
+        col_ref = param_name
+    else:
+        col_ref = _column_only(_strip_iri(operand))
+    rendered_values = ", ".join(f"'{str(v)}'" for v in values)
+    return f"{col_ref} IN ({rendered_values})"
 
 
 def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult:

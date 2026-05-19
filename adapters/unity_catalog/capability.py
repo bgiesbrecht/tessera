@@ -37,9 +37,18 @@ UNITY_CATALOG_PROFILE = CapabilityProfile(
         ),
         Capability.ATTRIBUTE_BASED_SCOPING: (
             CapabilitySupport.PARTIAL,
-            "ABAC via governed tags + CREATE POLICY ... ON CATALOG/SCHEMA/TABLE is supported in principle; "
-            "the scaffold currently emits per-table mechanisms and routes ABAC paths through a TODO. ADR-023's "
-            "γ-with-refinement combination is observed but not yet enforced at emission time.",
+            "ABAC row visibility via byScope + matching is implemented and live-verified 2026-05-19 "
+            "against bg_rls_demo.tpch.orders_abac. Emission produces the three-piece DDL: "
+            "(1) CREATE OR REPLACE FUNCTION ... RETURNS BOOLEAN with CASE branching (Mechanism B); "
+            "(2) GRANT EXECUTE ... TO `account users` (adapter scaffolding per ADR-025); "
+            "(3) CREATE OR REPLACE POLICY ... ON CATALOG/SCHEMA/TABLE ... ROW FILTER ... "
+            "FOR TABLES MATCH COLUMNS has_tag_value(<tag_key>, <tag_value>) AS alias "
+            "USING COLUMNS (alias). The IR's `column:$matched` reference substitutes the function "
+            "parameter at emit time. tag_taxonomy (ADR-021) translates Tessera axis+value to "
+            "Databricks tag key+value; unbound attributes fall back with a warning. "
+            "ABAC column masking via byScope is not yet implemented (the abac-column-mask-policy-* "
+            "IR shapes are queued). ADR-023's γ-with-refinement combination is observed but not "
+            "yet enforced at emission time.",
         ),
         Capability.DATASET_DRIVEN_PRINCIPALS: (
             CapabilitySupport.PARTIAL,

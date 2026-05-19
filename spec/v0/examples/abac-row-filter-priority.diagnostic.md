@@ -141,3 +141,32 @@ The row-filter mechanism on Databricks ABAC inherits the same account-group cach
 - **Not an attempt to validate every ABAC syntax variant.** WHEN clauses (table-level conditions), USING COLUMNS with multiple args, and other ABAC features the worked example doesn't exercise remain unvalidated.
 
 These are intentional scope choices.
+
+---
+
+## 9. Postscript — adapter coverage 2026-05-19
+
+The Unity Catalog adapter now emits this policy. `_emit_row_visibility_by_scope` in `adapters/unity_catalog/emission.py` produces the three-piece DDL: `CREATE OR REPLACE FUNCTION` with the Mechanism B CASE body, `GRANT EXECUTE` (scaffolding per ADR-025), and `CREATE OR REPLACE POLICY ... ON CATALOG bg_rls_demo ROW FILTER ... FOR TABLES MATCH COLUMNS has_tag_value('abac_column', 'orderpriority') AS orderpriority USING COLUMNS (orderpriority)`.
+
+`AdapterConfig.tag_taxonomy` carries the Tessera-to-Databricks tag translation:
+
+```python
+tag_taxonomy = {
+    ('bg:rowDiscriminator', 'orderpriority'): ('abac_column', 'orderpriority'),
+}
+```
+
+The IR's `column:$matched` reference in rule conditions substitutes the function parameter name at emit time — the IR's per-policy abstraction over the matched column.
+
+**Differences from the hand-derived target** (`abac-row-filter-priority.databricks.sql`):
+
+| Aspect | Hand-derived | Adapter | Why divergent |
+|---|---|---|---|
+| Function parameter name | `priority` | `orderpriority` | Adapter derives from the tag value; arbitrary either way |
+| Policy `MATCH COLUMNS` alias | `priority_col` | `orderpriority` | Same — adapter derives from the tag value |
+| `COMMENT 'Tessera ABAC row filter — ...'` clause | present | absent | Adapter doesn't emit COMMENT clauses yet (cosmetic; queued as a small refinement) |
+| Whitespace alignment | manually aligned for readability | standard formatting | Cosmetic |
+
+Substantively equivalent. Live-applied via `CREATE OR REPLACE POLICY` (the prior hand-derived policy with the same name was overwritten cleanly). Caller (not in either custom group; `account users` only) saw `4,499,708` rows in priorities `3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW` — exactly the ELSE branch, consistent with the prior exercise's verification.
+
+Capability profile entry `Capability.ATTRIBUTE_BASED_SCOPING` updated to reflect that ABAC row visibility is now implemented (PARTIAL overall; ABAC column masking via byScope is the remaining stub).
