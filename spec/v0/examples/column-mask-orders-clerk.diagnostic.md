@@ -153,3 +153,31 @@ The Unity Catalog adapter now emits this policy. The hand-derived SQL in `column
 Coverage scope of this emission path: `byIdentity` column targets; rules with `effect: allow` or `effect: transform`; `defaultBranch` with `effect: transform`; `Redact` transformation. `Mask` and `Hash` transformations have parameter-shape semantics settled in v0 but their SQL templates are queued. ABAC `byScope` column masking (the `abac-column-mask-policy-*` IR shapes) remains a separate emission path, not yet implemented.
 
 The hand-derived SQL file stays in this directory as historical record of the empirical target the exercise validated against.
+
+### Cross-platform coverage 2026-05-19 (same day, follow-on)
+
+The Snowflake adapter now also emits this policy. The same IR was lowered through `adapters/snowflake/emission.py` to a Snowflake masking-policy DDL block:
+
+```sql
+CREATE OR REPLACE MASKING POLICY BRICETEST.TESSERA.column_mask_orders_clerk_mask
+AS (O_CLERK VARCHAR) RETURNS VARCHAR ->
+  CASE
+    WHEN IS_ROLE_IN_SESSION('BG_RLS_DEMO_HIGH_PRIORITY_OPS') THEN O_CLERK
+    ELSE 'CLERK-REDACTED'
+  END;
+
+ALTER TABLE BRICETEST.TESSERA.SNOW_ORDERS
+  MODIFY COLUMN O_CLERK
+  SET MASKING POLICY BRICETEST.TESSERA.column_mask_orders_clerk_mask;
+```
+
+Live-executed against `BRICETEST.TESSERA.SNOW_ORDERS.O_CLERK`. With `USE SECONDARY ROLES NONE` and the role bound to `group:orders_full_access` set to `BG_RLS_DEMO_HIGH_PRIORITY_OPS`:
+
+| Active role | O_CLERK values returned |
+|---|---|
+| `BG_RLS_DEMO_HIGH_PRIORITY_OPS` | real `Clerk#000000…` values |
+| `BG_RLS_DEMO_ALL_PRIORITY_OPS` | `CLERK-REDACTED` |
+| `PUBLIC` | `CLERK-REDACTED` |
+| `ACCOUNTADMIN` | `CLERK-REDACTED` |
+
+Behavior matches the policy intent. The Tessera column-mask exercise is now empirically validated on both Databricks (column-mask-orders-clerk.databricks.sql, applied via UC adapter on the same day) and Snowflake (this run). The cross-platform parity test `adapters/tests/test_parity.py::test_column_visibility_parity_emits_clean_on_both_adapters` regression-tests both emission paths.

@@ -44,7 +44,15 @@ SNOWFLAKE_PROFILE = CapabilityProfile(
         ),
         Capability.COLUMN_VISIBILITY: (
             CapabilitySupport.SUPPORTED,
-            "Emitted via CREATE MASKING POLICY ... -> CASE plus ALTER TABLE ... MODIFY COLUMN ... SET MASKING POLICY.",
+            "Emitted via CREATE OR REPLACE MASKING POLICY ... AS (col VARCHAR) RETURNS VARCHAR -> CASE ... END "
+            "plus ALTER TABLE ... MODIFY COLUMN ... SET MASKING POLICY. Live-verified 2026-05-19 against "
+            "BRICETEST.TESSERA.SNOW_ORDERS.O_CLERK: identity-bound role sees real values; all other "
+            "tested roles (ACCOUNTADMIN, ALL_PRIORITY_OPS, PUBLIC) see the Redact replacement literal. "
+            "Coverage: byIdentity column targets; rules with effect=allow or effect=transform; "
+            "defaultBranch with effect=transform; Redact transformation. Role-discrimination semantics "
+            "are Intent B (IS_ROLE_IN_SESSION) per Snowflake's recommendation and the adapter's "
+            "convention (see issue #14). Mask and Hash transformations have SQL templates queued. "
+            "ABAC byScope column masking remains a separate emission path, not yet implemented.",
         ),
         Capability.ATTRIBUTE_BASED_SCOPING: (
             CapabilitySupport.PARTIAL,

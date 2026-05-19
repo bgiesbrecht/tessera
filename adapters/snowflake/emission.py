@@ -32,6 +32,8 @@ def emit_policy(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult
 
     if policy_kind == "RowVisibilityConstraint":
         return _emit_row_visibility(policy, config)
+    if policy_kind == "ColumnVisibilityConstraint":
+        return _emit_column_visibility(policy, config)
 
     return EmissionResult(
         policy_id=policy_id,
@@ -251,6 +253,190 @@ def _emit_row_visibility_by_dataset(
         statements=statements,
         diagnostics=diagnostics,
     )
+
+
+def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult:
+    """Lower a ColumnVisibilityConstraint to a Snowflake masking policy.
+
+    Emission target:
+        CREATE OR REPLACE MASKING POLICY <name>
+        AS (<col> VARCHAR) RETURNS VARCHAR ->
+          CASE
+            WHEN IS_ROLE_IN_SESSION('<role>') THEN <col>
+            ELSE '<replacement>'
+          END;
+
+        ALTER TABLE <table> MODIFY COLUMN <col> SET MASKING POLICY <name>;
+
+    Snowflake role-discrimination semantics per issue #14: the adapter emits
+    `IS_ROLE_IN_SESSION` (Intent B — permission-scope semantics, matches
+    Snowflake's documented recommendation). If a policy needs primary-role-only
+    discrimination (Intent A), that's a deferred design question, not implemented here.
+
+    Coverage scope: byIdentity column targets; rules with effect=allow or
+    effect=transform; defaultBranch with effect=transform; Redact transformation.
+    Mask and Hash emit NULL placeholders pending future scaffold passes.
+    ABAC byScope column masking is a separate emission path, queued.
+    """
+    diagnostics: list[Diagnostic] = []
+    policy_id = policy.get("@id")
+    applies_to = policy.get("appliesTo") or {}
+    raw_resource = applies_to.get("resource") or ""
+    bound_resource = config.bind_resource(raw_resource) or _strip_iri(raw_resource)
+    rules = policy.get("rules") or []
+    default_branch = policy.get("defaultBranch") or {}
+
+    if applies_to.get("selector") != "byIdentity":
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="UNIMPLEMENTED_SELECTOR_FOR_COLUMN_VISIBILITY",
+            message=(
+                "scaffold currently emits masking policies only for byIdentity column targets. "
+                f"Got selector={applies_to.get('selector')!r}. ABAC byScope column masking is queued."
+            ),
+            location="appliesTo.selector",
+        ))
+
+    if "." not in bound_resource:
+        return EmissionResult(
+            policy_id=policy_id, target_artifacts=[], statements=[],
+            diagnostics=[Diagnostic(
+                severity=DiagnosticSeverity.ERROR,
+                code="MALFORMED_COLUMN_REFERENCE",
+                message=(
+                    "ColumnVisibility appliesTo.resource must resolve (via resource_bindings or "
+                    "directly) to a fully-qualified <database>.<schema>.<table>.<column>; "
+                    f"got {bound_resource!r}."
+                ),
+                location="appliesTo.resource",
+            )],
+        )
+    target_table, target_column = bound_resource.rsplit(".", 1)
+    schema_qualified = target_table.rsplit(".", 1)[0] if target_table.count(".") >= 1 else target_table
+
+    # Each rule contributes a WHEN clause. The policy body's parameter name must
+    # not collide with any column name referenced in the body — see the row-access
+    # policy comment in _emit_row_visibility_by_dataset. For masking policies the
+    # parameter IS the column being masked, so the name should match (Snowflake
+    # binds positionally and uses the parameter name as the column reference
+    # inside the CASE). We use the column name verbatim as the parameter; the
+    # collision concern in the byDataset row-policy case does not apply here.
+    when_clauses: list[str] = []
+    for idx, rule in enumerate(rules):
+        principal = rule.get("principal") or {}
+        effect = rule.get("effect")
+        if principal.get("selector") != "byIdentity":
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_PRINCIPAL_SELECTOR",
+                message=f"rule {idx}: scaffold supports only byIdentity principal selectors for masking policies.",
+                location=f"rules[{idx}].principal.selector",
+            ))
+            continue
+        principal_ref = principal.get("resource") or ""
+        bound = config.bind_principal(principal_ref) or _strip_iri(principal_ref).upper()
+        membership = f"IS_ROLE_IN_SESSION('{bound}')"
+
+        if effect == "allow":
+            when_clauses.append(f"WHEN {membership} THEN {target_column}")
+        elif effect == "transform":
+            transform_expr, t_diags = _render_transformation_expression(
+                rule.get("transformation") or {}, target_column, idx,
+            )
+            diagnostics.extend(t_diags)
+            if transform_expr:
+                when_clauses.append(f"WHEN {membership} THEN {transform_expr}")
+        else:
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="COLUMN_MASK_EFFECT_UNSUPPORTED",
+                message=(
+                    f"rule {idx}: masking-policy emission supports effect=allow or "
+                    f"effect=transform; got {effect!r}."
+                ),
+                location=f"rules[{idx}].effect",
+            ))
+
+    if default_branch.get("effect") == "transform":
+        else_expr, db_diags = _render_transformation_expression(
+            default_branch.get("transformation") or {}, target_column, "default",
+        )
+        diagnostics.extend(db_diags)
+    elif default_branch.get("effect") == "allow":
+        else_expr = target_column
+    else:
+        else_expr = target_column  # no default branch ⇒ pass-through
+
+    case_body = "\n    ".join(when_clauses + [f"ELSE {else_expr}"])
+    policy_name = _mask_policy_name(policy_id, schema_qualified)
+
+    statements = [
+        f"CREATE OR REPLACE MASKING POLICY {policy_name}\n"
+        f"AS ({target_column} VARCHAR) RETURNS VARCHAR ->\n"
+        f"  CASE\n"
+        f"    {case_body}\n"
+        f"  END;",
+        f"ALTER TABLE {target_table}\n  MODIFY COLUMN {target_column}\n  SET MASKING POLICY {policy_name};",
+    ]
+
+    return EmissionResult(
+        policy_id=policy_id,
+        target_artifacts=[target_table],
+        statements=statements,
+        diagnostics=diagnostics,
+    )
+
+
+def _render_transformation_expression(
+    transformation: dict[str, Any], column_name: str, location_tag: Any,
+) -> tuple[str | None, list[Diagnostic]]:
+    """Render a TransformationInstance into a Snowflake SQL expression usable inside a CASE branch."""
+    diagnostics: list[Diagnostic] = []
+    ttype = transformation.get("type") or transformation.get("@type")
+    if ttype == "Redact":
+        replacement = transformation.get("replacement")
+        if replacement is None:
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.ERROR,
+                code="REDACT_MISSING_REPLACEMENT",
+                message="Redact transformation requires a `replacement` value (ADR-016).",
+                location=f"transformation@{location_tag}",
+            ))
+            return None, diagnostics
+        quoted = "'" + str(replacement).replace("'", "''") + "'"
+        return quoted, diagnostics
+    if ttype == "Mask":
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="MASK_TRANSFORMATION_NOT_IMPLEMENTED",
+            message="Mask transformation emission queued; emitting NULL placeholder.",
+            location=f"transformation@{location_tag}",
+        ))
+        return "NULL", diagnostics
+    if ttype == "Hash":
+        algorithm = (transformation.get("algorithm") or "sha256").lower()
+        if algorithm in ("sha256", "sha-256"):
+            # Snowflake's SHA2 with bit-length 256.
+            return f"SHA2({column_name}, 256)", diagnostics
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="HASH_ALGORITHM_NOT_IMPLEMENTED",
+            message=f"Hash algorithm {algorithm!r} emission queued; emitting NULL placeholder.",
+            location=f"transformation@{location_tag}",
+        ))
+        return "NULL", diagnostics
+    diagnostics.append(Diagnostic(
+        severity=DiagnosticSeverity.WARNING,
+        code="UNKNOWN_TRANSFORMATION_TYPE",
+        message=f"Unknown transformation type {ttype!r}; emitting NULL placeholder.",
+        location=f"transformation@{location_tag}",
+    ))
+    return "NULL", diagnostics
+
+
+def _mask_policy_name(policy_id: str | None, schema_qualified: str) -> str:
+    slug = (policy_id or "policy").split(":")[-1].replace("-", "_")
+    return f"{schema_qualified}.{slug}_mask"
 
 
 def _render_rule_branch(

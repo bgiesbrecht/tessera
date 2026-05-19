@@ -58,6 +58,46 @@ def test_row_visibility_parity_emits_clean_on_both_adapters():
     assert uc_sql != sf_sql, "Adapters emitted identical SQL — the contract did not lower to platform-native form"
 
 
+def test_column_visibility_parity_emits_clean_on_both_adapters():
+    """Same IR for the column-mask-orders-clerk policy, both adapters emit valid
+    platform-native column-mask DDL with the correct primitives.
+    """
+    policy = _load("column-mask-orders-clerk-policy.jsonld")
+
+    uc_config = AdapterConfig(
+        identity_bindings={"group:orders_full_access": "orders_full_access"},
+    )
+    sf_config = AdapterConfig(
+        identity_bindings={"group:orders_full_access": "ORDERS_FULL_ACCESS"},
+        resource_bindings={
+            "column:bg_rls_demo.tpch.orders.o_clerk": "BRICETEST.TESSERA.SNOW_ORDERS.O_CLERK",
+        },
+    )
+
+    uc = UnityCatalogAdapter(config=uc_config).emit(policy)
+    sf = SnowflakeAdapter(config=sf_config).emit(policy)
+
+    assert not uc.has_errors, f"UC emission errors: {uc.diagnostics}"
+    assert not sf.has_errors, f"Snowflake emission errors: {sf.diagnostics}"
+
+    uc_sql = "\n".join(uc.statements)
+    sf_sql = "\n".join(sf.statements)
+
+    # Both must produce the platform-native column-mask primitive.
+    assert "SET MASK" in uc_sql, "UC SQL missing column-mask attachment DDL"
+    assert "MASKING POLICY" in sf_sql, "Snowflake SQL missing masking-policy DDL"
+
+    # Both must reference the policy's Redact replacement literal.
+    assert "CLERK-REDACTED" in uc_sql and "CLERK-REDACTED" in sf_sql, \
+        "Redact replacement literal missing from one or both adapters' output"
+
+    # Platform-specific principal-binding mechanism present in each.
+    assert "is_account_group_member" in uc_sql
+    assert "IS_ROLE_IN_SESSION" in sf_sql
+
+    assert uc_sql != sf_sql
+
+
 def test_capability_profiles_differ_meaningfully():
     """Both adapters declare profiles, with different platform names."""
     uc = UnityCatalogAdapter()
@@ -68,3 +108,5 @@ def test_capability_profiles_differ_meaningfully():
     from adapters.contract.types import Capability, CapabilitySupport
     assert uc.capability_profile.support_for(Capability.ROW_VISIBILITY) == CapabilitySupport.SUPPORTED
     assert sf.capability_profile.support_for(Capability.ROW_VISIBILITY) == CapabilitySupport.SUPPORTED
+    assert uc.capability_profile.support_for(Capability.COLUMN_VISIBILITY) == CapabilitySupport.SUPPORTED
+    assert sf.capability_profile.support_for(Capability.COLUMN_VISIBILITY) == CapabilitySupport.SUPPORTED
