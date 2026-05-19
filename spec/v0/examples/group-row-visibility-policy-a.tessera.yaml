@@ -1,0 +1,87 @@
+# Group-based row visibility on bg_rls_demo.tpch.orders — Policy A.
+#
+# Worked-example artifact, post-ADR-014. Companion files:
+#   group-row-visibility-policy-a.jsonld     — canonical (JSON-LD) form
+#   group-row-visibility.databricks.sql      — adapter emission target
+#   group-row-visibility.diagnostic.md       — per-element enforcement report
+#   group-row-visibility.comparison.md       — Phase 3 comparison record
+#
+# Inputs: docs/exercises/group-row-visibility-inputs.md
+# Strategy: explicit-baseline-group (ADR-013) — the default branch is
+# grounded in explicit membership in Databricks' universal `account users`
+# group.
+#
+# This file uses the Policy container shape introduced in ADR-014. The
+# pre-ADR-014 multi-constraint @graph form is preserved in git history
+# (commit chain that landed ADR-014) for reference; the diagnostic and
+# comparison documents describe the gap that motivated the backport.
+
+"@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
+"@type": Policy
+"@id": policy:group-row-visibility-policy-a
+version: 1.0.0
+policyKind: RowVisibilityConstraint
+description: >
+  Three-branch row visibility on bg_rls_demo.tpch.orders driven by group
+  memberships. Default visibility (priorities 3-5) grounded in explicit
+  membership in the Databricks universal group `account users`.
+
+appliesTo:
+  selector: byIdentity
+  resource: table:bg_rls_demo.tpch.orders
+
+action: Read
+
+defaultStrategy: explicit-baseline-group
+baselineGroup: "account users"
+
+# Rules are evaluated in order; first match wins (ADR-015). The last rule
+# below is keyed off the baseline group (`account users`); the framework
+# recognizes it as the default branch under explicit-baseline-group.
+
+rules:
+
+  # Rule A1 — "all priority ops" group sees every row.
+  - principal:
+      selector: byIdentity
+      resource: group:bg_rls_demo_all_priority_ops
+    effect: keep-matching-rows
+    # No condition — every row is kept for matching principals.
+
+  # Rule A2 — "high priority ops" group sees the high-priority rows.
+  - principal:
+      selector: byIdentity
+      resource: group:bg_rls_demo_high_priority_ops
+    effect: keep-matching-rows
+    condition:
+      op: in
+      operands:
+        - column:bg_rls_demo.tpch.orders.o_orderpriority
+      values:
+        - "1-URGENT"
+        - "2-HIGH"
+
+  # Rule A3 — baseline (`account users`) sees the lower-priority rows.
+  # This rule is the default branch under the explicit-baseline-group
+  # strategy. The principal selector uses a URI-safe Tessera identifier
+  # (group:account-users); the verbatim platform-native group name
+  # ("account users", with a space) is carried by `baselineGroup` above.
+  # See `docs/issue-drafts` for the iri-safety-convention discussion.
+  - principal:
+      selector: byIdentity
+      resource: group:account-users
+    effect: keep-matching-rows
+    condition:
+      op: in
+      operands:
+        - column:bg_rls_demo.tpch.orders.o_orderpriority
+      values:
+        - "3-MEDIUM"
+        - "4-NOT SPECIFIED"
+        - "5-LOW"
+
+provenance:
+  notes: |
+    Hand-authored for the first worked example.
+    Rewritten to the Policy container shape after ADR-014 backported the
+    container into v0.

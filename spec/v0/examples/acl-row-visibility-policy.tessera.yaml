@@ -1,0 +1,111 @@
+# ACL-driven row visibility on bg_rls_demo.tpch.orders_rls_acl.
+#
+# Worked-example artifact (post-ADR-014 / ADR-015). Companion files:
+#   acl-row-visibility-policy.jsonld     — canonical (JSON-LD) form
+#   acl-row-visibility.databricks.sql    — adapter emission target
+#   acl-row-visibility.diagnostic.md     — per-element enforcement report
+#
+# Inputs: docs/exercises/acl-row-visibility-inputs.md
+#
+# Single-rule Policy. defaultStrategy: none — fail-closed for principals
+# without an ACL chain. This is the policy the framework should be able
+# to express; the exercise's value is partly measured by how cleanly v0
+# can or cannot represent the two-table-join nature of the pattern.
+#
+# See the diagnostic for the two v0 IR gaps this exercise surfaces:
+#   1. PrincipalSetFromTable models a single ACL table; this pattern uses
+#      a two-table join (rls_acl_mapping → rls_priority_acl via codename).
+#      The condition below carries the second leg as a best-effort
+#      exists-in-dataset, but v0 has no clean join-binding vocabulary.
+#   2. PrincipalSetFromTable has no case-insensitive / whitespace-trim
+#      match modifier. The existing implementation uses
+#      `lower(trim(...))`; the IR cannot declare this.
+
+"@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
+"@type": Policy
+"@id": policy:acl-row-visibility
+version: 1.0.0
+policyKind: RowVisibilityConstraint
+description: >
+  A principal sees rows of bg_rls_demo.tpch.orders_rls_acl whose
+  o_orderpriority is granted to them via the two-table ACL join
+  (rls_acl_mapping ⋈ rls_priority_acl on code_name). Principals not in
+  the ACL mapping see no rows (fail-closed; defaultStrategy: none).
+
+appliesTo:
+  selector: byIdentity
+  resource: table:bg_rls_demo.tpch.orders_rls_acl
+
+action: Read
+
+defaultStrategy: none
+
+# Single-rule Policy. Visibility is determined entirely by ACL presence;
+# there is no default branch. Per ADR-013 and ADR-015, a Policy with
+# defaultStrategy: none and one rule has fail-closed semantics for
+# anything the rule does not match.
+
+rules:
+
+  - # Principal selector: byDataset over the rls_acl_mapping table.
+    # This captures the first leg of the join — mapping current user to
+    # a set of codenames. The v0 PrincipalSetFromTable carries the
+    # principal-to-codename relationship; the codename-to-priority
+    # relationship lives in the condition below (best-effort v0 fit).
+    principal:
+      selector: byDataset
+      dataset:
+        "@type": PrincipalSetFromTable
+        table: bg_rls_demo.tpch.rls_acl_mapping
+        principalColumn: username
+        # The "resource" of the ACL row is the codename — the indirection
+        # to which the row grants visibility. The protected table's
+        # actual rows are not directly named in this ACL row; they are
+        # reached via the second join (see condition below).
+        resourceColumn: code_name
+
+    # Condition: existsInDataset against rls_priority_acl. The condition
+    # is satisfied for a protected-table row iff there exists a row in
+    # rls_priority_acl where:
+    #   - code_name matches a code_name from the principal's
+    #     PrincipalSetFromTable (i.e., codenames mapped to the current user)
+    #   - orderpriority matches the protected row's o_orderpriority
+    #
+    # v0 BEST-EFFORT REPRESENTATION. The condition operand shape below
+    # uses a ResourceSetFromTable to name the second table and its match
+    # columns, but the join semantics across the principal-selector and
+    # condition layers are not fully formalized in v0. The adapter must
+    # compile the full two-table join based on this best-effort shape;
+    # the diagnostic (§4.1) describes the gap in detail.
+    condition:
+      op: exists-in-dataset
+      operands:
+        - "@type": ResourceSetFromTable
+          table: bg_rls_demo.tpch.rls_priority_acl
+          # Joined against the principal selector's code_name column.
+          principalColumn: code_name
+          # Matched against the protected row's o_orderpriority.
+          resourceColumn: orderpriority
+
+    effect: keep-matching-rows
+
+# Capability requirements: declared so the adapter capability profile can
+# confirm support per ADR-014's adapter-contract framing. The
+# `two-table-join` and `case-insensitive-principal-match` capabilities
+# are NOT v0 vocabulary — they're declared here as the requirements the
+# pattern actually imposes, with full knowledge that v0 cannot natively
+# enforce that the adapter supports them. See the diagnostic.
+
+capabilityRequirements:
+  - data-driven-selectors
+  - two-table-join-via-codename
+  - case-insensitive-principal-match
+  - fail-closed-on-acl-absence
+
+provenance:
+  notes: |
+    Hand-authored for the ACL-table worked example.
+    The principal selector and condition are the closest v0 representation
+    of a two-table join pattern. The actual SQL emission compiles the full
+    join; the IR carries only the structural shape v0 can express. See
+    diagnostic §4 for the gaps this exercise surfaces.

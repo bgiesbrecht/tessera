@@ -1,0 +1,469 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bgiesbrecht.github.io/tessera/spec/v0/schema.json",
+  "title": "Tessera v0 Policy Schema",
+  "description": "Structural validation for Tessera policy documents in JSON-LD form. Validates document shape: required fields, type enums, conditional dependencies. Semantic validation (CURIE resolution, classification existence, references to known purposes, etc.) is the job of SHACL shapes in spec/v0/shapes.ttl — this schema does not duplicate that territory. See technical-design-v0.2.md §4.2 and §7.2 for how this layer fits in the validation pipeline. Three top-level document shapes are accepted: a Policy container (canonical multi-branch form, ADR-014); a single PolicyConstraint (backward-compat single-rule form); and a @graph of PolicyConstraints (legacy multi-branch form, deprecated by ADR-014 but accepted during the v0 lifecycle).",
+
+  "oneOf": [
+    { "$ref": "#/$defs/policyDocument" },
+    { "$ref": "#/$defs/constraintDocument" },
+    { "$ref": "#/$defs/graphDocument" }
+  ],
+
+  "$defs": {
+
+    "policyDocument": {
+      "title": "Policy container document",
+      "description": "A JSON-LD document whose root node is a tessera:Policy — the canonical multi-branch form per ADR-014.",
+      "type": "object",
+      "required": ["@context", "@type", "policyKind", "appliesTo", "rules"],
+      "properties": {
+        "@context": { "$ref": "#/$defs/contextRef" },
+        "@type":    { "const": "Policy" },
+        "@id":      { "type": "string", "minLength": 1 },
+        "version":  { "type": "string" },
+        "description": { "type": "string" },
+        "policyKind": { "$ref": "#/$defs/policyKind" },
+        "appliesTo": { "$ref": "#/$defs/resourceSelector" },
+        "action":    { "$ref": "#/$defs/action" },
+        "rules":     {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/rule" }
+        },
+        "defaultStrategy": { "$ref": "#/$defs/defaultStrategy" },
+        "baselineGroup":   { "type": "string", "minLength": 1 },
+        "defaultBranch":   { "$ref": "#/$defs/defaultBranchRule" },
+        "capabilityRequirements": { "type": "array", "items": { "type": "string" } },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      },
+      "allOf": [
+        {
+          "description": "ADR-013: when defaultStrategy is explicit-baseline-group, baselineGroup must be present.",
+          "if": {
+            "properties": { "defaultStrategy": { "const": "explicit-baseline-group" } },
+            "required": ["defaultStrategy"]
+          },
+          "then": { "required": ["baselineGroup"] }
+        },
+        {
+          "description": "baselineGroup should not appear unless defaultStrategy is explicit-baseline-group.",
+          "if": { "required": ["baselineGroup"] },
+          "then": {
+            "properties": { "defaultStrategy": { "const": "explicit-baseline-group" } },
+            "required": ["defaultStrategy"]
+          }
+        },
+        {
+          "description": "ADR-014: defaultBranch is required iff defaultStrategy is negated-complement; forbidden otherwise.",
+          "if": {
+            "properties": { "defaultStrategy": { "const": "negated-complement" } },
+            "required": ["defaultStrategy"]
+          },
+          "then": { "required": ["defaultBranch"] },
+          "else": { "not": { "required": ["defaultBranch"] } }
+        },
+        {
+          "description": "ColumnVisibility policies: each rule must declare a transformation.",
+          "if": {
+            "properties": { "policyKind": { "const": "ColumnVisibilityConstraint" } },
+            "required": ["policyKind"]
+          },
+          "then": {
+            "properties": {
+              "rules": { "items": { "required": ["transformation"] } }
+            }
+          },
+          "else": {
+            "properties": {
+              "rules": { "items": { "not": { "required": ["transformation"] } } }
+            }
+          }
+        }
+      ]
+    },
+
+    "constraintDocument": {
+      "title": "Single-constraint document (backward-compat single-rule form)",
+      "description": "A JSON-LD document whose root node is a single Tessera policy constraint. Backward-compatible single-rule shape; the canonical multi-branch shape is the Policy container (see policyDocument).",
+      "type": "object",
+      "required": ["@context", "@type"],
+      "properties": {
+        "@context": { "$ref": "#/$defs/contextRef" }
+      },
+      "allOf": [{ "$ref": "#/$defs/policyConstraint" }]
+    },
+
+    "graphDocument": {
+      "title": "Graph document (legacy multi-branch shape)",
+      "description": "A JSON-LD document containing a @graph of one or more Tessera policy constraints. Deprecated for multi-branch policies by ADR-014; the canonical shape is the Policy container. Still accepted during the v0 lifecycle for backward compatibility with policies authored before ADR-014.",
+      "type": "object",
+      "required": ["@context", "@graph"],
+      "properties": {
+        "@context": { "$ref": "#/$defs/contextRef" },
+        "@graph": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/policyConstraint" }
+        }
+      }
+    },
+
+    "contextRef": {
+      "description": "@context must reference the Tessera v0 context document. v0 does not support inlined contexts (ADR-004).",
+      "oneOf": [
+        { "type": "string", "format": "uri" },
+        { "type": "array", "items": { "type": "string", "format": "uri" }, "minItems": 1 }
+      ]
+    },
+
+    "policyKind": {
+      "description": "Discriminator selecting the policy domain inside a Policy container. Determines the legal shape of each rule.",
+      "enum": [
+        "AccessConstraint",
+        "RowVisibilityConstraint",
+        "ColumnVisibilityConstraint",
+        "DistributionConstraint",
+        "tessera:AccessConstraint",
+        "tessera:RowVisibilityConstraint",
+        "tessera:ColumnVisibilityConstraint",
+        "tessera:DistributionConstraint"
+      ]
+    },
+
+    "rule": {
+      "title": "Policy rule",
+      "description": "A single rule inside a Policy's `rules` list. Carries the principal-and-condition pair plus the effect for that match. The transformation field is required for ColumnVisibility kind and forbidden for others; this is enforced at the Policy level via if/then on policyKind, not on the rule alone.",
+      "type": "object",
+      "required": ["principal", "effect"],
+      "properties": {
+        "@id":         { "type": "string", "minLength": 1 },
+        "principal":   { "$ref": "#/$defs/principalSelector" },
+        "condition":   { "$ref": "#/$defs/condition" },
+        "effect":      { "$ref": "#/$defs/effect" },
+        "transformation": { "$ref": "#/$defs/TransformationInstance" }
+      }
+    },
+
+    "defaultBranchRule": {
+      "title": "Default-branch rule",
+      "description": "The default branch under defaultStrategy: negated-complement. A slimmer rule with no principal selector (it applies to principals matching no other rule).",
+      "type": "object",
+      "required": ["effect"],
+      "properties": {
+        "condition": { "$ref": "#/$defs/condition" },
+        "effect":    { "$ref": "#/$defs/effect" }
+      },
+      "not": { "required": ["principal"] }
+    },
+
+    "policyConstraint": {
+      "title": "Tessera policy constraint",
+      "description": "The structural properties of a single-rule policy constraint per technical-design-v0.2.md §4.2. Used by the backward-compat single-constraint document shape and the legacy @graph shape.",
+      "type": "object",
+      "required": ["@type", "appliesTo", "principal", "action", "effect"],
+      "properties": {
+        "@id":           { "type": "string", "minLength": 1 },
+        "@type":         { "$ref": "#/$defs/policyType" },
+        "version":       { "type": "string" },
+        "description":   { "type": "string" },
+        "appliesTo":     { "$ref": "#/$defs/resourceSelector" },
+        "principal":     { "$ref": "#/$defs/principalSelector" },
+        "action":        { "$ref": "#/$defs/action" },
+        "effect":        { "$ref": "#/$defs/effect" },
+        "condition":     { "$ref": "#/$defs/condition" },
+        "transformation": { "$ref": "#/$defs/TransformationInstance" },
+        "obligations":   { "type": "array", "items": { "$ref": "#/$defs/obligation" } },
+        "capabilityRequirements": { "type": "array", "items": { "type": "string" } },
+        "defaultStrategy": { "$ref": "#/$defs/defaultStrategy" },
+        "baselineGroup": { "type": "string", "minLength": 1 },
+        "provenance":    { "$ref": "#/$defs/provenance" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "defaultStrategy": { "const": "explicit-baseline-group" } },
+            "required": ["defaultStrategy"]
+          },
+          "then": { "required": ["baselineGroup"] }
+        },
+        {
+          "if": { "required": ["baselineGroup"] },
+          "then": {
+            "properties": { "defaultStrategy": { "const": "explicit-baseline-group" } },
+            "required": ["defaultStrategy"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "@type": { "const": "ColumnVisibilityConstraint" } },
+            "required": ["@type"]
+          },
+          "then": { "required": ["transformation"] },
+          "else": { "not": { "required": ["transformation"] } }
+        }
+      ]
+    },
+
+    "policyType": {
+      "description": "The known policy constraint subclasses from the v0 ontology.",
+      "enum": [
+        "AccessConstraint",
+        "RowVisibilityConstraint",
+        "ColumnVisibilityConstraint",
+        "DistributionConstraint",
+        "tessera:AccessConstraint",
+        "tessera:RowVisibilityConstraint",
+        "tessera:ColumnVisibilityConstraint",
+        "tessera:DistributionConstraint"
+      ]
+    },
+
+    "action": {
+      "description": "Action vocabulary per ontology v0. ADR-007 tracks the extensibility question; for v0 the set is closed.",
+      "enum": [
+        "Read", "Write", "Delete", "Share", "Sample", "Aggregate",
+        "tessera:Read", "tessera:Write", "tessera:Delete",
+        "tessera:Share", "tessera:Sample", "tessera:Aggregate"
+      ]
+    },
+
+    "effect": {
+      "description": "Effects a policy may declare.",
+      "enum": [
+        "allow", "deny", "transform", "keep-matching-rows", "drop-matching-rows",
+        "tessera:allow", "tessera:deny", "tessera:transform",
+        "tessera:keepMatchingRows", "tessera:dropMatchingRows"
+      ]
+    },
+
+    "defaultStrategy": {
+      "description": "Default-handling strategy per ADR-013.",
+      "enum": [
+        "explicit-baseline-group", "negated-complement", "none",
+        "tessera:explicitBaselineGroup", "tessera:negatedComplement", "tessera:none"
+      ]
+    },
+
+    "selectorKind": {
+      "enum": [
+        "byIdentity", "byAttribute", "byClassification", "byDataset", "byComposition",
+        "tessera:byIdentity", "tessera:byAttribute", "tessera:byClassification",
+        "tessera:byDataset", "tessera:byComposition"
+      ]
+    },
+
+    "resourceSelector": {
+      "title": "Resource selector",
+      "description": "Identifies the resource(s) the policy applies to.",
+      "type": "object",
+      "required": ["selector"],
+      "properties": {
+        "selector": { "$ref": "#/$defs/selectorKind" },
+        "resource": { "type": "string", "minLength": 1 },
+        "classification": { "type": "string", "minLength": 1 },
+        "dataset": { "$ref": "#/$defs/setFromTable" },
+        "match": { "$ref": "#/$defs/booleanMatch" },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/resourceSelector" }
+        }
+      },
+      "oneOf": [
+        {
+          "properties": { "selector": { "enum": ["byIdentity", "tessera:byIdentity"] } },
+          "required": ["resource"]
+        },
+        {
+          "properties": { "selector": { "enum": ["byClassification", "tessera:byClassification"] } },
+          "required": ["classification"]
+        },
+        {
+          "properties": { "selector": { "enum": ["byDataset", "tessera:byDataset"] } },
+          "required": ["dataset"]
+        },
+        {
+          "properties": { "selector": { "enum": ["byComposition", "tessera:byComposition"] } },
+          "required": ["match", "criteria"]
+        },
+        {
+          "properties": { "selector": { "enum": ["byAttribute", "tessera:byAttribute"] } }
+        }
+      ]
+    },
+
+    "principalSelector": {
+      "title": "Principal selector",
+      "description": "Identifies the principal(s) the policy applies to. Same shape as resource selector except dataset shape is PrincipalSetFromTable and composition criteria are principal selectors.",
+      "type": "object",
+      "required": ["selector"],
+      "properties": {
+        "selector": { "$ref": "#/$defs/selectorKind" },
+        "resource": { "type": "string", "minLength": 1 },
+        "dataset": { "$ref": "#/$defs/setFromTable" },
+        "match": { "$ref": "#/$defs/booleanMatch" },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/principalSelector" }
+        }
+      },
+      "oneOf": [
+        {
+          "properties": { "selector": { "enum": ["byIdentity", "tessera:byIdentity"] } },
+          "required": ["resource"]
+        },
+        {
+          "properties": { "selector": { "enum": ["byDataset", "tessera:byDataset"] } },
+          "required": ["dataset"]
+        },
+        {
+          "properties": { "selector": { "enum": ["byComposition", "tessera:byComposition"] } },
+          "required": ["match", "criteria"]
+        },
+        {
+          "properties": { "selector": { "enum": ["byAttribute", "tessera:byAttribute"] } }
+        }
+      ]
+    },
+
+    "setFromTable": {
+      "title": "PrincipalSetFromTable / ResourceSetFromTable",
+      "type": "object",
+      "required": ["table"],
+      "properties": {
+        "@type": {
+          "enum": [
+            "PrincipalSetFromTable", "ResourceSetFromTable",
+            "tessera:PrincipalSetFromTable", "tessera:ResourceSetFromTable"
+          ]
+        },
+        "table":             { "type": "string", "minLength": 1 },
+        "principalColumn":   { "type": "string", "minLength": 1 },
+        "resourceColumn":    { "type": "string", "minLength": 1 },
+        "permissionColumn":  { "type": "string", "minLength": 1 },
+        "permissionValue":   { "type": "string" }
+      }
+    },
+
+    "booleanMatch": {
+      "enum": ["and", "or", "not", "tessera:and", "tessera:or", "tessera:not"]
+    },
+
+    "condition": {
+      "title": "Condition",
+      "type": "object",
+      "required": ["op"],
+      "properties": {
+        "op": { "$ref": "#/$defs/conditionOperator" },
+        "operands": { "type": "array" },
+        "values":   { "type": "array" }
+      }
+    },
+
+    "conditionOperator": {
+      "enum": [
+        "and", "or", "not",
+        "eq", "lt", "gt", "in",
+        "purpose-in", "located-in", "time-window", "consent-granted",
+        "exists-in-dataset",
+        "tessera:and", "tessera:or", "tessera:not",
+        "tessera:eq", "tessera:lt", "tessera:gt", "tessera:in",
+        "tessera:purposeIn", "tessera:locatedIn", "tessera:timeWindow",
+        "tessera:consentGranted", "tessera:existsInDataset"
+      ]
+    },
+
+    "TransformationInstance": {
+      "title": "Transformation instance",
+      "description": "A specific application of a Transformation, per ADR-016. Required for ColumnVisibility rules. The `type` field identifies the transformation kind; additional fields carry per-kind parameters. Uniform structured form applies even for parameterless transformations (e.g., Hash with default algorithm).",
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["Mask", "Hash", "Tokenize", "Redact", "Bucketize"]
+        },
+        "replacement": {
+          "description": "Required iff type is Redact. JSON-encodable value.",
+          "type": ["string", "number", "boolean", "null"]
+        },
+        "maskChar": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1,
+          "default": "X"
+        },
+        "preserveFirst": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "preserveLast": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": ["sha256", "sha512", "sha1"],
+          "default": "sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "Redact" } }
+          },
+          "then": {
+            "required": ["replacement"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "Mask" } }
+          },
+          "then": {
+            "not": { "required": ["replacement"] }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "Hash" } }
+          },
+          "then": {
+            "not": { "required": ["replacement"] }
+          }
+        }
+      ]
+    },
+
+    "obligation": {
+      "title": "Obligation",
+      "type": "object",
+      "required": ["@type"],
+      "properties": {
+        "@type": {
+          "enum": [
+            "AuditLog", "Notify", "Watermark",
+            "tessera:AuditLog", "tessera:Notify", "tessera:Watermark"
+          ]
+        },
+        "target": { "type": "string" }
+      }
+    },
+
+    "provenance": {
+      "title": "Provenance",
+      "type": "object",
+      "properties": {
+        "extractedFrom":      { "type": "string" },
+        "extractedAt":        { "type": "string", "format": "date-time" },
+        "confidence":         { "enum": ["high", "medium", "low", "tessera:confidenceHigh", "tessera:confidenceMedium", "tessera:confidenceLow"] },
+        "notes":              { "type": "string" },
+        "originalConstruct":  { "type": "string" }
+      }
+    }
+  }
+}

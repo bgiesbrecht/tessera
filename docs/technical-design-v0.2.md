@@ -130,19 +130,46 @@ Conversion between forms is bidirectional, lossless within stated tolerances (co
 
 File extension is `.tessera.yaml` for the YAML form. The JSON-LD form is not committed to customer repositories; it is generated on demand by tooling.
 
-### 4.2 Structural properties of every IR policy
+### 4.2 Top-level shapes: Policy container and single PolicyConstraint
 
-Every policy carries, regardless of policy kind:
+The IR has **two top-level shapes**. Both are valid; one is canonical, one is a backward-compat affordance.
+
+**`tessera:Policy` (canonical, ADR-014).** A container holding an ordered list of `rules` plus policy-level metadata. The canonical shape for any policy that has more than one rule, and the recommended shape for single-rule policies as well. Identified by `@type: Policy` and a `policyKind` discriminator (`RowVisibilityConstraint`, `AccessConstraint`, `ColumnVisibilityConstraint`, `DistributionConstraint`) that determines the legal shape of rules within the policy.
+
+**Single `PolicyConstraint`.** A standalone policy constraint at the document root. Backward-compatible from before ADR-014. Equivalent to a Policy with a single rule. Customers may continue to use this shape for single-rule policies; tools normalize to Policy form for internal processing.
+
+A third shape — a JSON-LD `@graph` of multiple `PolicyConstraint` instances — was used to represent multi-branch policies before ADR-014. It is deprecated; the converter accepts it during the v0 lifecycle and normalizes to Policy form. At v1 cut, only the Policy shape will be accepted for multi-branch policies.
+
+#### 4.2.1 Properties of a Policy
+
+A `tessera:Policy` carries:
 
 - **Identity.** Stable opaque identifier (`@id`) and semantic version.
 - **Vocabulary reference.** Explicit `@context` reference to a specific vocabulary version.
-- **Type.** The policy entity (e.g., `RowVisibilityConstraint`).
-- **Selectors.** Principal, resource, and action selectors as described in §3.3.
-- **Condition.** Optional, drawn from the fixed condition algebra (§4.4).
-- **Effect and parameters.** What the policy does when it applies — allow, deny, transform, filter, share — and the parameters of that effect.
-- **Obligations.** Optional list of obligations honored when the policy applies.
+- **Kind.** `policyKind` — the policy domain discriminator. References one of the existing PolicyConstraint subclasses.
+- **Applies to.** `appliesTo` — a resource selector identifying the resource(s) the policy applies to. Policy-wide; shared across all rules.
+- **Action.** The action the policy concerns (e.g., `Read` for visibility policies).
+- **Rules.** `rules` — an **ordered** list of rule sub-objects. Each rule carries a principal selector, optional condition, effect, and kind-specific extras (`transformation` for `ColumnVisibilityConstraint`). Order is semantically meaningful: rules are evaluated in declaration order under first-match combining (§4.7 and ADR-015).
+- **Default strategy.** Optional. Names how principals matching no rule are handled. One of `explicit-baseline-group`, `negated-complement`, or `none`. See §4.6 and ADR-013.
+- **Baseline group.** Required iff `defaultStrategy` is `explicit-baseline-group`. Names the universal baseline group (e.g., `account users` on Databricks). The rule whose principal references this group is, by convention, the last rule in `rules` and is recognized by the framework as the default branch.
+- **Default branch.** Required iff `defaultStrategy` is `negated-complement`. A slimmer rule (effect plus optional condition; no principal selector) describing what principals matching no rule see. Forbidden under other strategies.
 - **Capability requirements.** Optional list of capabilities the policy depends on; consulted at emission time.
 - **Provenance.** For authored policies: author, version-control reference, review history. For extracted policies: source platform, source artifact, extraction timestamp, confidence, notes.
+
+#### 4.2.2 Properties of a rule within a Policy
+
+A rule is a structurally slimmer object than a freestanding PolicyConstraint. It carries:
+
+- **Principal.** `principal` — a principal selector identifying the principals the rule applies to.
+- **Condition.** Optional, drawn from the condition algebra (§4.4).
+- **Effect.** What the rule does when it matches — `keep-matching-rows` and `drop-matching-rows` for RowVisibility; `allow`, `deny`, `transform` for AccessConstraint; etc.
+- **Transformation.** Required for `ColumnVisibilityConstraint` rules; forbidden otherwise. When present, the transformation field carries a structured `TransformationInstance` object — a `type` identifying the transformation kind, plus any parameters specific to that kind. See §4.8 for the parameter shapes formalized in v0.
+
+Rules do not carry their own `@type`, `appliesTo`, or `action` — those are inherited from the containing Policy.
+
+#### 4.2.3 Properties of a freestanding PolicyConstraint
+
+For the backward-compat single-constraint shape, a freestanding `PolicyConstraint` carries the same properties as a Policy rule plus the Policy-level metadata (Type as `@type`, appliesTo, action, etc.) all in a single document. The properties are exactly the v0 pre-ADR-014 set; see ADR-014 for the migration story.
 
 ### 4.3 Confidence on extracted policies
 
@@ -167,62 +194,124 @@ Extensibility of the algebra is an open question (ADR-007).
 
 ### 4.5 Worked example
 
-The same ACL-driven row visibility policy that has been the reference example throughout the design, rendered in YAML as customers would author or review it:
+A multi-branch row-visibility Policy, rendered in YAML as customers would author or review it. This is the canonical Policy-container shape introduced in ADR-014.
 
 ```yaml
 "@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
-"@type": RowVisibilityConstraint
-"@id": policy:acl-driven-customer-orders
-version: 0.1.0
+"@type": Policy
+"@id": policy:group-row-visibility
+version: 1.0.0
+policyKind: RowVisibilityConstraint
 
-# Row-level visibility for customer.orders, driven by the
-# corporate ACL table. Replaces the legacy enforcing view.
-# See SECURITY-1234.
+# Three-branch row visibility on the orders table, driven by group
+# membership. The default branch is the rule keyed off `account users`
+# — the universal baseline group on Databricks.
 
 description: >
-  Users see rows in customer.orders only when the corporate
-  ACL table contains an entry granting read access.
+  Members of bg_rls_demo_all_priority_ops see all rows; members of
+  bg_rls_demo_high_priority_ops see rows with high priority; all other
+  principals (caught by the baseline `account users` rule) see rows
+  with lower priority.
 
 appliesTo:
   selector: byIdentity
-  resource: table:warehouse.customer.orders
+  resource: table:bg_rls_demo.tpch.orders
 
-principal:
-  selector: byDataset
-  dataset:
-    "@type": PrincipalSetFromTable
-    table: governance.acl
-    principalColumn: user_email
-    resourceColumn: resource_fqn
-    permissionColumn: permission
-    permissionValue: read
+action: Read
+defaultStrategy: explicit-baseline-group
+baselineGroup: "account users"
 
-effect: keep-matching-rows
+rules:
+  - principal: { selector: byIdentity, resource: group:bg_rls_demo_all_priority_ops }
+    effect: keep-matching-rows
+    # No condition — every row is kept for matching principals.
 
-condition:
-  op: purpose-in
-  values:
-    - purpose:Analytics
-    - purpose:Operations
+  - principal: { selector: byIdentity, resource: group:bg_rls_demo_high_priority_ops }
+    effect: keep-matching-rows
+    condition:
+      op: in
+      operands: [column:bg_rls_demo.tpch.orders.o_orderpriority]
+      values: ["1-URGENT", "2-HIGH"]
 
-obligations:
-  - "@type": AuditLog
-    target: topic:row-access-audit
-
-capabilityRequirements:
-  - data-driven-selectors
-  - obligation-audit-log
+  - principal: { selector: byIdentity, resource: group:account-users }
+    effect: keep-matching-rows
+    condition:
+      op: in
+      operands: [column:bg_rls_demo.tpch.orders.o_orderpriority]
+      values: ["3-MEDIUM", "4-NOT SPECIFIED", "5-LOW"]
 
 provenance:
-  extractedFrom: legacy-acl-adapter://corp/governance/acl
-  extractedAt: 2026-05-18T14:22:00Z
-  confidence: high
-  notes: |
-    Adapter recognized the canonical ACL-and-view pattern.
-    Reviewer should verify purpose binding matches intent.
+  notes: Worked example from the first Tessera exercise (group-based row visibility).
 ```
 
-The corresponding JSON-LD is the same structure with comments dropped or mapped to `rdfs:comment`, the multiline strings rendered as JSON strings, and the YAML-specific syntactic affordances normalized. Adapters consume the JSON-LD; reviewers see the YAML.
+Notes on the shape:
+
+- `appliesTo`, `action`, `defaultStrategy`, and `baselineGroup` live on the Policy, not on individual rules.
+- Each rule is structurally slimmer than a freestanding constraint: just `principal`, optional `condition`, and `effect`.
+- The third rule's principal references the baseline group named in `baselineGroup`. The framework recognizes this as the default branch (per ADR-013 and ADR-014).
+- The rules are evaluated in order under first-match combining (§4.7 and ADR-015). A principal in both `bg_rls_demo_all_priority_ops` and `bg_rls_demo_high_priority_ops` matches the first rule (sees all rows); ordering determines the effect.
+
+The corresponding JSON-LD is the same structure with comments dropped or mapped to `rdfs:comment`. Adapters consume the JSON-LD; reviewers see the YAML.
+
+Other shapes in current use:
+
+- **`negated-complement` variant.** Same observable behavior, different intent: no baseline group; the default branch (rule for non-matchers) is expressed via a `defaultBranch` field on the Policy. See `spec/v0/examples/group-row-visibility-policy-b.tessera.yaml`.
+- **Single-rule (backward-compat) shape.** A freestanding `RowVisibilityConstraint` at document root, equivalent to a one-rule Policy. Used by the deferred ACL-table exercise example (see `docs/exercises/`).
+
+For the data-driven (ACL-table) variant of row visibility — exercised by the deferred custom-pattern adapter work — a Policy contains a single rule with a `byDataset` principal selector and a `PrincipalSetFromTable` reference. Conceptually the same shape as the worked example, with one rule and no default branch.
+
+### 4.6 Default-handling strategy
+
+A multi-rule Policy may have an affirmative default branch — a behavior for principals matching no other rule. The framework's default disposition is fail-closed; an affirmative default is opt-in via `defaultStrategy`.
+
+Two semantically distinct mechanisms produce the same observable default behavior:
+
+- **Explicit baseline group.** A universal group (e.g., Databricks `account users`) is referenced affirmatively as one of the Policy's rules. Principals get the default by virtue of explicit membership in this group. The default is grounded in an administrative artifact. The rule keyed off the baseline group is, by convention, the last rule in `rules`; the framework recognizes it as the default branch.
+- **Negated complement.** No baseline group exists; the default branch applies to principals who are not members of any of the affirmative-grant rules. The default is grounded in the absence of restrictive memberships. The default branch's effect and (optional) condition live in a separate `defaultBranch` field on the Policy (introduced in ADR-014); no rule is keyed off a baseline group.
+
+Both patterns are common, and the choice between them is intent, not just SQL shape. A policy expressed with `explicit-baseline-group` has cleaner audit semantics ("did this principal have baseline access at time T?"); a policy expressed with `negated-complement` works on platforms without a universal group concept. Treating them as indistinguishable flattens an important semantic distinction.
+
+The IR makes the choice explicit via the `defaultStrategy` field. The values are:
+
+- `explicit-baseline-group` — the Policy asserts a specific group is the universal baseline. The companion field `baselineGroup` names the group. A rule keyed off that group is the default branch.
+- `negated-complement` — the Policy asserts no baseline group. The `defaultBranch` field on the Policy carries the default-branch row predicate. Required iff this strategy.
+- `none` — the Policy has no default branch. Principals matching no rule see nothing. Equivalent to omitting the field, but preferred when the author wants to assert the choice explicitly.
+
+Field-level rules summarized: `baselineGroup` is required iff `defaultStrategy: explicit-baseline-group`; `defaultBranch` is required iff `defaultStrategy: negated-complement`; both are forbidden under any other strategy.
+
+Adapters consult `defaultStrategy` when emitting native code. The `negated-complement` strategy with a clear set of affirmative-grant rules plus a single `defaultBranch` should produce a readable structural shape (a `CASE`/`WHEN`/`ELSE` row filter on Databricks, for example) — the `defaultBranch` lowers to the `ELSE` clause directly, without pattern-recognition heuristics. The `explicit-baseline-group` strategy produces affirmative emission referencing the named baseline, with an extra `WHEN` branch keyed off the baseline group.
+
+If a target platform cannot natively support the declared strategy — for example, a platform without a universal group concept cannot honor `explicit-baseline-group` directly — the adapter's diagnostic report names this as a partial-enforcement gap and either falls back to negated-complement form (with a clear note in the report) or refuses to emit, depending on adapter policy.
+
+See ADR-013 (the `defaultStrategy` decision) and ADR-014 (the Policy container and `defaultBranch` decision) for the decision history.
+
+### 4.7 Rule combining algebra
+
+Multi-rule Policies use **ordered first-match** semantics. Rules are evaluated in declaration order; the first rule whose principal selector and condition both match an evaluation context applies; subsequent rules are not evaluated. If no rule matches, the policy falls back to its `defaultStrategy`-dictated behavior: `defaultBranch` under `negated-complement`; the baseline-group rule under `explicit-baseline-group`; fail-closed under `none`.
+
+First-match is the only combining algorithm v0 supports. The choice forecloses three alternatives that the framework deliberately does not adopt at this layer:
+
+- **Deny-overrides** and **permit-overrides** are XACML-style algorithms for reconciling independently-authored policies at decision time. Tessera Policies are coherent authored artifacts; multi-rule precedence is expressed by ordering, not by algebra. Cross-policy interaction is a separate problem and is not in v0 scope.
+- **Non-deterministic combination** (multiple rules contributing to a single decision) is not supported. First-match is deterministic by ordering. The framework does not blend rule effects.
+- **Declared-per-policy combining algorithm** (a `combiningAlgorithm` field on Policy that lets customers choose among algorithms) is deferred. v0 ships with first-match only.
+
+See ADR-015 for the decision and the foreclosures.
+
+### 4.8 Transformation parameters
+
+A `ColumnVisibilityConstraint`'s transformation is a structured object, not a bare class reference. The structure has a `type` field naming the transformation (one of `Mask`, `Hash`, `Tokenize`, `Redact`, `Bucketize`) plus per-transformation parameter fields. This uniform structure applies even for parameterless transformations — `type: Hash` (with defaults for algorithm) is valid and is the canonical shape, not `transformation: Hash`.
+
+The parameter shapes formalized in v0 are:
+
+**`Redact`** replaces the column value with a literal. Required parameter: `replacement` (JSON-encodable value — string, number, boolean, or null). The adapter checks type-compatibility with the column at emission time.
+
+**`Mask`** replaces characters with a fixed mask character, optionally preserving a prefix or suffix. Optional parameters: `maskChar` (default `'X'`), `preserveFirst` (non-negative integer, default 0), `preserveLast` (non-negative integer, default 0). If `preserveFirst` and `preserveLast` together meet or exceed the value's character length, the value is returned unchanged (forgiving behavior). Character counts are over Unicode code points, not bytes.
+
+**`Hash`** replaces the column value with a hash digest. Optional parameter: `algorithm` (one of `sha256`, `sha512`, `sha1`; default `sha256`). Salted hashing is deferred to v1 pending a secret-reference vocabulary.
+
+**`Tokenize`** and **`Bucketize`** are valid transformation types in v0 but their parameter shapes are not yet formalized. Policies using them may declare adapter-specific parameter fields; the adapter is responsible for supporting the parameters or rejecting the policy with a diagnostic. Their parameter shapes will be pinned down by follow-on ADRs when worked examples drive them.
+
+See ADR-016 for the design rationale and the choice of the uniform structured form.
 
 ---
 
@@ -248,6 +337,8 @@ Each adapter publishes a profile declaring, per vocabulary concept and IR constr
 - **Unsupported.** Adapter cannot express the concept.
 
 For partially supported features, the profile names the limitation in machine-readable form. The compiler refuses to emit policies depending on unsupported features and surfaces limitations on partial features in the diagnostic report.
+
+The profile also covers **timing and consistency characteristics** of the mechanisms an adapter emits. The Databricks adapter, for the group-based row-visibility mechanism, declares a 2–4 minute propagation window for membership changes via the account-group cache — observed empirically during the first worked example (see `spec/v0/examples/group-row-visibility.comparison.md` §2.3). The general principle is that timing characteristics belong to specific enforcement mechanisms, not to the framework as a whole: an ACL-table-driven row filter on the same adapter would have a different timing profile than a group-membership check; a tag-driven column mask has yet another; a Snowflake session-tag-gated row access policy has yet another still. The framework's role is to require the disclosure; the vocabulary describing the timing is mechanism-specific and lives in the adapter's profile, not in the IR or in the policy. Conversely, enumerating a fixed set of "timing categories" at the framework layer would push mechanism vocabulary up into the IR and would not survive contact with the next adapter.
 
 ### 5.3 The diagnostic report
 

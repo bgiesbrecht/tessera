@@ -45,6 +45,10 @@
     "ColumnVisibilityConstraint": "tessera:ColumnVisibilityConstraint",
     "DistributionConstraint":     "tessera:DistributionConstraint",
 
+    "_comment_policy_container": "Policy is the multi-rule container class introduced in ADR-014. See technical design v0.2 §4.2.",
+
+    "Policy":                     "tessera:Policy",
+
     "_comment_selector_classes": "Selector classes — see technical design v0.2 §3.3",
 
     "PrincipalSelector":       "tessera:PrincipalSelector",
@@ -58,13 +62,36 @@
     "Notify":               "tessera:Notify",
     "Watermark":            "tessera:Watermark",
 
-    "_comment_transformation_classes": "Transformation classes — closed vocabulary in v0; new transformations require spec extension to preserve portability",
+    "_comment_transformation_classes": "Transformation classes — closed vocabulary in v0; new transformations require spec extension to preserve portability. Per ADR-016, transformations are referenced as structured TransformationInstance objects with parameter fields.",
 
     "Mask":                 "tessera:Mask",
     "Hash":                 "tessera:Hash",
     "Tokenize":             "tessera:Tokenize",
     "Redact":               "tessera:Redact",
     "Bucketize":            "tessera:Bucketize",
+    "TransformationInstance": "tessera:TransformationInstance",
+
+    "_comment_transformation_parameters": "Parameter properties on TransformationInstance — see ADR-016 for per-transformation parameter shapes",
+
+    "replacement": {
+      "@id": "tessera:replacement"
+    },
+    "maskChar": {
+      "@id": "tessera:maskChar",
+      "@type": "xsd:string"
+    },
+    "preserveFirst": {
+      "@id": "tessera:preserveFirst",
+      "@type": "xsd:nonNegativeInteger"
+    },
+    "preserveLast": {
+      "@id": "tessera:preserveLast",
+      "@type": "xsd:nonNegativeInteger"
+    },
+    "algorithm": {
+      "@id": "tessera:algorithm",
+      "@type": "xsd:string"
+    },
 
     "_comment_policy_properties": "Properties used on policy documents",
 
@@ -109,6 +136,29 @@
       "@id": "tessera:requiresCapability",
       "@type": "xsd:string",
       "@container": "@set"
+    },
+    "defaultStrategy": {
+      "@id": "tessera:defaultStrategy",
+      "@type": "@vocab"
+    },
+    "baselineGroup": {
+      "@id": "tessera:baselineGroup",
+      "@type": "xsd:string"
+    },
+    "policyKind": {
+      "@id": "tessera:policyKind",
+      "@type": "@vocab",
+      "_comment": "Discriminator selecting the policy domain. Values are the existing PolicyConstraint subclass short names (RowVisibilityConstraint, AccessConstraint, etc.). See ADR-014."
+    },
+    "rules": {
+      "@id": "tessera:rules",
+      "@container": "@list",
+      "_comment": "Ordered list of rules in a Policy. Order is semantically meaningful (first-match combining, ADR-015)."
+    },
+    "defaultBranch": {
+      "@id": "tessera:defaultBranch",
+      "@type": "@id",
+      "_comment": "Default branch under defaultStrategy: negated-complement. Required iff that strategy; forbidden otherwise. See ADR-014."
     },
     "provenance": {
       "@id": "tessera:provenance",
@@ -248,6 +298,12 @@
     "transform":           "tessera:transform",
     "keep-matching-rows":  "tessera:keepMatchingRows",
     "drop-matching-rows":  "tessera:dropMatchingRows",
+
+    "_comment_well_known_default_strategies": "Default-handling strategies for policies with multiple branches — see ADR-013",
+
+    "explicit-baseline-group": "tessera:explicitBaselineGroup",
+    "negated-complement":      "tessera:negatedComplement",
+    "none":                    "tessera:none",
 
     "_comment_well_known_selector_kinds": "Selector kinds — see technical design v0.2 §3.3",
 

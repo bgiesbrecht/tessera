@@ -29,20 +29,7 @@ For customers running only Databricks, Tessera is not applicable — Unity Catal
 
 When a user request conflicts with a recorded ADR, the right response is to flag the conflict and reference the ADR by number, not to silently override the decision. If the user wants to change a recorded decision, propose adding a new ADR that supersedes the old one — do not retroactively edit ADRs.
 
-Currently the recorded ADRs are 001 through 012:
-
-- 001 — Project framing: semantic interoperability, not migration
-- 002 — Organizational posture: skunkworks, customer enablement
-- 003 — Architecture: adapter model is the unifying abstraction
-- 004 — Canonical form is JSON-LD; authoring form is YAML
-- 005 — Vocabulary alignment with existing standards (DPV, ODRL, Cedar, XACML)
-- 006 — Sequencing: DSL designed last
-- 007 — Open technical questions still to resolve
-- 008 — Project name: Tessera
-- 009 — License: Apache 2.0
-- 010 — Repository at github.com/bgiesbrecht/tessera
-- 011 — Canonical namespace URL: GitHub Pages
-- 012 — Repository visibility: public
+The ADRs cover, at a high level: project framing and posture, architectural choices about the IR and adapters, vocabulary alignment with standards, the canonical name and license, repository hosting decisions, and specific IR-design refinements that emerged during early work. The authoritative current list lives in `DECISIONS.md`; do not maintain a parallel enumeration here.
 
 ### When unsure, ask before drifting
 
@@ -63,7 +50,7 @@ The project is also explicit about its political position: Unity Catalog is the 
 ```
 README.md                         — front door, project overview
 LICENSE                           — Apache 2.0
-DECISIONS.md                      — 11 ADRs covering all major decisions
+DECISIONS.md                      — numbered ADRs covering all major decisions
 docs/
   executive-summary.md            — one-page leadership brief
   problem-and-recommendation.md   — stakeholder framing, no implementation
@@ -72,15 +59,15 @@ docs/
 spec/v0/
   context.jsonld                  — JSON-LD context, v0 (immutable)
   ontology.ttl                    — OWL/Turtle ontology, v0 (immutable)
+  schema.json                     — JSON Schema 2020-12 for IR structural validation
+  examples/                       — worked policy examples in YAML and JSON-LD (group-row-visibility, A and B)
 ```
 
 ### What's planned but not built (in rough order of priority)
 
 ```
 spec/v0/
-  schema.json                     — JSON Schema for IR structural validation
   shapes.ttl                      — SHACL shapes for semantic validation
-  examples/                       — worked policy examples in YAML and JSON-LD
 tools/
   converter/                      — YAML ↔ JSON-LD converter
   linter/                         — full validation pipeline
@@ -114,6 +101,15 @@ Adapters connect the IR to real systems. Each adapter has four responsibilities:
 
 Adapters are *peers*. Unity Catalog adapter, Snowflake-native adapter, and custom-pattern adapters all implement the same contract. The IR layer is platform-neutral by design — privileging one platform there would defeat the project.
 
+Two v0 IR details worth knowing about up front because the first worked example surfaced them and they reshape how policies are written:
+
+- **`tessera:Policy` container (ADR-014).** The canonical top-level shape for any multi-rule policy. A `Policy` holds policy-level metadata (`appliesTo`, `defaultStrategy`, `baselineGroup`, `defaultBranch`, `policyKind`) plus an ordered `rules` list. The pre-ADR-014 `@graph`-of-constraints shape is deprecated for multi-branch policies (still accepted during the v0 lifecycle for backward compat; not accepted at v1 cut). Single-rule policies may still use a freestanding `PolicyConstraint` at document root. See `docs/technical-design-v0.2.md` §4.2 and ADR-014.
+- **`defaultStrategy` and `defaultBranch` (ADR-013, ADR-014).** Policies carry an optional `defaultStrategy` field (`explicit-baseline-group`, `negated-complement`, `none`) capturing *intent* about how the policy handles principals matching no rule. Two policies with the same observable behavior may differ in `defaultStrategy`, and the difference is real. Under `explicit-baseline-group`, `baselineGroup` is required; under `negated-complement`, `defaultBranch` is required; both forbidden otherwise. See §4.6 of the technical design.
+
+Multi-rule Policies use **ordered first-match** combining (ADR-015). The first rule whose principal selector and condition both match wins; subsequent rules don't evaluate. If no rule matches, `defaultStrategy` controls the fallback.
+
+Another v0 IR detail worth knowing: column-visibility transformations are referenced as structured `TransformationInstance` objects, not bare class names. A redaction policy carries `transformation: {type: Redact, replacement: 'value'}`, not `transformation: Redact`. Per-transformation parameter shapes are defined for `Redact` (required `replacement`), `Mask` (`maskChar`, `preserveFirst`, `preserveLast`), and `Hash` (`algorithm`); `Tokenize` and `Bucketize` are valid types but their parameter shapes are deferred. See `docs/technical-design-v0.2.md` §4.8 and ADR-016.
+
 ---
 
 ## What to do next — recommended priorities
@@ -131,25 +127,33 @@ curl -I https://bgiesbrecht.github.io/tessera/spec/v0/ontology.ttl
 
 Both should return 200. Content types will be wrong (`.ttl` and `.jsonld` served as `text/plain` by default); this is acceptable for v0 and not worth fixing unless tools choke on it.
 
-### Priority 2 — A worked example end-to-end
+### Priority 2 — Worked example end-to-end (in flight)
 
-Write a complete YAML policy file at `spec/v0/examples/acl-driven-row-visibility.tessera.yaml` that exercises:
+The first worked example is being run against a real Databricks group-based row-visibility implementation. See `docs/worked-example-exercise.md` for the exercise framing and `docs/exercises/group-row-visibility-inputs.md` for the Phase 1 inputs.
 
-- The `byDataset` selector pattern (data-driven principal set from an ACL table)
-- Classification-based resource selection
-- Purpose binding via condition
-- An obligation (audit-log)
-- Provenance metadata
+The exercise produces two parallel Tessera policies expressing the same observable behavior via the two default-handling strategies introduced in ADR-013:
 
-Then convert it by hand to the equivalent JSON-LD at `spec/v0/examples/acl-driven-row-visibility.jsonld`. This is the artifact that proves the YAML ↔ JSON-LD pipeline conceptually works, even before the converter is built.
+- **Policy A** — `defaultStrategy: explicit-baseline-group`, with `account users` as the baseline.
+- **Policy B** — `defaultStrategy: negated-complement`, no baseline group; default applies to non-members of restrictive groups.
 
-Validate by hand that the JSON-LD references against the published context and ontology resolve correctly. This catches any naming inconsistencies between the three files before they get baked in.
+Phase 3 comparison evaluates Policy B against the existing implementation (which is structurally negated-complement, using a `CASE`/`WHEN`/`ELSE` row filter on `bg_rls_demo.tpch.orders`). Policy A is the parallel demonstration that the framework can express the alternative pattern.
 
-### Priority 3 — JSON Schema for structural validation
+Artifacts to produce per `docs/worked-example-exercise.md` §2:
 
-`spec/v0/schema.json` defining the structural requirements of a Tessera policy in JSON-LD form. Used by the linter (eventually) and by any tool that wants to validate IR without invoking a reasoner. Should be a JSON Schema 2020-12 document.
+- `spec/v0/examples/group-row-visibility-policy-a.tessera.yaml`
+- `spec/v0/examples/group-row-visibility-policy-a.jsonld`
+- `spec/v0/examples/group-row-visibility-policy-b.tessera.yaml`
+- `spec/v0/examples/group-row-visibility-policy-b.jsonld`
+- `spec/v0/examples/group-row-visibility.databricks.sql` (the Tessera-derived row filter SQL)
+- `spec/v0/examples/group-row-visibility.diagnostic.md`
 
-The schema should cover the structure described in §4.2 of the technical design (identity, vocabulary reference, type, selectors, condition, effect, obligations, capability requirements, provenance). It should not duplicate semantic constraints that belong in SHACL (e.g., "this CURIE must reference a known classification" is SHACL territory, not JSON Schema).
+A separate, deferred ACL-table-driven exercise (using the `byDataset` selector and a custom-pattern adapter) is tracked but not active. The original ACL framing referenced in earlier drafts of this section is preserved as the planned scope for that later exercise; do not conflate the two.
+
+### Priority 3 — JSON Schema for structural validation (done)
+
+`spec/v0/schema.json` exists. JSON Schema 2020-12; structural validation only, per §4.2 of the technical design. Validates both single-policy and `@graph` documents. Enforces conditional dependencies (e.g., `baselineGroup` required when `defaultStrategy` is `explicit-baseline-group`; `transformation` required iff `@type` is `ColumnVisibilityConstraint`). Semantic constraints (CURIE resolution, classification membership) are deliberately left for SHACL.
+
+Validated against the worked-example artifacts and the technical-design §4.5 ACL example.
 
 ### Priority 4 — A first cut of SHACL shapes
 
@@ -174,7 +178,7 @@ These are anti-patterns this project specifically rejects. Mentioned not because
 - **Do not propose a runtime policy engine.** ADR-001 disclaims this category explicitly. If a user request seems to require it, surface the conflict.
 - **Do not introduce platform-specific concepts into the vocabulary or IR.** Words like "masking policy" or "row access policy" belong to platform DDL; the IR uses platform-neutral terms like "ColumnVisibilityConstraint." Platform-specific concepts live in adapters.
 - **Do not "improve" the vocabulary by tightening alignment with ODRL or DPV unilaterally.** The current alignment is documented as `skos:exactMatch` / `skos:closeMatch` per ADR-005; tightening these to `owl:equivalentClass` requires deliberate decision because it has reasoning consequences.
-- **Do not edit ADRs 001–011 retroactively.** They are historical record. If something needs to change, propose a new ADR that supersedes the old one.
+- **Do not retroactively edit existing ADRs.** They are historical record. If something needs to change, propose a new ADR that supersedes the old one.
 - **Do not start the DSL.** ADR-006 defers it. If the user asks for DSL syntax design, the answer is "not yet, per ADR-006; YAML is the authoring form."
 - **Do not centralize policy evaluation in tooling.** Even helper utilities like "decide whether this policy applies" cross into runtime-engine territory. The project compiles to platform-native enforcement and does not evaluate policies itself.
 - **Do not assume Snowflake is competitive or hostile.** Per ADR-002, the project is neutral. Snowflake-related work proceeds against public platform surfaces as any partner integration would.
@@ -204,16 +208,19 @@ When working in this repository:
 
 ## Where the user is in the work
 
-The user (Brice, github: `bgiesbrecht`) has just established the repository with the initial commits. The immediate context as of this handoff:
+The user (Brice, github: `bgiesbrecht`) established the repository and has run several rounds of design refinement on top of the initial commits. The immediate context as of this handoff:
 
-- Documents and spec artifacts are committed.
-- GitHub Pages is *not yet* enabled (or has just been enabled — verify).
-- No worked examples exist yet.
-- No tooling exists yet.
-- No adapter scaffolding exists yet.
-- The custom-ACL customer engagement has not yet started.
+- Documents and spec artifacts are committed at v0 — including the pre-publication corrections ADR-013 (`defaultStrategy`/`baselineGroup`), ADR-014 (Policy container backport), and ADR-015 (ordered first-match combining). The **v0 immutability bar comes down with the ADR-014 commit chain** (per ADR-014's closing note); subsequent IR changes require a v1 cut.
+- GitHub Pages is enabled; URLs under `https://bgiesbrecht.github.io/tessera/spec/v0/` resolve.
+- **Two worked examples complete**, both against `RLS Demo (3).ipynb`:
+  - **Group-based row visibility** — Phase 1 / 2 / 3 done. Artifacts at `spec/v0/examples/group-row-visibility-*`. Phase 3 verification passed all three scenarios; cache-propagation lag of 2–4 minutes observed. Drove ADR-014 / ADR-015 backports.
+  - **ACL-table-driven row visibility** — Phase 1 / 2 / 3 done. Artifacts at `spec/v0/examples/acl-row-visibility-*`. Phase 3 verification passed all three scenarios; synchronous propagation observed (contra group exercise's cache lag). Exercised `byDataset` / `PrincipalSetFromTable`; surfaced four v1-candidate gaps the v0 IR can't natively express.
+- **Eleven GitHub issues** total, all opened from worked-example findings. Resolved/closed: #1, #2 (policy-container, default-branch-predicate — by ADR-014); #6 (timing disclosure — closed-on-arrival when §5.2 paragraph landed). Open: #3 (principal-in-group-condition, deferred-not-needed-yet); #4 (iri-safety-convention); #5 (adapter-emission-pattern-recognition); #7 (principal-set-from-joined-tables); #8 (principal-set-match-modifiers); #9 (exists-in-dataset-operand-formalization); #10 (policy-execute-grants — surfaced by both exercises); #11 (acl-integrity-checks, lower priority).
+- `spec/v0/schema.json` exists and reflects the Policy container (Priority 3 complete). SHACL shapes (Priority 4) are next.
+- No converter, linter, or adapter scaffolding exists yet.
+- Both worked examples are complete; no deferred follow-ons remain on the exercise track. The next conversation typically moves to Priority 4 (SHACL), Priority 5 (converter), Priority 6 (first adapter), or v1 design work informed by the open issues.
 
-The user's current preferred sequencing is roughly the priority order above, but is open to redirection based on what proves most valuable. The user values:
+The user's current preferred sequencing is the priority order in this document, but is open to redirection based on what proves most valuable. The user values:
 
 - Honesty over completeness. Better to ship less and label it correctly than to ship more and overstate.
 - Posture preservation. The skunkworks framing and the Unity-Catalog-source-of-truth concession are non-negotiable.

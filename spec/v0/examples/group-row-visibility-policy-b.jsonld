@@ -1,0 +1,52 @@
+{
+  "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
+  "@type": "Policy",
+  "@id": "policy:group-row-visibility-policy-b",
+  "version": "1.0.0",
+  "policyKind": "RowVisibilityConstraint",
+  "description": "Three-branch row visibility on bg_rls_demo.tpch.orders driven by group memberships. Default visibility (priorities 3-5) grounded in the absence of restrictive group memberships, expressed via defaultBranch.",
+
+  "appliesTo": {
+    "selector": "byIdentity",
+    "resource": "table:bg_rls_demo.tpch.orders"
+  },
+
+  "action": "Read",
+
+  "defaultStrategy": "negated-complement",
+
+  "rules": [
+    {
+      "principal": {
+        "selector": "byIdentity",
+        "resource": "group:bg_rls_demo_all_priority_ops"
+      },
+      "effect": "keep-matching-rows"
+    },
+    {
+      "principal": {
+        "selector": "byIdentity",
+        "resource": "group:bg_rls_demo_high_priority_ops"
+      },
+      "effect": "keep-matching-rows",
+      "condition": {
+        "op": "in",
+        "operands": ["column:bg_rls_demo.tpch.orders.o_orderpriority"],
+        "values": ["1-URGENT", "2-HIGH"]
+      }
+    }
+  ],
+
+  "defaultBranch": {
+    "effect": "keep-matching-rows",
+    "condition": {
+      "op": "in",
+      "operands": ["column:bg_rls_demo.tpch.orders.o_orderpriority"],
+      "values": ["3-MEDIUM", "4-NOT SPECIFIED", "5-LOW"]
+    }
+  },
+
+  "provenance": {
+    "notes": "Hand-authored for the first worked example. Rewritten to the Policy container shape after ADR-014 backported the container into v0. Pre-ADR-014, the default branch was expressed as a byComposition/match: not rule — the workaround that motivated the `defaultBranch` field's introduction."
+  }
+}

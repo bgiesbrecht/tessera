@@ -331,6 +331,79 @@ tessera:DistributionConstraint a owl:Class ;
 
 #
 # ============================================================================
+# Policy container
+# ============================================================================
+# A Policy is a container that holds an ordered set of rules plus
+# policy-level metadata. Introduced in ADR-014 to give multi-branch
+# policies first-class structural representation. A single-rule policy
+# may also be expressed as a Policy with a one-element `rules` list, but
+# bare PolicyConstraint top-level forms remain valid for backward
+# compatibility.
+#
+# Rule combining is ordered first-match (ADR-015): the first rule whose
+# principal and condition both match wins; subsequent rules are not
+# evaluated. The `defaultStrategy` field on Policy determines what
+# happens when no rule matches.
+#
+
+tessera:Policy a owl:Class ;
+    rdfs:subClassOf tessera:Entity ;
+    rdfs:label "Policy"@en ;
+    rdfs:comment
+        "A container holding an ordered set of rules plus policy-level "
+        "metadata (appliesTo, defaultStrategy, baselineGroup, defaultBranch, "
+        "policyKind). A Policy is not a subclass of PolicyConstraint; it "
+        "contains constraints rather than refining the constraint concept. "
+        "See ADR-014 for the introduction of this class."@en .
+
+
+#
+# ============================================================================
+# Default-handling strategy
+# ============================================================================
+# When a policy has multiple branches, the strategy for handling principals
+# who match no affirmative branch is part of the policy's intent, not just
+# its observable behavior. Two policies producing identical SQL may differ
+# in whether the default visibility is grounded in an explicit baseline
+# group or in the absence of restrictive memberships. See ADR-013.
+#
+
+tessera:DefaultStrategy a owl:Class ;
+    rdfs:subClassOf tessera:Entity ;
+    rdfs:label "Default strategy"@en ;
+    rdfs:comment
+        "Names the mechanism by which a policy handles principals who do not "
+        "match its affirmative-grant rules. Captures intent: same observable "
+        "behavior can be produced by different strategies, and the choice "
+        "between them is part of the policy's meaning."@en .
+
+tessera:explicitBaselineGroup a tessera:DefaultStrategy ;
+    rdfs:label "explicit baseline group"@en ;
+    rdfs:comment
+        "The policy asserts a specific group is the universal baseline. "
+        "A companion field, baselineGroup, names the group. The framework "
+        "treats the rule keyed off this group as the default branch. The "
+        "default is grounded in explicit group membership."@en .
+
+tessera:negatedComplement a tessera:DefaultStrategy ;
+    rdfs:label "negated complement"@en ;
+    rdfs:comment
+        "The policy asserts no baseline group. The default branch applies "
+        "to principals who do not match any affirmative-grant rule. The "
+        "framework treats the negation as inherent to the policy structure. "
+        "The default is grounded in the absence of restrictive memberships."@en .
+
+tessera:none a tessera:DefaultStrategy ;
+    rdfs:label "none"@en ;
+    rdfs:comment
+        "The policy has no default branch. Principals matching no rule see "
+        "nothing. This is the framework's fail-closed disposition stated "
+        "explicitly. Equivalent to omitting the defaultStrategy field, but "
+        "preferred when the policy author wants to assert the choice."@en .
+
+
+#
+# ============================================================================
 # Selectors
 # ============================================================================
 # A Selector identifies the set of principals or resources a policy applies
@@ -452,19 +525,82 @@ tessera:Watermark a owl:Class ;
 # ============================================================================
 # A Transformation is a function applied to data on read, parameterized.
 # The transformation vocabulary is closed in v0 to preserve portability
-# (ADR-007 tracks extensibility).
+# (ADR-007 tracks extensibility). Parameter shapes are formalized via
+# TransformationInstance per ADR-016.
 #
 
 tessera:Transformation a owl:Class ;
     rdfs:subClassOf tessera:Entity ;
     rdfs:label "Transformation"@en ;
-    rdfs:comment "A function applied to data on read."@en .
+    rdfs:comment
+        "A function applied to data on read. Subclasses name the function "
+        "(Mask, Hash, Redact, etc.); the parameters of a specific application "
+        "of that function live on a TransformationInstance."@en .
 
 tessera:Mask       a owl:Class ; rdfs:subClassOf tessera:Transformation ; rdfs:label "Mask"@en .
 tessera:Hash       a owl:Class ; rdfs:subClassOf tessera:Transformation ; rdfs:label "Hash"@en .
 tessera:Tokenize   a owl:Class ; rdfs:subClassOf tessera:Transformation ; rdfs:label "Tokenize"@en .
 tessera:Redact     a owl:Class ; rdfs:subClassOf tessera:Transformation ; rdfs:label "Redact"@en .
 tessera:Bucketize  a owl:Class ; rdfs:subClassOf tessera:Transformation ; rdfs:label "Bucketize"@en .
+
+# --- TransformationInstance: a specific application of a Transformation ----
+# Per ADR-016, every reference to a transformation in a policy is a
+# TransformationInstance, even for parameterless cases (uniform structured
+# form). The `type` field identifies which Transformation subclass applies;
+# the additional properties carry parameters specific to that transformation.
+
+tessera:TransformationInstance a owl:Class ;
+    rdfs:subClassOf tessera:Entity ;
+    rdfs:label "Transformation instance"@en ;
+    rdfs:comment
+        "A specific application of a Transformation, carrying any parameters "
+        "required. The `type` property identifies the Transformation subclass; "
+        "additional properties carry per-transformation parameters. See ADR-016 "
+        "for the parameter shapes formalized in v0."@en .
+
+tessera:replacement a owl:DatatypeProperty ;
+    rdfs:label "replacement"@en ;
+    rdfs:comment
+        "The literal value to substitute for the column's content when a "
+        "Redact transformation is applied. Accepts JSON-encodable values: "
+        "strings, numbers, booleans, or null. The adapter is responsible "
+        "for type-compatibility with the column at emission time."@en ;
+    rdfs:domain tessera:TransformationInstance .
+
+tessera:maskChar a owl:DatatypeProperty ;
+    rdfs:label "mask character"@en ;
+    rdfs:comment
+        "The character used for masked positions in a Mask transformation. "
+        "Single character; default 'X' if omitted."@en ;
+    rdfs:domain tessera:TransformationInstance ;
+    rdfs:range xsd:string .
+
+tessera:preserveFirst a owl:DatatypeProperty ;
+    rdfs:label "preserve first N characters"@en ;
+    rdfs:comment
+        "Non-negative integer. The first N Unicode code points of the value "
+        "pass through unchanged in a Mask transformation. Default 0."@en ;
+    rdfs:domain tessera:TransformationInstance ;
+    rdfs:range xsd:nonNegativeInteger .
+
+tessera:preserveLast a owl:DatatypeProperty ;
+    rdfs:label "preserve last N characters"@en ;
+    rdfs:comment
+        "Non-negative integer. The last N Unicode code points of the value "
+        "pass through unchanged in a Mask transformation. Default 0. If the "
+        "sum of preserveFirst and preserveLast meets or exceeds the value's "
+        "character length, the value is returned unchanged."@en ;
+    rdfs:domain tessera:TransformationInstance ;
+    rdfs:range xsd:nonNegativeInteger .
+
+tessera:algorithm a owl:DatatypeProperty ;
+    rdfs:label "hash algorithm"@en ;
+    rdfs:comment
+        "The hash algorithm for a Hash transformation. One of 'sha256', "
+        "'sha512', 'sha1'. Default 'sha256'. Salted hashing is deferred to "
+        "v1 pending secret-reference vocabulary."@en ;
+    rdfs:domain tessera:TransformationInstance ;
+    rdfs:range xsd:string .
 
 
 #
@@ -515,8 +651,15 @@ tessera:confidenceLow    a tessera:ExtractionConfidence ; rdfs:label "low"@en .
 
 tessera:appliesTo a owl:ObjectProperty ;
     rdfs:label "applies to"@en ;
-    rdfs:comment "Relates a policy constraint to the resource selector identifying the resources it constrains."@en ;
-    rdfs:domain tessera:PolicyConstraint ;
+    rdfs:comment
+        "Relates a policy (Policy container, or a standalone PolicyConstraint) "
+        "to the resource selector identifying the resources it constrains. "
+        "On a Policy, appliesTo is policy-wide and shared across all rules. "
+        "See ADR-014 for the property's extension to Policy."@en ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( tessera:Policy tessera:PolicyConstraint )
+    ] ;
     rdfs:range tessera:ResourceSelector .
 
 tessera:principal a owl:ObjectProperty ;
@@ -545,9 +688,13 @@ tessera:condition a owl:ObjectProperty ;
 
 tessera:transformation a owl:ObjectProperty ;
     rdfs:label "transformation"@en ;
-    rdfs:comment "Relates a column visibility constraint to the transformation applied to matching data."@en ;
+    rdfs:comment
+        "Relates a column visibility constraint to the transformation instance "
+        "applied to matching data. Per ADR-016, every reference is a structured "
+        "TransformationInstance carrying the transformation type and any "
+        "applicable parameters."@en ;
     rdfs:domain tessera:ColumnVisibilityConstraint ;
-    rdfs:range tessera:Transformation .
+    rdfs:range tessera:TransformationInstance .
 
 tessera:hasObligation a owl:ObjectProperty ;
     rdfs:label "has obligation"@en ;
@@ -560,6 +707,64 @@ tessera:requiresCapability a owl:DatatypeProperty ;
     rdfs:comment "Names a capability the policy depends on; consulted at emission time against the target adapter's capability profile."@en ;
     rdfs:domain tessera:PolicyConstraint ;
     rdfs:range xsd:string .
+
+tessera:defaultStrategy a owl:ObjectProperty ;
+    rdfs:label "default strategy"@en ;
+    rdfs:comment
+        "Relates a policy (Policy container, or a standalone PolicyConstraint) "
+        "to the strategy by which it handles principals who match no "
+        "affirmative rule. Optional; when omitted, the framework treats the "
+        "policy as fail-closed (equivalent to tessera:none). See ADR-013 for "
+        "the property's introduction and ADR-014 for its extension to Policy."@en ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( tessera:Policy tessera:PolicyConstraint )
+    ] ;
+    rdfs:range tessera:DefaultStrategy .
+
+tessera:baselineGroup a owl:DatatypeProperty ;
+    rdfs:label "baseline group"@en ;
+    rdfs:comment
+        "Names the group treated as the universal baseline when "
+        "defaultStrategy is tessera:explicitBaselineGroup. Required if and "
+        "only if that strategy is in use. Value is the platform-native group "
+        "identifier (e.g., 'account users' on Databricks). See ADR-013 for "
+        "the property's introduction and ADR-014 for its extension to Policy."@en ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( tessera:Policy tessera:PolicyConstraint )
+    ] ;
+    rdfs:range xsd:string .
+
+tessera:policyKind a owl:ObjectProperty ;
+    rdfs:label "policy kind"@en ;
+    rdfs:comment
+        "Discriminator selecting the policy domain (e.g., "
+        "tessera:RowVisibilityConstraint) for a Policy. Determines the legal "
+        "shape of rules within the Policy. See ADR-014."@en ;
+    rdfs:domain tessera:Policy ;
+    rdfs:range rdfs:Class .
+
+tessera:rules a owl:ObjectProperty ;
+    rdfs:label "rules"@en ;
+    rdfs:comment
+        "Ordered list of rules in a Policy. Order is semantically meaningful: "
+        "rules are evaluated in order under first-match combining (ADR-015). "
+        "Each rule is a structurally slimmer constraint with principal, "
+        "optional condition, and effect (and kind-specific extras such as "
+        "transformation for ColumnVisibility)."@en ;
+    rdfs:domain tessera:Policy ;
+    rdfs:range rdf:List .
+
+tessera:defaultBranch a owl:ObjectProperty ;
+    rdfs:label "default branch"@en ;
+    rdfs:comment
+        "The default branch of a Policy under defaultStrategy: "
+        "negated-complement. Applies when no rule in `rules` matches. "
+        "A slimmer rule (no principal selector; effect and optional "
+        "condition only). Required iff defaultStrategy is "
+        "tessera:negatedComplement; forbidden otherwise. See ADR-014."@en ;
+    rdfs:domain tessera:Policy .
 
 # --- Resource classification ---
 

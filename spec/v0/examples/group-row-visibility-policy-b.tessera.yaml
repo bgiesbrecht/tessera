@@ -1,0 +1,85 @@
+# Group-based row visibility on bg_rls_demo.tpch.orders — Policy B.
+#
+# Worked-example artifact, post-ADR-014. Companion files:
+#   group-row-visibility-policy-b.jsonld     — canonical (JSON-LD) form
+#   group-row-visibility.databricks.sql      — adapter emission target
+#   group-row-visibility.diagnostic.md       — per-element enforcement report
+#   group-row-visibility.comparison.md       — Phase 3 comparison record
+#
+# Inputs: docs/exercises/group-row-visibility-inputs.md
+# Strategy: negated-complement (ADR-013) — the default branch is grounded
+# in the *absence* of restrictive group memberships, not in any explicit
+# baseline group. This is the policy that mirrors the existing Databricks
+# implementation (CASE/WHEN/ELSE row filter) and was the comparison target
+# in Phase 3.
+#
+# Same observable behavior as Policy A; different intent. The structural
+# difference is visible in the IR: Policy B has two rules and a
+# `defaultBranch`; Policy A has three rules with the baseline group
+# referenced affirmatively.
+
+"@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
+"@type": Policy
+"@id": policy:group-row-visibility-policy-b
+version: 1.0.0
+policyKind: RowVisibilityConstraint
+description: >
+  Three-branch row visibility on bg_rls_demo.tpch.orders driven by group
+  memberships. Default visibility (priorities 3-5) grounded in the
+  absence of restrictive group memberships, expressed via defaultBranch.
+
+appliesTo:
+  selector: byIdentity
+  resource: table:bg_rls_demo.tpch.orders
+
+action: Read
+
+defaultStrategy: negated-complement
+
+# Rules are evaluated in order; first match wins (ADR-015). Under
+# negated-complement, principals matching neither rule fall through to
+# `defaultBranch` below.
+
+rules:
+
+  # Rule B1 — "all priority ops" group sees every row.
+  - principal:
+      selector: byIdentity
+      resource: group:bg_rls_demo_all_priority_ops
+    effect: keep-matching-rows
+
+  # Rule B2 — "high priority ops" group sees the high-priority rows.
+  - principal:
+      selector: byIdentity
+      resource: group:bg_rls_demo_high_priority_ops
+    effect: keep-matching-rows
+    condition:
+      op: in
+      operands:
+        - column:bg_rls_demo.tpch.orders.o_orderpriority
+      values:
+        - "1-URGENT"
+        - "2-HIGH"
+
+# defaultBranch — applied when no rule matches. The lower-priority rows
+# are visible to principals not in either restrictive group. Under
+# ADR-014, defaultBranch carries the default-branch predicate directly
+# rather than expressing it as a byComposition/not workaround rule.
+defaultBranch:
+  effect: keep-matching-rows
+  condition:
+    op: in
+    operands:
+      - column:bg_rls_demo.tpch.orders.o_orderpriority
+    values:
+      - "3-MEDIUM"
+      - "4-NOT SPECIFIED"
+      - "5-LOW"
+
+provenance:
+  notes: |
+    Hand-authored for the first worked example.
+    Rewritten to the Policy container shape after ADR-014 backported the
+    container into v0. Pre-ADR-014, the default branch was expressed as
+    a byComposition/match: not rule — the workaround that motivated the
+    `defaultBranch` field's introduction.

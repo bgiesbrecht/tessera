@@ -23,7 +23,7 @@ Tessera delivers **semantic interoperability of policy**: an agreement, encoded 
 
 - **Not a runtime policy enforcement engine.** Tessera compiles to and from the platforms that already do enforcement well. It does not insert itself into the query path.
 - **Not a replacement for platform-native governance.** Unity Catalog is the source of truth for governance inside a Databricks environment. Snowflake's governance is the source of truth inside Snowflake. Tessera is the lingua franca *between* governance estates, not a replacement for either of them.
-- **Not an official product of any vendor.** Tessera is a skunkworks initiative by an engineer at Databricks, intended to help joint Databricks–Snowflake customers (and customers running other combinations) solve a real and continuous governance problem. It does not represent an official Databricks position, it is not coordinated with Snowflake, and it does not propose itself as an industry standard.
+- **Not an official product of any vendor.** Tessera is an initiative intended to help solve a real and continuous governance problem. It does not represent an official Databricks position, it is not coordinated with Snowflake.
 - **Not a universal authorization language.** Tessera is scoped to data-platform governance and is intentionally narrower than general-purpose authorization tools like Cedar or OPA. Narrowness is a feature.
 
 ## Who Tessera is for
@@ -120,7 +120,7 @@ If you're trying to evaluate whether Tessera fits a specific environment, read 2
 
 ## Foundational decisions
 
-The project is grounded in seven recorded decisions (see `DECISIONS.md` for the full text and rationale):
+The project is grounded in twelve recorded decisions (see `DECISIONS.md` for the full text and rationale):
 
 - **ADR-001** Tessera's value proposition is semantic interoperability across platforms, not migration. Migration is a derived benefit.
 - **ADR-002** Tessera is a skunkworks customer-enablement initiative. Unity Catalog remains the source of truth inside Databricks; Tessera operates between governance estates.
@@ -129,6 +129,11 @@ The project is grounded in seven recorded decisions (see `DECISIONS.md` for the 
 - **ADR-005** The vocabulary reuses existing standards (W3C ODRL, W3C DPV, Cedar, XACML) where they fit, rather than reinventing them.
 - **ADR-006** A custom DSL is deferred until the IR has stabilized through real corpus exposure and at least two adapter implementations. YAML is the authoring surface in the interim.
 - **ADR-007** Several technical questions remain open and are tracked explicitly rather than resolved by default.
+- **ADR-008** Project name is **Tessera**; the vocabulary prefix is `tessera:` and the YAML authoring extension is `.tessera.yaml`.
+- **ADR-009** License is **Apache 2.0** for both specification and code.
+- **ADR-010** The repository is hosted at **`github.com/bgiesbrecht/tessera`** under an individual account, consistent with the skunkworks posture.
+- **ADR-011** The canonical namespace, context, and ontology URLs are served from **GitHub Pages** at `bgiesbrecht.github.io/tessera/spec/v0/`.
+- **ADR-012** The repository is **public**, because the published namespace URLs must resolve anonymously for downstream tooling.
 
 ## Posture toward the platforms
 
