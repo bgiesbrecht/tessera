@@ -2,7 +2,7 @@
 
 **Status:** Draft, supersedes v0.1
 **Audience:** Technical reviewers — architects, senior engineers, specification editors
-**Authoritative context:** This document is consistent with ADR-001 through ADR-006 in `DECISIONS.md`. Conflicts are resolved in favor of the ADRs.
+**Authoritative context:** This document is consistent with the ADRs in `DECISIONS.md` (ADR-001 through ADR-027 as of 2026-05-20). Conflicts are resolved in favor of the ADRs. The document's voice is **descriptive, not prescriptive** (ADR-027): it describes what the IR represents and what each adapter emits, without recommending authoring preferences the platforms themselves do not document.
 
 ---
 

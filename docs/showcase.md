@@ -218,6 +218,7 @@ These are non-goals, documented in ADRs and held consistently:
 - **Not a Databricks product.** Skunkworks (ADR-002). No commercial commitments, no SLA, no roadmap commitments to customers.
 - **Not seeking standardization.** Uses W3C technology (RDF, OWL, JSON-LD, SHACL, SKOS) because the technology fits the problem; not pursuing W3C recommendation status.
 - **Not operational interoperability.** Policy behavior on data physically moving between platforms (Delta Sharing, Iceberg replication) is out of scope.
+- **Not prescriptive about authoring style** (ADR-027). Tessera represents policy intent; it does not invent cross-platform authoring recommendations the platforms themselves do not document. Where a platform's docs make a recommendation, Tessera surfaces and cites it.
 
 The `docs/user-guide/evaluating.md` page expands these into a fuller adopt/don't-adopt decision framework.
 

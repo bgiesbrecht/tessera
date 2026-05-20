@@ -4,6 +4,32 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.6.1] — 2026-05-20
+
+A documentation-and-principle increment. No spec or adapter changes. Captures a recurring framing slip as a recorded ADR so the next instance gets caught at the principle layer rather than after seven docs have to be corrected.
+
+### Added
+
+**ADR-027 — Descriptive representation: that which can be defined can be represented.** Records the principle that Tessera's authoring guidance and capability profiles are descriptive, not prescriptive. The framework represents any well-defined policy intent; it does not synthesize cross-platform authoring recommendations the platforms themselves do not make. Where a platform's docs make a recommendation, Tessera surfaces and cites it. Where the IR cannot represent a definable intent, the gap is an IR-extension candidate (e.g., issue #14 for Intent A primary-role-only semantics) — not a constraint on authors.
+
+Empirical motivation: two consecutive correction passes hit the same drift — the 2026-05-19 secondary-roles reframe and the 2026-05-20 Snowflake-guidance reframe. Both fixed instances of Tessera inventing recommendations Snowflake itself does not document. ADR-027 abstracts the recurring principle so the failure mode is caught at the ADR layer.
+
+### Changed
+
+**`docs/user-guide/contributing.md`** gains a "Descriptive, not prescriptive (ADR-027)" section establishing the principle as a contribution norm. PRs that introduce "Tessera recommends X" framing without a platform-side source will be redirected.
+
+**`docs/user-guide/authoring.md`** gains an opening "A note on this page's voice" section stating the principle so practitioners encounter it before any per-selector guidance.
+
+**`README.md`** updates the Foundational decisions section: ADR count bumped from 26 → 27; ADR-027 added under Posture and framing.
+
+### Snowflake guidance corrections (rolled forward from 2026-05-20)
+
+The 0.6.0 cycle's last commit (`97ff1d5`) corrected seven authoritative documents and the Snowflake capability profile to drop the "Snowflake prefers byDataset for non-trivial policies" overreach. Each corrected claim now carries an inline citation to Snowflake's actual documentation (`docs.snowflake.com/en/user-guide/security-row-using` and adjacent pages). The corrections realize what ADR-027 records as principle.
+
+### Issue tracker activity
+
+No issues opened or closed in this cycle. The 2026-05-19 secondary-roles correction and the 2026-05-20 Snowflake-guidance correction were both completed and abstracted into ADR-027.
+
 ## [0.6.0] — 2026-05-20
 
 RBAC support landed in the adapter cycle. The full ADR-024 four-responsibility set — emit, discover, extract, reconcile — now covers `AccessGrantConstraint` policies alongside the row/column-visibility shapes. The migration demo grew from three policies to six, with the table-grants exercise's RBAC patterns flowing through the same Snowflake → IR → UC pipeline as everything else.

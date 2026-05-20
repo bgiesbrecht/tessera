@@ -4,6 +4,10 @@ This page is the authoring reference. It assumes you've worked through [`tutoria
 
 The canonical form is JSON-LD (ADR-004), but you author in YAML (`.tessera.yaml` files). The YAML maps mechanically to JSON-LD via the JSON-LD context at `spec/v0/context.jsonld`. A v1 converter is available — run `python -m tools.converter <file.tessera.yaml> --out <file.jsonld>` or call `from tools.converter import yaml_to_jsonld` from Python. The converter handles envelope-form YAML (the practitioner shape `policy: { id, kind, ... }`) and JSON-LD-shaped YAML alike. Comment preservation in YAML round-trips and the reverse direction (JSON-LD → YAML) are deferred to v2.
 
+## A note on this page's voice (ADR-027)
+
+This reference is **descriptive**, not prescriptive. It describes what each selector, effect, and transformation represents — and where a platform's own documentation makes a recommendation (e.g., Snowflake on `IS_ROLE_IN_SESSION` vs. mapping tables for different scenarios), this page cites it. It does not synthesize cross-platform authoring recommendations Tessera has no authoritative basis to make. *That which can be defined can be represented*: the IR's job is to represent whatever well-defined intent you want to express, faithfully across platforms. Where the IR can't yet represent something definable, that's a gap to file an issue against — not a constraint on you. See ADR-027 for the full reasoning.
+
 ## Top-level structure — the Policy container
 
 Every multi-rule policy is a `Policy` container (ADR-014). Single-rule policies can use a freestanding `PolicyConstraint` at the document root, but `Policy` is the recommended shape for everything.

@@ -147,12 +147,13 @@ Routing by goal:
 
 ## Foundational decisions
 
-The project is grounded in **26 recorded ADRs** (see `DECISIONS.md` for the complete record and rationale). The decisions that most shape how a reader should understand the project:
+The project is grounded in **27 recorded ADRs** (see `DECISIONS.md` for the complete record and rationale). The decisions that most shape how a reader should understand the project:
 
 **Posture and framing**
 - **ADR-001** Value proposition is semantic interoperability across platforms, not migration. Migration is a derived benefit.
 - **ADR-002** Skunkworks customer-enablement initiative. Unity Catalog is the source of truth *inside* Databricks; Tessera operates *between* governance estates.
 - **ADR-017** v0 immutability is **conditional**: it engages when external dependency exists (third-party adapter, customer corpus, downstream tooling), not on a date.
+- **ADR-027** Tessera is **descriptive, not prescriptive**. The framework represents any well-defined policy intent; it does not invent cross-platform authoring recommendations the platforms themselves do not make. *That which can be defined can be represented.*
 
 **Architecture**
 - **ADR-003** Adapters are the unifying abstraction. Native and custom enforcement patterns are peers, not core-and-extension.

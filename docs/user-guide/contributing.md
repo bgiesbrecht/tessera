@@ -14,6 +14,19 @@ Every significant decision is recorded as a numbered ADR in `DECISIONS.md`. The 
 
 If a request would push Tessera toward becoming a runtime engine, a standards submission, a Databricks product, or any other direction ADR-001 or ADR-002 rules out, surface the conflict to the project lead (Brice) rather than silently broadening scope.
 
+## Descriptive, not prescriptive (ADR-027)
+
+Tessera's authoring guidance and capability profiles are **descriptive**, not prescriptive. The framework's job is to represent any well-defined policy intent faithfully; it does not prescribe an authoring preference Tessera invents.
+
+In practice:
+
+- **Authoring guidance describes what each selector represents and what each platform documents.** "Snowflake recommends `IS_ROLE_IN_SESSION` for role-discrimination scenarios" with a citation: yes. "Tessera recommends `byDataset` for non-trivial Snowflake policies" without a platform-side source: no.
+- **Cite-and-surface, do not invent.** Where a platform's docs make a recommendation, cite it. Where they don't, describe what each shape represents without synthesizing a cross-platform recommendation Tessera has no authoritative basis to make.
+- **Capability profiles describe emission and platform behavior.** They do not editorialize about authoring preferences.
+- **Where the IR cannot represent a definable intent, file an issue or propose an ADR.** The framework grows by adding representational range, not by adding prescription. Issue [#14](https://github.com/bgiesbrecht/tessera/issues/14) (Intent A primary-role-only semantics) is the canonical example of this discipline.
+
+If a PR introduces "Tessera recommends X" framing into authoring guidance, expect it to be redirected to either (a) a citation of the platform's own recommendation, (b) a descriptive statement of what the shape represents, or (c) an issue tracking an IR-extension candidate. See ADR-027 for the full reasoning and the empirical history (two correction passes — 2026-05-19 secondary-roles reframe, 2026-05-20 Snowflake-guidance reframe — that motivated recording the principle).
+
 ## Extending the IR
 
 The v0 immutability bar is suspended (ADR-017) until external dependency exists. v0 admits additions today; once external consumers ship, v0 freezes and changes go to v1.

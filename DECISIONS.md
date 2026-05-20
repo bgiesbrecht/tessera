@@ -1242,6 +1242,71 @@ policy:
 
 ---
 
+## ADR-027 — Descriptive representation: that which can be defined can be represented
+
+**Date:** 2026-05-20
+**Status:** Accepted
+
+### Context
+
+Two consecutive correction passes hit the same failure mode:
+
+1. **2026-05-19 secondary-roles reframe.** The initial framing of Snowflake's `DEFAULT_SECONDARY_ROLES = ('ALL')` default (BCR-1692) as a "gotcha" that "silently collapses policy discrimination" was sloppy. The default is consistent with `IS_ROLE_IN_SESSION` permission-scope semantics — secondary roles activate, the predicate sees them, the result is correct under what Snowflake documents. Reframed in ADR-024's postscript, `adapters/snowflake/capability.py` ROW_VISIBILITY entry, and `docs/user-guide/operating.md`.
+
+2. **2026-05-20 Snowflake-guidance reframe.** The user-guide and capability profile had drifted into claiming that Snowflake recommends mapping tables (Tessera's `byDataset`) for "non-trivial" row-access policies — with a fabricated section title ("Mapping table placement") and a directional "prefer `byDataset` over `byIdentity`" recommendation. Verification against Snowflake's actual docs (`/en/user-guide/security-row-using`, `/en/user-guide/security-row-intro`, `/en/guides-overview-govern`) showed: Snowflake recommends `IS_ROLE_IN_SESSION` for role-discrimination scenarios, documents the mapping-table pattern as a fit for data-driven entitlement (not as a complexity ladder), and explicitly favors simple patterns over mapping tables on performance grounds. Reframed across seven authoritative documents and the capability profile (commit `97ff1d5`).
+
+Both passes hit the same shape: Tessera's documentation drifted from *describing* what the IR represents and what each platform documents, into *prescribing* an authoring preference Tessera invented. The drift is not accidental. A multi-platform framework operating between governance estates (ADR-002) is constantly tempted to harmonize authoring shape across platforms by recommending one over another. That harmonization is the wrong move: it makes Tessera prescriptive in a way that contradicts its actual posture.
+
+### Decision
+
+**Tessera is descriptive, not prescriptive, in its policy authoring guidance.**
+
+The framework's job is to be expressive enough that any well-defined policy intent can be represented in the IR and lowered to the target platform's primitives. *That which can be defined can be represented.* Where the IR cannot represent a definable intent, that is a gap to track and fill — not a constraint on authors.
+
+### What this means in practice
+
+1. **Authoring guidance is descriptive.** "Here is what each selector represents; here is what each platform documents about each pattern." Not: "Tessera recommends X."
+
+2. **Cite-and-surface, do not invent.** When a platform's own documentation makes a recommendation (e.g., Snowflake's "Snowflake recommends that the policy conditions use the IS_ROLE_IN_SESSION function..." for role-discrimination scenarios), Tessera surfaces and cites that recommendation. Tessera does not synthesize cross-platform recommendations the platforms themselves don't make.
+
+3. **The IR aims at representational range.** Where a future exercise surfaces a definable intent that v0 cannot represent (Intent A primary-role-only semantics, per issue [#14](https://github.com/bgiesbrecht/tessera/issues/14), is the canonical example), the gap becomes an IR-extension candidate. The framework grows by adding representational range, not by adding prescription.
+
+4. **Capability profiles describe emission and platform implications.** They do not editorialize about authoring preferences. "Emitted via X; subject to platform behavior Y; cite documentation Z" is the shape. "Authors should prefer this over that" is not.
+
+5. **Selector-fit is descriptive, not normative.** Statements like "byDataset fits when the underlying decision is data-driven entitlement" are descriptive — they describe what the selector represents. Statements like "Tessera recommends byDataset for non-trivial policies on Snowflake" are normative — they prescribe an authoring preference Tessera has no basis to recommend.
+
+### Rationale
+
+- **Empirically grounded.** The same overreach has now required correction twice. A principle recorded at the ADR layer catches the next instance before it propagates through seven documents and a capability profile.
+- **Aligns with project posture.** ADR-001 frames Tessera's value as semantic interoperability across platforms; ADR-002 establishes the skunkworks posture and the Unity-Catalog-source-of-truth concession; ADR-005 chooses standards reuse over reinvention. All three point in the same direction: Tessera represents meaning, defers to platform-native authority, and does not impose authoring discipline.
+- **Sharpens what "semantic interoperability" means.** Not authoring discipline harmonized across platforms; rather, representational range that admits each platform's documented patterns faithfully.
+- **Constrains the project's voice but expands its scope.** Pushes back against harmonization-by-recommendation while keeping the IR ambitious about coverage of definable intents.
+
+### Relationship to prior ADRs
+
+- **ADR-001.** ADR-027 sharpens what "semantic interoperability" means: representational range, not authoring discipline.
+- **ADR-002.** The skunkworks posture is fragile in part because the project does not coordinate with Snowflake (ADR-002) — which means Tessera has no authoritative basis to recommend Snowflake authoring patterns Snowflake itself does not document. ADR-027 makes this implicit constraint explicit.
+- **ADR-005.** Standards reuse: where W3C ODRL/DPV defines a concept, Tessera aligns rather than reinvents. ADR-027 extends the same discipline to platform-side recommendations: where Snowflake or Databricks documents a recommendation, Tessera cites it rather than restates or rephrases.
+- **ADR-024.** The adapter-contract postscript records the empirical motivation from the first correction pass. ADR-027 abstracts the recurring principle.
+
+### Consequences
+
+- **The 0.6.0 corrections** (commits `97ff1d5` and predecessors) realized this principle in practice across seven documents and the capability profile. They are the implementation reference for "what descriptive looks like" going forward.
+- **`docs/user-guide/contributing.md`** gains a "Descriptive, not prescriptive" contribution norm referencing this ADR.
+- **`docs/user-guide/authoring.md`** gains an opening framing paragraph stating the principle, so practitioners encounter it before any per-selector guidance.
+- **Future contributions that introduce "Tessera recommends X" framing into authoring guidance will be redirected.** Where the contribution surfaces a platform-documented recommendation, the cite-and-surface form is correct.
+- **Where a future exercise surfaces an unrepresentable definable intent**, the gap becomes an IR-extension candidate (e.g., Intent A primary-role-only semantics → issue #14). The principle does not constrain growth; it constrains prescription.
+
+### What this ADR does not do
+
+- **Does not invalidate platform-fit observations.** "Snowflake documents the mapping-table pattern for data-driven entitlement" is descriptive, citing the platform's own framing. Such observations remain.
+- **Does not prohibit nudges based on Tessera-side mechanics.** "Single-rule policies can use a freestanding `PolicyConstraint` but `Policy` is the recommended shape for everything" (ADR-014) is a Tessera-internal recommendation about how to write Tessera, not about platform authoring preferences. Such nudges are admissible because they describe Tessera's own canonical shape, not platform behavior.
+- **Does not retroactively edit historical artifacts.** The 2026-05-19 worked-example diagnostics and exercise inputs record what was concluded at the time. The 2026-05-19 handoff already notes the framing was later corrected. Subsequent corrections live in the source-of-truth user-guide and capability profile, not by rewriting history.
+- **Does not freeze the IR.** The principle pushes growth toward representational range (admitting definable intents into the IR), not away from change. ADR-017's suspended-immutability framing continues to apply; the discipline is "add representation, don't add prescription."
+- **Does not require restating every platform recommendation in Tessera docs.** Citing the source page with a short quote is sufficient; reproducing the full guidance would duplicate the platform's documentation without adding value.
+
+---
+
 ## How to use this document
 
 - Every new technical or stakeholder document begins by reading this file.

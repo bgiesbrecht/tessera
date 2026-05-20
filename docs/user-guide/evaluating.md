@@ -23,6 +23,7 @@ These are not edge-case clarifications. They are load-bearing scope decisions, d
 - **Not a substitute for Unity Catalog inside Databricks-only shops.** If you run only Databricks, Unity Catalog already does what you need. Tessera adds value precisely when policy must mean the same thing on Unity Catalog AND somewhere else.
 - **Not a standards-body submission.** Tessera draws semantic alignment from ODRL, DPV, and adjacent vocabularies (ADR-005) but does not seek formal standardization. It is engineering posture: skunkworks, customer-driven, ADR-disciplined (ADR-002).
 - **Not a Databricks product.** It is an Anthropic / Databricks Field Engineering project led by Brice Giesbrecht. It does not have a Databricks product roadmap, formal SLAs, or commercial commitments.
+- **Not prescriptive about authoring style.** Tessera represents policy intent; it does not invent cross-platform authoring recommendations the platforms themselves do not document. Where Snowflake or Databricks recommends a pattern, Tessera surfaces and cites that recommendation. Where they don't, Tessera describes what each shape represents and lets you choose. (ADR-027.)
 
 ## When Tessera fits
 
@@ -98,6 +99,6 @@ Tessera's positioning: compile-time portability between platforms, leaning into 
 - [`tutorial.md`](./tutorial.md) — concrete end-to-end if you want to see what Tessera actually does.
 - `docs/executive-summary.md` — one-page leadership brief.
 - `docs/problem-and-recommendation.md` — stakeholder framing.
-- `DECISIONS.md` — every significant decision recorded. ADRs 001–024.
+- `DECISIONS.md` — every significant decision recorded. ADRs 001–027.
 - `docs/technical-design-v0.2.md` — spec-level reference.
 - `spec/v0/examples/` — seven completed worked exercises with full artifacts and diagnostic findings.
