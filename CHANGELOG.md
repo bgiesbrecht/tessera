@@ -4,6 +4,49 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.5.0] — 2026-05-20
+
+Three-commit increment focused on adapter-contract completeness and the documentation debt that emerged from the 0.4.0 migration cycle. The full ADR-024 adapter responsibility set — discover, extract, emit, reconcile — is now real on both Unity Catalog and Snowflake (modulo ABAC byScope shapes that remain queued under separate issues). Five issues closed.
+
+### Added
+
+**Unity Catalog `discover()` and `extract()` — `adapters/unity_catalog/discovery.py`.**
+
+Parallel to the Snowflake equivalent. discover() walks `SHOW TABLES IN <schema>` + `DESCRIBE TABLE EXTENDED` to inventory row filters and column masks attached to tables; fetches each function's body via `DESCRIBE FUNCTION EXTENDED`. extract() recognizes three body shapes that the UC adapter emits:
+
+- byDataset row filter (`EXISTS (SELECT 1 FROM <map> m JOIN <acl> p WHERE m.<user> = current_user() AND p.<col> = <param>)`).
+- byIdentity multi-OR row filter (`is_account_group_member('A') OR (is_account_group_member('B') AND col IN (…))`).
+- byIdentity column mask (`CASE WHEN is_account_group_member('X') THEN col ELSE 'literal' END`).
+
+Live-verified against `bg_rls_demo.migration_demo`: all three deployed policies discovered and extracted with confidence ≥ 0.9. The adapter stays SDK-agnostic — caller supplies a `run_sql` callable via `config.extras["run_sql"]`. Closes [#27](https://github.com/bgiesbrecht/tessera/issues/27).
+
+**Platform-neutral `reconcile()` — `adapters/contract/reconcile.py`.**
+
+The fourth ADR-024 responsibility, implemented as a default on `Adapter` so both adapters get it without per-adapter code. Composes the adapter's `discover()` + `extract()` to produce an observed IR snapshot, then runs a structural diff against the supplied intended corpus. Returns a `ReconciliationResult` with `additions` / `removals` / `modifications` plus surfaced extraction diagnostics.
+
+Matching is by `(appliesTo.resource, action)` key, case-folded on the identifier portion of `prefix:id` strings. The diff compares only structural fields (`policyKind`, `action`, `defaultStrategy`, `rules`, `defaultBranch`) — descriptive fields (`@id`, `description`, `provenance`) are noise for reconcile purposes.
+
+Live-verified against `bg_rls_demo.migration_demo`: 0 additions, 0 removals, 3 modifications (the modifications reflect real differences between the source YAMLs and the migration-bindings-translated deployed form). Closes [#26](https://github.com/bgiesbrecht/tessera/issues/26).
+
+### Changed (documentation)
+
+- **`docs/user-guide/contributing.md` § Design rules every adapter must follow** gains the UDF parameter-name collision convention. Bug was fixed in three emission paths during 0.3.0 and 0.4.0; the convention now lives in the authoring docs so future emission paths don't reintroduce it. Closes [#28](https://github.com/bgiesbrecht/tessera/issues/28).
+- **`docs/user-guide/operating.md` § Identifier case in extracted IR** documents the chosen convention: carry source-platform case verbatim in extracted IR; rely on `AdapterConfig.bind_principal` / `bind_resource` case-insensitivity (added 0.4.0) as the bridge. Closes [#29](https://github.com/bgiesbrecht/tessera/issues/29).
+- **`docs/technical-design-v0.2.md` §5.5a — Emission readability** documents the negated-complement → readable-ELSE expectation. Largely automatic post-ADR-014 (`defaultBranch` is structural); remains a quality expectation for pre-container IR shapes. Closes [#5](https://github.com/bgiesbrecht/tessera/issues/5).
+
+### Issue tracker activity
+
+- **Closed**: [#5](https://github.com/bgiesbrecht/tessera/issues/5), [#26](https://github.com/bgiesbrecht/tessera/issues/26), [#27](https://github.com/bgiesbrecht/tessera/issues/27), [#28](https://github.com/bgiesbrecht/tessera/issues/28), [#29](https://github.com/bgiesbrecht/tessera/issues/29).
+- **Comments added** to touched-but-not-closed issues: [#8](https://github.com/bgiesbrecht/tessera/issues/8) (binding-layer fix vs IR-level vocabulary distinction), [#13](https://github.com/bgiesbrecht/tessera/issues/13) (migration-demo workaround), [#14](https://github.com/bgiesbrecht/tessera/issues/14) (extractor collapses Intent A/B).
+- **Filed** at the start of this cycle: [#26](https://github.com/bgiesbrecht/tessera/issues/26)–[#31](https://github.com/bgiesbrecht/tessera/issues/31) — six new issues capturing gaps the 0.4.0 migration cycle surfaced. Four of these closed during 0.5.0; #30 (UC ABAC byScope column-mask) and #31 (Snowflake ABAC byScope) remain.
+- 31 total issues; 10 closed; 21 open at version close.
+
+### What this version does not include
+
+- **ABAC byScope emission gaps remain queued.** [#30](https://github.com/bgiesbrecht/tessera/issues/30) (UC column-mask) and [#31](https://github.com/bgiesbrecht/tessera/issues/31) (Snowflake row + column) cover the remaining adapter coverage gaps.
+- **Tessera CLI thin wrapper** — converter's `python -m tools.converter` is still the only command-line surface.
+- **Phase 2 scoping documents for #19 / #21 / #25** — queued for claude.ai.
+
 ## [0.4.0] — 2026-05-20
 
 Five-commit increment focused on closing the migration cycle: `discover` and `extract` on Snowflake are no longer stubs, `byDataset` row visibility is implemented on both adapters, and the full Snowflake → Unity Catalog migration runs end-to-end on fresh schemas with adapter-applied bindings carrying the platform translation. ADR-026 adds `AccessGrantConstraint` as the fifth v0 policyKind, closing the table-grants exercise's open question.
