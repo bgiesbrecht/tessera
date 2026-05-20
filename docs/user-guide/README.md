@@ -17,6 +17,7 @@ Tessera is a portable representation of data governance policy. It expresses *wh
 ## Pages
 
 - [**Scenario: ACL & masking**](./scenarios/acl-and-masking.md) — practitioner-shaped tutorial for the common "ACL-table row visibility plus column masking" situation. Assumes YAML literacy; no semantic-web background required.
+- [**Scenario: Migrating Snowflake → Unity Catalog**](./scenarios/migrating-snowflake-to-uc.md) — discover three policies running on Snowflake, lift them into Tessera IR, emit Databricks DDL, deploy on UC, verify behavioral equivalence. End-to-end migration via the IR pivot.
 - [**Tutorial**](./tutorial.md) — write a policy, validate it, emit DDL through both adapters, deploy on Databricks and Snowflake, verify. More concept-focused; ~30 minutes end to end.
 - [**Authoring**](./authoring.md) — the policy vocabulary. Selectors, conditions, transformations, the Policy container, the recommended Snowflake authoring pattern.
 - [**Operating**](./operating.md) — adapter configuration, identity / resource / tag bindings, capability profiles, deployment patterns per platform, the Snowflake `DEFAULT_SECONDARY_ROLES` caveat.
