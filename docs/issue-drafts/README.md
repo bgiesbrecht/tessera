@@ -29,7 +29,7 @@ Staging area for issues queued to be filed against `bgiesbrecht/tessera`. Keepin
 | 2026-05-19 | [#12](https://github.com/bgiesbrecht/tessera/issues/12) | policy-two-axis-attribute-matching — table-level + column-level attribute predicates | open (ABAC row-filter exercise) |
 | 2026-05-19 | [#13](https://github.com/bgiesbrecht/tessera/issues/13) | resourcecolumn-conflation — ResourceSetFromTable.resourceColumn carries two distinct identifiers | open (Snowflake byDataset exercise) |
 | 2026-05-19 | [#14](https://github.com/bgiesbrecht/tessera/issues/14) | snowflake-role-discrimination-semantics — primary vs active role discrimination | open (reframing of secondary-roles finding per claude.ai) |
-| 2026-05-19 | [#15](https://github.com/bgiesbrecht/tessera/issues/15) | access-grant-constraint-policykind — affirmative-grant policyKind missing from v0 | open (table-grants exercise) |
+| 2026-05-19 | [#15](https://github.com/bgiesbrecht/tessera/issues/15) | access-grant-constraint-policykind — affirmative-grant policyKind missing from v0 | closed by ADR-026 (2026-05-20) |
 | 2026-05-19 | [#16](https://github.com/bgiesbrecht/tessera/issues/16) | Coverage check: fine-grained access control (row + column level) | open (governance-gap survey; coverage-confirmed) |
 | 2026-05-19 | [#17](https://github.com/bgiesbrecht/tessera/issues/17) | Coverage check: dynamic data masking and redaction | open (governance-gap survey; coverage-confirmed) |
 | 2026-05-19 | [#18](https://github.com/bgiesbrecht/tessera/issues/18) | Coverage check: sensitive data classification (PII/PHI/PCI) | open (governance-gap survey; coverage-confirmed) |

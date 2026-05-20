@@ -1176,6 +1176,72 @@ ADR-025 lands alongside the table-grants exercise's Phase 2 commit on 2026-05-19
 
 ---
 
+## ADR-026 — Add `AccessGrantConstraint` as a first-class policyKind
+
+**Date:** 2026-05-20
+**Status:** Accepted; closes issue [#15](https://github.com/bgiesbrecht/tessera/issues/15)
+
+### Context
+
+v0 enumerated four `policyKind` discriminators: `AccessConstraint`, `RowVisibilityConstraint`, `ColumnVisibilityConstraint`, and `DistributionConstraint`. All four are *restriction-shaped* — each declares limits on what is seen, distributed, or accessed.
+
+The table-grants worked exercise (2026-05-19; `spec/v0/examples/table-grants-scenario-{a,b,c}.*`) surfaced a real gap: affirmative grants like `GRANT SELECT ON TABLE foo TO group_bar` have no natural `policyKind` in v0. Phase 2 squeezed them into `RowVisibilityConstraint` with `effect: allow`, which validates structurally but is semantically misleading on three concrete axes (the diagnostic's §3.4 enumerates them):
+
+1. **Reader comprehension.** A `.tessera.yaml` file with `kind: RowVisibilityConstraint` that's actually a table-level grant misleads readers about its intent.
+2. **Tooling dispatch.** Adapters typically dispatch on `policyKind` to choose between row-filter emission, column-mask emission, and other shapes. A "RowVisibilityConstraint with effect: allow on a table" forces the adapter to internally detect the affirmative-grant shape and emit `GRANT` SQL — dispatchable but not natural.
+3. **Migration extraction.** Lifting a `SHOW GRANTS ON TABLE` row into IR has no honest `policyKind` to assign — `RowVisibilityConstraint` is structurally wrong (no row visibility involved); `ColumnVisibilityConstraint` is also wrong. The IR was missing the concept.
+
+### Decision
+
+Add `tessera:AccessGrantConstraint` as the fifth `policyKind`, across all four v0 spec files:
+
+- `spec/v0/ontology.ttl` — `tessera:AccessGrantConstraint` declared as `rdfs:subClassOf tessera:PolicyConstraint` with a comment explaining the affirmative-grant semantic and the contrast with restriction-shaped constraints.
+- `spec/v0/context.jsonld` — `"AccessGrantConstraint": "tessera:AccessGrantConstraint"` short-name binding alongside the existing four kinds.
+- `spec/v0/schema.json` — `AccessGrantConstraint` and `tessera:AccessGrantConstraint` added to both `policyKind` enums (the Policy container's and the freestanding-PolicyConstraint enum).
+- `spec/v0/shapes.ttl` — `tessera:AccessGrantConstraint` added to the PolicyShape's `sh:in` policyKind enumeration.
+
+The three table-grants exercise YAMLs migrate from `kind: RowVisibilityConstraint` to `kind: AccessGrantConstraint`. The JSON-LDs regenerate cleanly through the v1 converter. All 11 worked-example policies (validation regression set) still pass JSON Schema and SHACL.
+
+### Semantic shape
+
+An `AccessGrantConstraint` policy reads as: "the principals matching the rules' principal selectors are authorized to perform the policy's `action` on the policy's resource." Rules carry `effect: allow` (or `effect: deny` for explicit denial). No `transformation` field (the policy is not value-shaping). `defaultStrategy` is optional — affirmative grants are additive, so principals matching no rule fall through to whatever other policies or platform defaults apply.
+
+Example:
+
+```yaml
+policy:
+  id: example-table-grant
+  kind: AccessGrantConstraint
+  appliesTo: { selector: byIdentity, resource: table:catalog.schema.foo }
+  action: Read
+  rules:
+    - principal: { selector: byIdentity, resource: group:bar }
+      effect: allow
+```
+
+### Rationale
+
+- **Empirically grounded.** The table-grants exercise's diagnostic §3.4 documented the awkwardness concretely; the resolution lands as a small spec addition (parallel in size to ADR-025's `Execute` addition).
+- **Migration completeness (per Brice's framing 2026-05-19).** Tessera's primary driving activity is migration — lifting an existing platform's policy corpus into IR and re-emitting on another platform. RBAC table grants are the most common shape in real corpora; the IR has to express them cleanly, not via a misleading squeeze. ADR-003's reference customer engagement explicitly drives this.
+- **`effect: allow` and `effect: deny` already exist** in the rule effect enum. No new effects required. The IR vocabulary is purely additive.
+- **Suspended-immutability framing (ADR-017) admits this addition** while v0 remains pre-external-dependency. Same posture as ADR-022 (transformation effect-driven) and ADR-025 (`Execute` action): empirically-grounded small additions land in v0 without breaking existing policies.
+
+### Consequences
+
+- **Three artifacts migrated** (`table-grants-scenario-{a,b,c}` YAMLs); JSON-LDs regenerated via the converter. The table-grants diagnostic's §3.4 (the open-question section) becomes resolved-by-ADR-026.
+- **All 11 worked-example JSON-LDs re-validate clean** against schema and SHACL.
+- **Adapter dispatch becomes cleaner.** An adapter implementing emission can dispatch on `policyKind == "AccessGrantConstraint"` and emit `GRANT` SQL directly, rather than detecting the affirmative shape inside `RowVisibilityConstraint`. Existing adapter code that emitted `GRANT` SQL from `RowVisibilityConstraint + effect: allow` should be updated to recognize the new policyKind; today's UC and Snowflake adapters don't yet emit `GRANT` SQL at all (table-grants emission was hand-derived for the exercise), so this is a forward concern rather than a breaking change.
+- **Issue [#15](https://github.com/bgiesbrecht/tessera/issues/15) closes.** The disposition the issue suggested ("defer until a Snowflake-byDataset-migration exercise drives it") is superseded by Brice's 2026-05-20 ask to land it ahead of the migration story rather than alongside.
+
+### What this ADR does not do
+
+- **Does not implement `GRANT`-style emission in either adapter.** The table-grants exercise's hand-derived SQL stays in place as the empirical target; adapter code that lowers `AccessGrantConstraint` to `GRANT` SQL is a queued follow-up, not in scope here.
+- **Does not introduce a separate `AccessDenyConstraint` policyKind.** Affirmative denials use `effect: deny` on an `AccessGrantConstraint`; modeling explicit denials as a separate policyKind is not currently justified.
+- **Does not address `USE SCHEMA`-style scaffolding privileges.** Same disposition as in ADR-025: those remain adapter scaffolding, not IR-modeled.
+- **Does not migrate prior hand-authored JSON-LDs in places other than the table-grants exercise.** No other worked example was using the squeeze pattern.
+
+---
+
 ## How to use this document
 
 - Every new technical or stakeholder document begins by reading this file.

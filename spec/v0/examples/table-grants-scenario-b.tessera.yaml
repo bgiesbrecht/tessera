@@ -9,7 +9,7 @@
 policy:
   id: table-grants-scenario-b
   version: 1.0.0
-  kind: RowVisibilityConstraint
+  kind: AccessGrantConstraint
   description: |
     Data engineering team can Read every table in bg_rls_demo.tpch_staging,
     including tables added after the policy is applied. No explicit

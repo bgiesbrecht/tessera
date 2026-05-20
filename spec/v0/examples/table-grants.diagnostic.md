@@ -105,7 +105,7 @@ Scenario B uses `byScope` with no `matching` block — the "match everything in 
 
 The semantics ("no matching block = apply to every resource in scope, with downward inheritance to child resources") are now empirically grounded; if claude.ai or other contributors prefer to make this explicit in the technical design §3.3a or in shapes.ttl as a documentation update, the empirical foundation is here. No new ADR required.
 
-### 3.4 — `RowVisibilityConstraint` vs hypothetical `AccessGrantConstraint` (OPEN)
+### 3.4 — `RowVisibilityConstraint` vs `AccessGrantConstraint` (RESOLVED by ADR-026, 2026-05-20)
 
 All three scenarios in this exercise are affirmative grants. The current IR has no `AccessGrantConstraint` policyKind, so the exercise squeezed them into `RowVisibilityConstraint` with `effect: allow`. This works structurally (validates clean; no schema or SHACL violations) but is *semantically misleading* — a row-visibility constraint conceptually limits which rows are seen; an affirmative grant confers ability. The shoehorn is awkward in three concrete ways:
 
@@ -134,7 +134,9 @@ policy:
 
 Adoption would mean: new ontology class, context short-name, schema enum entry, shape, and probably technical-design §4 paragraph. Roughly the size of an ADR-022-shaped change (small, but spans all four spec files).
 
-**Disposition.** Open. Recommend filing as a v0 candidate (per ADR-017's suspended-immutability framing, v0 admits this kind of addition) and deferring the spec-file change until after at least one more exercise touches the affirmative-grant space — possibly a migration exercise that lifts a SHOW GRANTS corpus into IR. The Phase 2 derivation works under `RowVisibilityConstraint`; that compromise is operationally tolerable while the design decision settles.
+**Disposition (2026-05-20):** Resolved by ADR-026. `AccessGrantConstraint` landed as the fifth `policyKind` across `ontology.ttl`, `context.jsonld`, `schema.json`, and `shapes.ttl`. The three Phase 2 artifacts (`table-grants-scenario-{a,b,c}.tessera.yaml`) migrated from `kind: RowVisibilityConstraint` to `kind: AccessGrantConstraint`; the JSON-LDs were regenerated via the converter; all 11 worked-example policies still validate clean against schema and SHACL.
+
+The decision-on-landing was originally framed as "defer until a migration exercise drives it" — superseded by Brice's 2026-05-20 ask to land the change ahead of the migration story rather than alongside. The structural awkwardness this section enumerated is now eliminated; readers, tooling dispatch, and migration extraction all see the honest policyKind.
 
 ## 4. Extraction shape sketch
 

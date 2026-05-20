@@ -44,6 +44,7 @@
     "RowVisibilityConstraint":    "tessera:RowVisibilityConstraint",
     "ColumnVisibilityConstraint": "tessera:ColumnVisibilityConstraint",
     "DistributionConstraint":     "tessera:DistributionConstraint",
+    "AccessGrantConstraint":      "tessera:AccessGrantConstraint",
 
     "_comment_policy_container": "Policy is the multi-rule container class introduced in ADR-014. See technical design v0.2 §4.2.",
 

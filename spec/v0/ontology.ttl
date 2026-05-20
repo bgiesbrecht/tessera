@@ -405,6 +405,12 @@ tessera:DistributionConstraint a owl:Class ;
     rdfs:comment
         """Constrains whether and how a Resource may be shared beyond its origin. Typical enforcement mechanisms: secure shares, listings, Delta Sharing, replication controls."""@en .
 
+tessera:AccessGrantConstraint a owl:Class ;
+    rdfs:subClassOf tessera:PolicyConstraint ;
+    rdfs:label "Access grant constraint"@en ;
+    rdfs:comment
+        """Affirmative-grant constraint: declares that a Principal is authorized to take an Action on a Resource. Distinct from RowVisibilityConstraint and ColumnVisibilityConstraint, both of which are restriction-shaped (they limit what is seen). An AccessGrantConstraint carries `effect: allow` on its rules; the policy reads as "the named principals are granted the named action on the named resource." Typical enforcement mechanisms: GRANT statements on Databricks (GRANT SELECT/EXECUTE/...) and Snowflake (GRANT USAGE/SELECT/...). Added 2026-05-20 by ADR-026, grounded in the table-grants worked exercise."""@en .
+
 
 #
 # ============================================================================

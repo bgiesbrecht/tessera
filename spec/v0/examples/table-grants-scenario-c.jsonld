@@ -3,7 +3,7 @@
   "@type": "Policy",
   "@id": "policy:table-grants-scenario-c",
   "version": "1.0.0",
-  "policyKind": "RowVisibilityConstraint",
+  "policyKind": "AccessGrantConstraint",
   "description": "Marketing analytics team can Execute the compute_customer_ltv function.\nGates who may invoke the business-logic function. Scoped to policy intent;\nplatform-mechanism uses of EXECUTE (UDFs as policy-enforcement vehicles)\nremain adapter scaffolding, not modeled here.",
   "appliesTo": {
     "selector": "byIdentity",

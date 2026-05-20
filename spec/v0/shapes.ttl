@@ -75,8 +75,9 @@ tessera:PolicyShape a sh:NodeShape ;
             tessera:RowVisibilityConstraint
             tessera:ColumnVisibilityConstraint
             tessera:DistributionConstraint
+            tessera:AccessGrantConstraint
         ) ;
-        sh:message "policyKind must reference a known PolicyConstraint subclass (AccessConstraint, RowVisibilityConstraint, ColumnVisibilityConstraint, or DistributionConstraint)."@en ;
+        sh:message "policyKind must reference a known PolicyConstraint subclass (AccessConstraint, RowVisibilityConstraint, ColumnVisibilityConstraint, DistributionConstraint, or AccessGrantConstraint)."@en ;
     ] ;
 
     # appliesTo is required and must structurally conform to ResourceSelectorShape.

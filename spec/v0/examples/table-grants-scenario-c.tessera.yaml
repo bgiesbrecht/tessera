@@ -8,7 +8,7 @@
 policy:
   id: table-grants-scenario-c
   version: 1.0.0
-  kind: RowVisibilityConstraint
+  kind: AccessGrantConstraint
   description: |
     Marketing analytics team can Execute the compute_customer_ltv function.
     Gates who may invoke the business-logic function. Scoped to policy intent;

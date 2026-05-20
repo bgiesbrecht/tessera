@@ -110,10 +110,12 @@
         "RowVisibilityConstraint",
         "ColumnVisibilityConstraint",
         "DistributionConstraint",
+        "AccessGrantConstraint",
         "tessera:AccessConstraint",
         "tessera:RowVisibilityConstraint",
         "tessera:ColumnVisibilityConstraint",
-        "tessera:DistributionConstraint"
+        "tessera:DistributionConstraint",
+        "tessera:AccessGrantConstraint"
       ]
     },
 
@@ -222,10 +224,12 @@
         "RowVisibilityConstraint",
         "ColumnVisibilityConstraint",
         "DistributionConstraint",
+        "AccessGrantConstraint",
         "tessera:AccessConstraint",
         "tessera:RowVisibilityConstraint",
         "tessera:ColumnVisibilityConstraint",
-        "tessera:DistributionConstraint"
+        "tessera:DistributionConstraint",
+        "tessera:AccessGrantConstraint"
       ]
     },
 
