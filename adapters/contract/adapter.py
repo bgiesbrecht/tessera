@@ -62,12 +62,55 @@ class Adapter(ABC):
             )],
         )
 
-    def reconcile(self, policy: dict[str, Any]) -> ReconciliationResult:
-        """Diff the intended IR state against observed platform state. Default: not implemented."""
-        return ReconciliationResult(diagnostics=[
-            _stub_diagnostic("RECONCILIATION_NOT_IMPLEMENTED",
-                             f"{self.name} adapter has not implemented reconciliation yet.")
-        ])
+    def reconcile(
+        self,
+        intended: list[dict[str, Any]],
+        *,
+        catalog: str | None = None,
+        schema: str | None = None,
+        database: str | None = None,
+    ) -> ReconciliationResult:
+        """Diff intended IR state against the platform's observed state.
+
+        Default implementation: invoke `discover()` to enumerate deployed
+        artifacts, `extract()` each into IR, then diff the resulting observed
+        IR against the supplied `intended` corpus. Adapters that need a
+        platform-specific reconciliation (e.g., richer state comparison) can
+        override.
+
+        Args:
+            intended: list of IR-shaped policy dicts representing what should be
+                deployed (typically the validated corpus on disk).
+            catalog/schema/database: optional kwargs forwarded to discover().
+
+        Returns ReconciliationResult with additions / removals / modifications.
+        """
+        from adapters.contract.reconcile import reconcile as _do_reconcile
+
+        # Build the discover() kwargs from whatever the adapter accepts.
+        discover_kwargs: dict[str, Any] = {}
+        if catalog is not None:
+            discover_kwargs["catalog"] = catalog
+        if schema is not None:
+            discover_kwargs["schema"] = schema
+        if database is not None:
+            discover_kwargs["database"] = database
+        try:
+            disc = self.discover(**discover_kwargs)
+        except TypeError:
+            disc = self.discover()
+
+        observed: list[dict[str, Any]] = []
+        observe_diagnostics = list(disc.diagnostics)
+        for art in disc.artifacts:
+            r = self.extract(art)
+            observe_diagnostics.extend(r.diagnostics)
+            if r.policy is not None:
+                observed.append(r.policy)
+
+        result = _do_reconcile(intended, observed)
+        result.diagnostics = observe_diagnostics + result.diagnostics
+        return result
 
 
 def _stub_diagnostic(code: str, message: str):

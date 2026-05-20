@@ -19,7 +19,7 @@ Staging area for issues queued to be filed against `bgiesbrecht/tessera`. Keepin
 | 2026-05-18 | [#2](https://github.com/bgiesbrecht/tessera/issues/2) | default-branch-predicate — default-branch row predicate on the policy container | open |
 | 2026-05-18 | [#3](https://github.com/bgiesbrecht/tessera/issues/3) | principal-in-group-condition — group-membership operator in the condition algebra | open |
 | 2026-05-18 | [#4](https://github.com/bgiesbrecht/tessera/issues/4) | iri-safety-convention — dual-identifier carrier pattern for non-IRI-safe platform names | open |
-| 2026-05-18 | [#5](https://github.com/bgiesbrecht/tessera/issues/5) | adapter-emission-pattern-recognition — negated-complement → readable-ELSE expectation | open |
+| 2026-05-18 | [#5](https://github.com/bgiesbrecht/tessera/issues/5) | adapter-emission-pattern-recognition — negated-complement → readable-ELSE expectation | closed by technical-design §5.5a (2026-05-20) |
 | 2026-05-18 | [#6](https://github.com/bgiesbrecht/tessera/issues/6) | adapter-capability-profile-timing-disclosure — extend §5.2 to cover per-mechanism timing disclosure | closed-on-arrival (paragraph landed in same revision) |
 | 2026-05-18 | [#7](https://github.com/bgiesbrecht/tessera/issues/7) | principal-set-from-joined-tables — multi-table support for data-driven principal sets | open (ACL exercise) |
 | 2026-05-18 | [#8](https://github.com/bgiesbrecht/tessera/issues/8) | principal-set-match-modifiers — case-insensitive / trim match flag on PrincipalSetFromTable | open (ACL exercise) |
@@ -40,10 +40,10 @@ Staging area for issues queued to be filed against `bgiesbrecht/tessera`. Keepin
 | 2026-05-19 | [#23](https://github.com/bgiesbrecht/tessera/issues/23) | Cross-border data transfer controls — covered but unexercised | open (governance-gap survey; underexercised) |
 | 2026-05-19 | [#24](https://github.com/bgiesbrecht/tessera/issues/24) | Consent management — partially covered, integration with consent records undefined | open (governance-gap survey; integration question) |
 | 2026-05-19 | [#25](https://github.com/bgiesbrecht/tessera/issues/25) | AI governance — training-eligibility and ADM-restriction attribute axes | open (governance-gap survey; in-scope gap; v0-candidate; scoping-needed) |
-| 2026-05-20 | [#26](https://github.com/bgiesbrecht/tessera/issues/26) | adapter-reconcile-stub — `Adapter.reconcile()` still stubbed on both adapters | open (v0-candidate; gap surfaced by 0.4.0 migration cycle) |
-| 2026-05-20 | [#27](https://github.com/bgiesbrecht/tessera/issues/27) | uc-adapter-discover-extract — UC adapter discover() and extract() not implemented | open (v0-candidate; gap surfaced by 0.4.0 migration cycle) |
-| 2026-05-20 | [#28](https://github.com/bgiesbrecht/tessera/issues/28) | udf-parameter-name-collision-convention — document the row-filter/column-mask UDF parameter naming rule | open (v0-doc-correction; bug fixed in three emission paths, convention now needs documenting) |
-| 2026-05-20 | [#29](https://github.com/bgiesbrecht/tessera/issues/29) | extracted-ir-identifier-provenance — should extracted IR carry source-platform identifier case? | open (v0-doc-correction; case-insensitive binding lookup mitigates operationally) |
+| 2026-05-20 | [#26](https://github.com/bgiesbrecht/tessera/issues/26) | adapter-reconcile-stub — `Adapter.reconcile()` still stubbed on both adapters | closed by contract reconcile() implementation (2026-05-20) |
+| 2026-05-20 | [#27](https://github.com/bgiesbrecht/tessera/issues/27) | uc-adapter-discover-extract — UC adapter discover() and extract() not implemented | closed by UC discovery.py implementation (2026-05-20) |
+| 2026-05-20 | [#28](https://github.com/bgiesbrecht/tessera/issues/28) | udf-parameter-name-collision-convention — document the row-filter/column-mask UDF parameter naming rule | closed by contributing.md addition (2026-05-20) |
+| 2026-05-20 | [#29](https://github.com/bgiesbrecht/tessera/issues/29) | extracted-ir-identifier-provenance — should extracted IR carry source-platform identifier case? | closed by operating.md addition (2026-05-20) |
 | 2026-05-20 | [#30](https://github.com/bgiesbrecht/tessera/issues/30) | uc-abac-byscope-column-mask — UC adapter byScope column-mask emission not implemented | open (v0-candidate; ABAC coverage gap) |
 | 2026-05-20 | [#31](https://github.com/bgiesbrecht/tessera/issues/31) | snowflake-abac-byscope — Snowflake adapter byScope ABAC emission not implemented (row + column) | open (v0-candidate; Snowflake mechanism is genuinely different from Databricks) |
 
