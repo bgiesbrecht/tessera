@@ -26,6 +26,28 @@ Tessera is a portable representation of data governance policy. It expresses *wh
 
 Scenarios live under `scenarios/`. More can be added as additional customer shapes emerge.
 
+## CLI quick reference
+
+A `tessera` CLI wraps the converter + adapters. Run as `python -m tools.cli <subcommand>`:
+
+```bash
+# Offline (no platform connection)
+tessera validate path/to/policy.tessera.yaml
+tessera convert  path/to/policy.tessera.yaml [--out path/to/policy.jsonld]
+tessera emit     path/to/policy.{tessera.yaml,jsonld} \
+                 --adapter {unity-catalog,snowflake} [--config bindings.yaml]
+
+# Platform-touching
+tessera discover  --adapter unity-catalog --catalog C --schema S
+tessera discover  --adapter snowflake     --database D --schema S
+tessera extract   --adapter unity-catalog --catalog C --schema S [--name N] [--out dir/]
+tessera reconcile --adapter unity-catalog --catalog C --schema S --intended path-or-dir/
+```
+
+Connection details accept `--profile` / `--warehouse-id` (Databricks) or `--account` / `--user` / `--warehouse` / `--database` / `--auth-file` (Snowflake), and read the same values from `TESSERA_DB_*` / `TESSERA_SF_*` env vars when CLI args are absent. The Snowflake auth file defaults to `~/snowflake_auth.txt`.
+
+The `--config` bindings file is YAML carrying `identity_bindings`, `resource_bindings`, `tag_taxonomy`, and `extras` per `AdapterConfig`. See [`operating.md`](./operating.md) for the binding-layer details.
+
 ## Conventions used in this guide
 
 - **YAML is the authoring form**, JSON-LD is the canonical form (ADR-004). Examples in this guide show YAML unless the JSON-LD shape is what's being illustrated.
