@@ -166,7 +166,8 @@ def _emit_row_visibility_by_dataset(
             )],
         )
 
-    mapping_table = dataset.get("table") or ""
+    mapping_table_raw = dataset.get("table") or ""
+    mapping_table = config.bind_resource(f"table:{mapping_table_raw}") or mapping_table_raw
     mapping_principal_col = dataset.get("principalColumn") or "username"
     mapping_resource_col = dataset.get("resourceColumn") or "code_name"
 
@@ -207,7 +208,8 @@ def _emit_row_visibility_by_dataset(
                 ),
                 location="rules[0].condition.operands[0].@type",
             ))
-        resource_table = resource_ds.get("table") or ""
+        resource_table_raw = resource_ds.get("table") or ""
+        resource_table = config.bind_resource(f"table:{resource_table_raw}") or resource_table_raw
         resource_principal_col = resource_ds.get("principalColumn") or "code_name"
         resource_resource_col = resource_ds.get("resourceColumn") or "orderpriority"
 

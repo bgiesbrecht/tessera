@@ -141,9 +141,40 @@ class AdapterConfig:
     extras: dict[str, Any] = field(default_factory=dict)
 
     def bind_principal(self, principal_ref: str) -> str | None:
-        """Resolve an IR PrincipalRef to a platform principal identifier."""
-        return self.identity_bindings.get(principal_ref)
+        """Resolve an IR PrincipalRef to a platform principal identifier.
+
+        Case-insensitive on the identifier portion (the part after the first
+        colon). Snowflake stores identifiers uppercase; extracted IRs come back
+        uppercase too; bindings authored lowercase would otherwise miss.
+        """
+        if principal_ref in self.identity_bindings:
+            return self.identity_bindings[principal_ref]
+        return _case_insensitive_lookup(self.identity_bindings, principal_ref)
 
     def bind_resource(self, resource_ref: str) -> str | None:
-        """Resolve an IR ResourceRef to a platform-qualified identifier."""
-        return self.resource_bindings.get(resource_ref)
+        """Resolve an IR ResourceRef to a platform-qualified identifier.
+
+        Case-insensitive on the identifier portion. Same rationale as bind_principal.
+        """
+        if resource_ref in self.resource_bindings:
+            return self.resource_bindings[resource_ref]
+        return _case_insensitive_lookup(self.resource_bindings, resource_ref)
+
+
+def _case_insensitive_lookup(bindings: dict[str, str], key: str) -> str | None:
+    """Find a binding by matching the IRI prefix exactly and the identifier
+    portion case-insensitively. Prefix (`table:`, `column:`, `group:`) is
+    semantic and stays case-sensitive; identifier (the part after the first
+    colon) is case-insensitive to bridge Snowflake's uppercase / mixed-case gap.
+    """
+    if ":" not in key:
+        return None
+    prefix, ident = key.split(":", 1)
+    ident_cf = ident.casefold()
+    for candidate_key, value in bindings.items():
+        if ":" not in candidate_key:
+            continue
+        c_prefix, c_ident = candidate_key.split(":", 1)
+        if c_prefix == prefix and c_ident.casefold() == ident_cf:
+            return value
+    return None
