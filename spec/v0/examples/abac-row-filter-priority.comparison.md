@@ -26,13 +26,13 @@ The Phase 2 artifacts express the three-branch row-visibility intent using the p
 
 ### 2.1 Test scenarios — results
 
-Deployed 2026-05-19 against `bg_rls_demo.tpch.orders_abac` on Azure workspace `adb-984752964297111`. Brice's group memberships verified live via `is_account_group_member`.
+Deployed 2026-05-19 against `acme.tpch.orders_abac` on Azure workspace `adb-984752964297111`. Brice's group memberships verified live via `is_account_group_member`.
 
 | Scenario | Brice's membership | Expected priorities | Observed | Match |
 |---|---|---|---|---|
 | 3 | Neither restrictive group | `3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW` | Same (4,499,708 rows; 60% of unfiltered 7,500,000) | ✓ |
-| 1 | Member of `bg_rls_demo_all_priority_ops` | All five | **Pending Brice's toggle** | — |
-| 2 | Member of `bg_rls_demo_high_priority_ops` only | `1-URGENT`, `2-HIGH` | **Pending Brice's toggle** | — |
+| 1 | Member of `acme_all_priority_ops` | All five | **Pending Brice's toggle** | — |
+| 2 | Member of `acme_high_priority_ops` only | `1-URGENT`, `2-HIGH` | **Pending Brice's toggle** | — |
 
 Per-priority breakdown for Scenario 3 confirms exact source-distribution match for the visible priorities:
 
@@ -52,11 +52,11 @@ Scenarios 1 and 2 require Brice to add himself to the respective restrictive gro
 
 This is an orthogonal-composition success — two different ABAC mechanisms on the same table, both applying simultaneously. Distinct from the multi-mask conflict observed in the prior column-mask exercise (which was *two* column masks competing on the *same* column).
 
-`SHOW POLICIES ON CATALOG bg_rls_demo` confirms both attached:
+`SHOW POLICIES ON CATALOG acme` confirms both attached:
 
 ```
-tessera__abac_column_mask_clerk_redact  COLUMN_MASK  bg_rls_demo  ...
-tessera__abac_row_filter_priority       ROW_FILTER   bg_rls_demo  ...
+tessera__abac_column_mask_clerk_redact  COLUMN_MASK  acme  ...
+tessera__abac_row_filter_priority       ROW_FILTER   acme  ...
 ```
 
 ### 2.2 Multi-row-filter cross-policy test (optional)
@@ -87,7 +87,7 @@ Existing implementation shared by Brice on 2026-05-19 (after Phase 2 commit; bli
 | ELSE branch | `NOT IN ('1-URGENT', '2-HIGH')` | `IN ('3-MEDIUM', '4-NOT SPECIFIED', '5-LOW')` | **Real divergence — same observable behavior on current data, different intent under data evolution.** See §3.2. |
 | `GRANT EXECUTE ON FUNCTION` | **Absent** | **Present** | **Real divergence**, same as prior exercises (issue #10). |
 | Policy name | `priority_rls` | `tessera__abac_row_filter_priority` | **Accepted divergence**. |
-| Policy attachment scope | `ON SCHEMA bg_rls_demo.tpch` | `ON CATALOG bg_rls_demo` | **Real divergence.** See §3.4. |
+| Policy attachment scope | `ON SCHEMA acme.tpch` | `ON CATALOG acme` | **Real divergence.** See §3.4. |
 | `COMMENT` | Yes | Yes | **Match on form**, content differs. |
 | `ROW FILTER fn` | Same | Same | **Match.** |
 | `TO account users` | Same | Same | **Match.** No EXCEPT in either (Mechanism B). |
@@ -160,10 +160,10 @@ Tessera's `matching.attributes` shape is **single-axis** (column-level only):
 ```yaml
 appliesTo:
   selector: byScope
-  scope: catalog:bg_rls_demo
+  scope: catalog:acme
   matching:
     attributes:
-      bg:rowDiscriminator: orderpriority   # column attribute
+      acme:rowDiscriminator: orderpriority   # column attribute
 ```
 
 There is no place to add a *table-level* attribute predicate. To express Brice's `WHEN has_tag_value('abac_scope', 'orders_demo')`, the Tessera shape would need something like:
@@ -171,14 +171,14 @@ There is no place to add a *table-level* attribute predicate. To express Brice's
 ```yaml
 appliesTo:
   selector: byScope
-  scope: catalog:bg_rls_demo
+  scope: catalog:acme
   matching:
     resource:
       attributes:
         bg:abacScope: orders_demo     # table attribute (proposed)
     column:
       attributes:
-        bg:rowDiscriminator: orderpriority    # column attribute (existing shape)
+        acme:rowDiscriminator: orderpriority    # column attribute (existing shape)
 ```
 
 **This is a new v1 candidate.** ADRs 018–021 give Tessera the IR shape for attribute axes and scoped attachment, but the *two-tier matching* (resource-level predicate + column-level predicate) isn't modeled. ABAC supports both axes; Tessera would benefit from being able to express both.
@@ -195,9 +195,9 @@ appliesTo:
 
 ### 3.4 Schema vs. catalog scope (recurring finding)
 
-Same as the ABAC column-mask exercise's §3.4. Brice consistently chooses `ON SCHEMA bg_rls_demo.tpch`. Tessera's Phase 1 inputs defaulted to catalog scope and the derivation followed. Both valid; Brice's is narrower.
+Same as the ABAC column-mask exercise's §3.4. Brice consistently chooses `ON SCHEMA acme.tpch`. Tessera's Phase 1 inputs defaulted to catalog scope and the derivation followed. Both valid; Brice's is narrower.
 
-**Pattern observation across exercises:** When the inputs don't specify scope explicitly, the natural-language hint ("a row-visibility policy on `bg_rls_demo.tpch.orders_abac`") suggests *table* scope; Brice generalizes to *schema* scope; my interpretation generalized to *catalog* scope. The three are valid for different reasons — table is narrowest, catalog is broadest, schema is the sensible middle. The Phase 1 inputs template for future ABAC exercises should make the scope choice explicit so the divergence stops recurring.
+**Pattern observation across exercises:** When the inputs don't specify scope explicitly, the natural-language hint ("a row-visibility policy on `acme.tpch.orders_abac`") suggests *table* scope; Brice generalizes to *schema* scope; my interpretation generalized to *catalog* scope. The three are valid for different reasons — table is narrowest, catalog is broadest, schema is the sensible middle. The Phase 1 inputs template for future ABAC exercises should make the scope choice explicit so the divergence stops recurring.
 
 ### 3.5 GRANT EXECUTE asymmetry (recurring finding)
 
@@ -221,7 +221,7 @@ Same as prior exercises:
 |---|---|---|
 | Canonical IR form | `.tessera.yaml` + `.jsonld` | None |
 | Declared `defaultStrategy: negated-complement` | Explicit | Implicit (in the CASE's ELSE) |
-| Adopter-namespaced axis (`bg:rowDiscriminator`) | Declared in IR; surfaces design gap | Implicit (the column tag IS the discriminator marker) |
+| Adopter-namespaced axis (`acme:rowDiscriminator`) | Declared in IR; surfaces design gap | Implicit (the column tag IS the discriminator marker) |
 | Tag-taxonomy mapping | Configurable per environment | Hardcoded in the SQL DDL |
 | Provenance | Header comments link back to policy ID | None |
 | Diagnostic + Comparison | Present | None |
@@ -243,7 +243,7 @@ Phase 3 deployment (Scenario 3) and structural comparison did not surface design
 
 ### 4.2 Findings carried from Phase 2 (in the diagnostic)
 
-- **Axis-naming gap (`bg:rowDiscriminator`)** — v1 candidate; choice between adding a well-known axis or documenting adopter-extensibility.
+- **Axis-naming gap (`acme:rowDiscriminator`)** — v1 candidate; choice between adding a well-known axis or documenting adopter-extensibility.
 - **Condition-operand reference (`column:$matched`)** — v1 candidate; formalize a reserved identifier.
 - **Mechanism A vs B collapses for multi-branch row filter** — observation; document in technical design.
 

@@ -7,14 +7,14 @@
   "description": "Marketing analytics team can Execute the compute_customer_ltv function.\nGates who may invoke the business-logic function. Scoped to policy intent;\nplatform-mechanism uses of EXECUTE (UDFs as policy-enforcement vehicles)\nremain adapter scaffolding, not modeled here.",
   "appliesTo": {
     "selector": "byIdentity",
-    "resource": "function:bg_rls_demo.tpch.compute_customer_ltv"
+    "resource": "function:acme.tpch.compute_customer_ltv"
   },
   "action": "Execute",
   "rules": [
     {
       "principal": {
         "selector": "byIdentity",
-        "resource": "group:bg_rls_demo_marketing_analytics"
+        "resource": "group:acme_marketing_analytics"
       },
       "effect": "allow"
     }

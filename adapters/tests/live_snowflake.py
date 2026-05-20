@@ -6,7 +6,7 @@ Run from the repo root with the .venv interpreter:
 The script:
     1. Loads spec/v0/examples/group-row-visibility-policy-a.jsonld.
     2. Emits Snowflake DDL via SnowflakeAdapter with explicit identity/resource bindings.
-    3. Executes the DDL against BRICETEST.TESSERA.SNOW_ORDERS.
+    3. Executes the DDL against ACME.TESSERA.SNOW_ORDERS.
     4. Probes the resulting policy by activating different roles and counting rows.
 """
 
@@ -28,7 +28,7 @@ AUTH = REPO_ROOT / "snowflake_auth.txt"
 ACCOUNT = "FBGQMMZ-DCC90967"
 USER = "BGIESBRECHT"
 WAREHOUSE = "COMPUTE_WH"
-DATABASE = "BRICETEST"
+DATABASE = "ACME"
 SCHEMA = "TESSERA"
 TARGET_TABLE = f"{DATABASE}.{SCHEMA}.SNOW_ORDERS"
 
@@ -41,12 +41,12 @@ def main() -> None:
     # corresponding Snowflake role name.
     config = AdapterConfig(
         identity_bindings={
-            "group:bg_rls_demo_all_priority_ops": "BG_RLS_DEMO_ALL_PRIORITY_OPS",
-            "group:bg_rls_demo_high_priority_ops": "BG_RLS_DEMO_HIGH_PRIORITY_OPS",
+            "group:acme_all_priority_ops": "ACME_ALL_PRIORITY_OPS",
+            "group:acme_high_priority_ops": "ACME_HIGH_PRIORITY_OPS",
             "group:account-users": "PUBLIC",
         },
         resource_bindings={
-            "table:bg_rls_demo.tpch.orders": TARGET_TABLE,
+            "table:acme.tpch.orders": TARGET_TABLE,
         },
     )
     result = SnowflakeAdapter(config=config).emit(policy)
@@ -91,7 +91,7 @@ def main() -> None:
         first_line = policy_objs[0].splitlines()[0]
         # CREATE OR REPLACE ROW ACCESS POLICY <schema-qualified-name>
         policy_name = first_line.split("ROW ACCESS POLICY", 1)[1].strip()
-        for role in ("BG_RLS_DEMO_ALL_PRIORITY_OPS", "BG_RLS_DEMO_HIGH_PRIORITY_OPS", "PUBLIC"):
+        for role in ("ACME_ALL_PRIORITY_OPS", "ACME_HIGH_PRIORITY_OPS", "PUBLIC"):
             cur.execute(f"GRANT APPLY ON ROW ACCESS POLICY {policy_name} TO ROLE {role}")
 
     # Snowflake activates secondary roles per session. With the default of ALL,
@@ -103,7 +103,7 @@ def main() -> None:
 
     print()
     print("=== Verification: row counts per active role (secondary roles disabled) ===")
-    for role in ("PUBLIC", "BG_RLS_DEMO_HIGH_PRIORITY_OPS", "BG_RLS_DEMO_ALL_PRIORITY_OPS", "ACCOUNTADMIN"):
+    for role in ("PUBLIC", "ACME_HIGH_PRIORITY_OPS", "ACME_ALL_PRIORITY_OPS", "ACCOUNTADMIN"):
         try:
             cur.execute(f"USE ROLE {role}")
             cur.execute("USE WAREHOUSE COMPUTE_WH")

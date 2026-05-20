@@ -15,7 +15,7 @@
 
 ## 2. Behavioral verification (Phase 3)
 
-Live execution against `BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL` (1.5M rows from TPC-H), as user `BGIESBRECHT`:
+Live execution against `ACME.TESSERA.SNOW_ORDERS_RLS_ACL` (1.5M rows from TPC-H), as user `BGIESBRECHT`:
 
 | Scenario | Setup | Expected | Observed | Pass |
 |---|---|---|---|---|

@@ -25,7 +25,7 @@ Three v0 IR gaps were surfaced by the derivation (diagnostic §4); none affected
 
 ### 2.1 Test scenarios per inputs §7.1
 
-Behavioral equivalence verified by deploying the Tessera-derived row filter (`bg_rls_demo.tpch.tessera__acl_row_visibility__row_filter`) to `bg_rls_demo.tpch.orders_rls_acl` and running `SELECT DISTINCT o_orderpriority` under three ACL membership states.
+Behavioral equivalence verified by deploying the Tessera-derived row filter (`acme.tpch.tessera__acl_row_visibility__row_filter`) to `acme.tpch.orders_rls_acl` and running `SELECT DISTINCT o_orderpriority` under three ACL membership states.
 
 | Scenario | Setup | Expected (Brice) | Observed (Tessera Policy B) | Match |
 |---|---|---|---|---|
@@ -54,7 +54,7 @@ Two mechanisms, same adapter, materially different timing characteristics. Recor
 
 ### 2.4 Setup gotcha worth recording
 
-A setup mistake during initial deployment is worth noting because it could trip a future contributor: the protected table was first created as a CTAS from `bg_rls_demo.tpch.orders`, which already had the *group* exercise's row filter attached. Because the operator's group membership at the time was "in neither restrictive group" (left over from the group exercise's Scenario 3), the CTAS source was filtered to only show priorities 3, 4, 5 — the new ACL table inherited that filtered set and was missing the 1-URGENT and 2-HIGH rows the ACL was supposed to grant to Brice.
+A setup mistake during initial deployment is worth noting because it could trip a future contributor: the protected table was first created as a CTAS from `acme.tpch.orders`, which already had the *group* exercise's row filter attached. Because the operator's group membership at the time was "in neither restrictive group" (left over from the group exercise's Scenario 3), the CTAS source was filtered to only show priorities 3, 4, 5 — the new ACL table inherited that filtered set and was missing the 1-URGENT and 2-HIGH rows the ACL was supposed to grant to Brice.
 
 The fix was straightforward: rebuild the table from `samples.tpch.orders` (the unfiltered TPC-H source).
 
@@ -70,7 +70,7 @@ Both implementations produce a Unity Catalog row filter function with substantiv
 
 | Dimension | Existing implementation | Tessera-derived | Category |
 |---|---|---|---|
-| Function name | `bg_rls_demo.tpch.rls_orders_by_priority` | `bg_rls_demo.tpch.tessera__acl_row_visibility__row_filter` | **Accepted divergence** per inputs §7.2; Tessera's form is deterministic and traces back to the policy ID. |
+| Function name | `acme.tpch.rls_orders_by_priority` | `acme.tpch.tessera__acl_row_visibility__row_filter` | **Accepted divergence** per inputs §7.2; Tessera's form is deterministic and traces back to the policy ID. |
 | Function parameter name | `p_priority` | `o_orderpriority` | **Accepted divergence**. Both work — parameter names are local to the function body; Databricks binds the function to the table column via the `ON (…)` clause in `ALTER TABLE`. |
 | `RETURNS BOOLEAN` clause | Implicit (Databricks infers from the EXISTS expression) | Explicit | **Accepted divergence**. Behaviorally identical. |
 | JOIN ON column order | `ON p.code_name = m.code_name` | `ON m.code_name = p.code_name` | **Match** (semantically). Equivalent join predicate. |
@@ -86,7 +86,7 @@ Both implementations produce a Unity Catalog row filter function with substantiv
 The existing implementation includes:
 
 ```sql
-GRANT EXECUTE ON FUNCTION bg_rls_demo.tpch.rls_orders_by_priority TO `account users`;
+GRANT EXECUTE ON FUNCTION acme.tpch.rls_orders_by_priority TO `account users`;
 ```
 
 This is operationally meaningful: without it, callers other than the function owner may hit `PERMISSION_DENIED` when their query triggers the row filter. The notebook's own prerequisite cell (cell 0) hints at this with "EXECUTE on functions" as a precondition.

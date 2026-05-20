@@ -514,7 +514,7 @@ Recording these explicitly so future readers see them as choices, not oversights
 
 ### Context
 
-The first column-masking exercise (`bg_rls_demo.tpch.orders.o_clerk` redacted to `'clerk-redacted'` unless the user is in `orders_full_access`) surfaced that v0 had no way to express transformation *parameters*. The ontology declares `Mask`, `Hash`, `Tokenize`, `Redact`, `Bucketize` as `Transformation` subclasses, and the policy IR references them via a `transformation` field. But the field accepts only a class name; there is no place to carry the replacement string for a `Redact`, the preserve-count for a `Mask`, the algorithm for a `Hash`, or the bucket boundaries for a `Bucketize`.
+The first column-masking exercise (`acme.tpch.orders.o_clerk` redacted to `'clerk-redacted'` unless the user is in `orders_full_access`) surfaced that v0 had no way to express transformation *parameters*. The ontology declares `Mask`, `Hash`, `Tokenize`, `Redact`, `Bucketize` as `Transformation` subclasses, and the policy IR references them via a `transformation` field. But the field accepts only a class name; there is no place to carry the replacement string for a `Redact`, the preserve-count for a `Mask`, the algorithm for a `Hash`, or the bucket boundaries for a `Bucketize`.
 
 A policy intent like "redact `o_clerk` to `'clerk-redacted'`" cannot be expressed in v0 as currently shaped. The fact-of-redacting can be expressed; the *what to redact to* cannot. Likewise, SSN-style masking ("show last 4") and hashing with a specified algorithm have no place to put their parameters.
 
@@ -707,7 +707,7 @@ This ADR does not introduce coordination labels (`team`, `cost-center`, `environ
 
 ### Context
 
-Tessera v0 attaches policies to specific resources via `appliesTo` with a `byIdentity` selector — the policy says "this applies to `bg_rls_demo.tpch.orders`." This is fine for table-specific policies but does not express ABAC's defining behavior: a policy attaches at a *level* in the resource hierarchy (catalog, schema, table) and automatically applies to anything within that scope matching its conditions.
+Tessera v0 attaches policies to specific resources via `appliesTo` with a `byIdentity` selector — the policy says "this applies to `acme.tpch.orders`." This is fine for table-specific policies but does not express ABAC's defining behavior: a policy attaches at a *level* in the resource hierarchy (catalog, schema, table) and automatically applies to anything within that scope matching its conditions.
 
 A single ABAC policy can protect every PII column in a catalog without enumerating tables. The IR needs a primitive for this.
 
@@ -988,7 +988,7 @@ The ABAC column-mask worked exercise (`spec/v0/examples/abac-column-mask-*`, Pha
 
 ```
 [COLUMN_MASKS_FEATURE_NOT_SUPPORTED.MULTIPLE_MASKS]
-Column mask policies for `bg_rls_demo`.`tpch`.`orders_abac` are not supported:
+Column mask policies for `acme`.`tpch`.`orders_abac` are not supported:
 Table has access control policies resulting in multiple column masks ...
 applying to the same column(s) `o_clerk`. Please contact the table owner or
 policy definer to resolve the issue by updating policies such that at most
@@ -1099,12 +1099,12 @@ ADR-024 lands together with the first concrete scaffolds (commit on 2026-05-19).
 
 The scaffold was exercised end-to-end against both target platforms on the same day it landed. The same `spec/v0/examples/group-row-visibility-policy-a.jsonld` was lowered through both adapters and the resulting DDL was executed against:
 
-- **Databricks** — `bg_rls_demo.tpch.orders` (7.5M rows from `samples.tpch.orders`).
-- **Snowflake** — `BRICETEST.TESSERA.SNOW_ORDERS` (1.5M rows from `SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS`).
+- **Databricks** — `acme.tpch.orders` (7.5M rows from `samples.tpch.orders`).
+- **Snowflake** — `ACME.TESSERA.SNOW_ORDERS` (1.5M rows from `SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS`).
 
 Three findings worth recording — none reshape the contract but each refines the platform-specific surface:
 
-1. **Resource bindings are a real config gap.** The same IR target (`table:bg_rls_demo.tpch.orders`) lowers to two different platform identifiers (`bg_rls_demo.tpch.orders` on Databricks; `BRICETEST.TESSERA.SNOW_ORDERS` on Snowflake). `AdapterConfig.resource_bindings` was added during the live exercise as the natural counterpart to `identity_bindings`. The pattern (ADR-021) already supported this implicitly; the live run made it concrete.
+1. **Resource bindings are a real config gap.** The same IR target (`table:acme.tpch.orders`) lowers to two different platform identifiers (`acme.tpch.orders` on Databricks; `ACME.TESSERA.SNOW_ORDERS` on Snowflake). `AdapterConfig.resource_bindings` was added during the live exercise as the natural counterpart to `identity_bindings`. The pattern (ADR-021) already supported this implicitly; the live run made it concrete.
 
 2. **Snowflake's role hierarchy is not flat group membership.** Snowflake roles inherit from each other (HIGH inherits PUBLIC ⇒ HIGH-active users satisfy PUBLIC's predicates). Databricks account groups are flat: `is_account_group_member('A')` and `is_account_group_member('B')` are independent. IR authors targeting both platforms see different effective row-set arithmetic from the same IR. This is now noted in the Snowflake adapter's capability profile.
 
@@ -1121,7 +1121,7 @@ These findings are pinned in `adapters/snowflake/capability.py` (entry: `ROW_VIS
 
 ### Context
 
-The v0 well-known action vocabulary in `spec/v0/ontology.ttl` enumerates `Read`, `Write`, `Delete`, `Share`, `Sample`, and `Aggregate`. The table-grants worked exercise (Scenario C — gating who may invoke `bg_rls_demo.tpch.compute_customer_ltv`) required expressing "principal P may invoke business-logic function F." None of the existing six actions express that intent; the closest, `Read`, conflates retrieving rows with invoking computation.
+The v0 well-known action vocabulary in `spec/v0/ontology.ttl` enumerates `Read`, `Write`, `Delete`, `Share`, `Sample`, and `Aggregate`. The table-grants worked exercise (Scenario C — gating who may invoke `acme.tpch.compute_customer_ltv`) required expressing "principal P may invoke business-logic function F." None of the existing six actions express that intent; the closest, `Read`, conflates retrieving rows with invoking computation.
 
 The migration use case (ADR-003's reference customer engagement) requires lifting Databricks `GRANT EXECUTE ON FUNCTION` statements and Snowflake `GRANT EXECUTE` / `GRANT USAGE ON FUNCTION` statements into IR with no information loss. Without an `Execute` action, the corpus cannot round-trip through Tessera.
 
@@ -1167,7 +1167,7 @@ The semantic-vs-mechanism boundary is explicit in the ontology comment: `Execute
 ### What this ADR does not do
 
 - **Does not introduce `AccessGrantConstraint`** as a policyKind for affirmative grants. The table-grants exercise's Phase 2 surfaces this as an open design question (see the diagnostic §3.4); the decision is deferred to a follow-up ADR after at least one migration exercise touches the affirmative-grant space.
-- **Does not declare a `function:` IRI prefix in `context.jsonld`.** The prefix is used informally in the worked example's resource string (`function:bg_rls_demo.tpch.compute_customer_ltv`) but is not validated by the IR layer. Formalization queued alongside [#4](https://github.com/bgiesbrecht/tessera/issues/4) (iri-safety-convention).
+- **Does not declare a `function:` IRI prefix in `context.jsonld`.** The prefix is used informally in the worked example's resource string (`function:acme.tpch.compute_customer_ltv`) but is not validated by the IR layer. Formalization queued alongside [#4](https://github.com/bgiesbrecht/tessera/issues/4) (iri-safety-convention).
 - **Does not address `USE SCHEMA`-style scaffolding privileges.** The Databricks emission of Scenario B requires both `GRANT USE SCHEMA` and `GRANT SELECT ON SCHEMA`. `USE SCHEMA` has no Tessera-action analog; the adapter emits it as scaffolding for `Read`. Whether to model it as an additional implicit grant is deferred.
 
 ### Note on ordering

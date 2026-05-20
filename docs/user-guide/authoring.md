@@ -60,11 +60,11 @@ A selector identifies a set of resources or principals. Tessera has five:
 ```yaml
 appliesTo:
   selector: byIdentity
-  resource: table:bg_rls_demo.tpch.orders
+  resource: table:acme.tpch.orders
 
 principal:
   selector: byIdentity
-  resource: group:bg_rls_demo_high_priority_ops
+  resource: group:acme_high_priority_ops
 ```
 
 The simplest selector. The IRI is platform-neutral; the adapter resolves it via `identity_bindings` (for principals) or `resource_bindings` (for resources) — see [`operating.md`](./operating.md).
@@ -98,9 +98,9 @@ The principal set is computed at query time by joining a mapping table. Used for
 ```yaml
 appliesTo:
   selector: byScope
-  scope: catalog:bg_rls_demo
+  scope: catalog:acme
   except:
-    - schema:bg_rls_demo.sandbox
+    - schema:acme.sandbox
   matching:
     attributes:
       sensitivity: PII

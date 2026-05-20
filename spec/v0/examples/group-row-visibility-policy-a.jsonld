@@ -4,10 +4,10 @@
   "@id": "policy:group-row-visibility-policy-a",
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
-  "description": "Three-branch row visibility on bg_rls_demo.tpch.orders driven by group memberships. Default visibility (priorities 3-5) grounded in explicit membership in the Databricks universal group `account users`.",
+  "description": "Three-branch row visibility on acme.tpch.orders driven by group memberships. Default visibility (priorities 3-5) grounded in explicit membership in the Databricks universal group `account users`.",
   "appliesTo": {
     "selector": "byIdentity",
-    "resource": "table:bg_rls_demo.tpch.orders"
+    "resource": "table:acme.tpch.orders"
   },
   "action": "Read",
   "defaultStrategy": "explicit-baseline-group",
@@ -16,20 +16,20 @@
     {
       "principal": {
         "selector": "byIdentity",
-        "resource": "group:bg_rls_demo_all_priority_ops"
+        "resource": "group:acme_all_priority_ops"
       },
       "effect": "keep-matching-rows"
     },
     {
       "principal": {
         "selector": "byIdentity",
-        "resource": "group:bg_rls_demo_high_priority_ops"
+        "resource": "group:acme_high_priority_ops"
       },
       "effect": "keep-matching-rows",
       "condition": {
         "op": "in",
         "operands": [
-          "column:bg_rls_demo.tpch.orders.o_orderpriority"
+          "column:acme.tpch.orders.o_orderpriority"
         ],
         "values": [
           "1-URGENT",
@@ -46,7 +46,7 @@
       "condition": {
         "op": "in",
         "operands": [
-          "column:bg_rls_demo.tpch.orders.o_orderpriority"
+          "column:acme.tpch.orders.o_orderpriority"
         ],
         "values": [
           "3-MEDIUM",

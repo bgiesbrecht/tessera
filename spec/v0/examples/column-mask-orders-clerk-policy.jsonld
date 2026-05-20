@@ -4,10 +4,10 @@
   "@id": "policy:column-mask-orders-clerk",
   "version": "1.0.0",
   "policyKind": "ColumnVisibilityConstraint",
-  "description": "Column-visibility policy on bg_rls_demo.tpch.orders.o_clerk. Members of the `orders_full_access` group see the unredacted clerk value; everyone else sees the literal `'CLERK-REDACTED'`.",
+  "description": "Column-visibility policy on acme.tpch.orders.o_clerk. Members of the `orders_full_access` group see the unredacted clerk value; everyone else sees the literal `'CLERK-REDACTED'`.",
   "appliesTo": {
     "selector": "byIdentity",
-    "resource": "column:bg_rls_demo.tpch.orders.o_clerk"
+    "resource": "column:acme.tpch.orders.o_clerk"
   },
   "action": "Read",
   "defaultStrategy": "negated-complement",

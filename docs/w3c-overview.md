@@ -152,13 +152,13 @@ A policy in canonical form:
   "policyKind": "RowVisibilityConstraint",
   "appliesTo": {
     "selector": "byIdentity",
-    "resource": "table:bg_rls_demo.tpch.orders"
+    "resource": "table:acme.tpch.orders"
   },
   "action": "Read",
   "defaultStrategy": "explicit-baseline-group",
   "rules": [
     { "principal": { "selector": "byIdentity",
-                     "resource": "group:bg_rls_demo_all_priority_ops" },
+                     "resource": "group:acme_all_priority_ops" },
       "effect": "keep-matching-rows" }
   ]
 }

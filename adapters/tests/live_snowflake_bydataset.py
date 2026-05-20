@@ -1,7 +1,7 @@
 """Live integration test: byDataset row visibility on Snowflake.
 
 This is the Phase 3 verification for the Snowflake byDataset exercise. It:
-    1. Sets up the protected table and ACL mapping tables in BRICETEST.TESSERA.
+    1. Sets up the protected table and ACL mapping tables in ACME.TESSERA.
     2. Seeds the ACL data per docs/exercises/snowflake-byDataset-row-visibility-inputs.md §2.8.
     3. Emits Snowflake DDL via SnowflakeAdapter from spec/v0/examples/snowflake-byDataset-row-visibility-policy.jsonld.
     4. Applies the row-access policy.
@@ -26,7 +26,7 @@ AUTH = REPO_ROOT / "snowflake_auth.txt"
 ACCOUNT = "FBGQMMZ-DCC90967"
 USER = "BGIESBRECHT"
 WAREHOUSE = "COMPUTE_WH"
-DATABASE = "BRICETEST"
+DATABASE = "ACME"
 SCHEMA = "TESSERA"
 
 PROTECTED_TABLE = f"{DATABASE}.{SCHEMA}.SNOW_ORDERS_RLS_ACL"

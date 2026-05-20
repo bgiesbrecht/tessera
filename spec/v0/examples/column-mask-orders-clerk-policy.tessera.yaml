@@ -1,4 +1,4 @@
-# Column-mask policy on bg_rls_demo.tpch.orders.o_clerk.
+# Column-mask policy on acme.tpch.orders.o_clerk.
 #
 # Worked-example artifact, single-pass exercise (Phase 2 + Phase 3 collapsed).
 # Companion files:
@@ -9,7 +9,7 @@
 #
 # Inputs: docs/exercises/column-mask-orders-clerk-inputs.md
 # Existing implementation: pre-ABAC `ALTER COLUMN ... SET MASK` form on
-# bg_rls_demo.tpch.orders.o_clerk, with a CASE-based UDF gating on
+# acme.tpch.orders.o_clerk, with a CASE-based UDF gating on
 # is_account_group_member('orders_full_access').
 #
 # This is a two-branch column visibility policy:
@@ -32,13 +32,13 @@
 version: 1.0.0
 policyKind: ColumnVisibilityConstraint
 description: >
-  Column-visibility policy on bg_rls_demo.tpch.orders.o_clerk. Members of
+  Column-visibility policy on acme.tpch.orders.o_clerk. Members of
   the `orders_full_access` group see the unredacted clerk value;
   everyone else sees the literal `'CLERK-REDACTED'`.
 
 appliesTo:
   selector: byIdentity
-  resource: column:bg_rls_demo.tpch.orders.o_clerk
+  resource: column:acme.tpch.orders.o_clerk
 
 action: Read
 

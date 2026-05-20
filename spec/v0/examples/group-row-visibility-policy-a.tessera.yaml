@@ -1,4 +1,4 @@
-# Group-based row visibility on bg_rls_demo.tpch.orders — Policy A.
+# Group-based row visibility on acme.tpch.orders — Policy A.
 #
 # Worked-example artifact, post-ADR-014. Companion files:
 #   group-row-visibility-policy-a.jsonld     — canonical (JSON-LD) form
@@ -22,13 +22,13 @@
 version: 1.0.0
 policyKind: RowVisibilityConstraint
 description: >
-  Three-branch row visibility on bg_rls_demo.tpch.orders driven by group
+  Three-branch row visibility on acme.tpch.orders driven by group
   memberships. Default visibility (priorities 3-5) grounded in explicit
   membership in the Databricks universal group `account users`.
 
 appliesTo:
   selector: byIdentity
-  resource: table:bg_rls_demo.tpch.orders
+  resource: table:acme.tpch.orders
 
 action: Read
 
@@ -44,19 +44,19 @@ rules:
   # Rule A1 — "all priority ops" group sees every row.
   - principal:
       selector: byIdentity
-      resource: group:bg_rls_demo_all_priority_ops
+      resource: group:acme_all_priority_ops
     effect: keep-matching-rows
     # No condition — every row is kept for matching principals.
 
   # Rule A2 — "high priority ops" group sees the high-priority rows.
   - principal:
       selector: byIdentity
-      resource: group:bg_rls_demo_high_priority_ops
+      resource: group:acme_high_priority_ops
     effect: keep-matching-rows
     condition:
       op: in
       operands:
-        - column:bg_rls_demo.tpch.orders.o_orderpriority
+        - column:acme.tpch.orders.o_orderpriority
       values:
         - "1-URGENT"
         - "2-HIGH"
@@ -74,7 +74,7 @@ rules:
     condition:
       op: in
       operands:
-        - column:bg_rls_demo.tpch.orders.o_orderpriority
+        - column:acme.tpch.orders.o_orderpriority
       values:
         - "3-MEDIUM"
         - "4-NOT SPECIFIED"

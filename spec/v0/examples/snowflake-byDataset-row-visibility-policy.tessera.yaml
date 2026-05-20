@@ -7,14 +7,14 @@ policy:
   version: 1.0.0
   kind: RowVisibilityConstraint
   description: |
-    A principal sees rows of BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL whose
+    A principal sees rows of ACME.TESSERA.SNOW_ORDERS_RLS_ACL whose
     O_ORDERPRIORITY is granted to them via the two-table ACL join
     (RLS_ACL_MAPPING ⋈ RLS_PRIORITY_ACL on CODE_NAME). Principals not in the
     ACL mapping see no rows (fail-closed; defaultStrategy: none).
 
   appliesTo:
     selector: byIdentity
-    resource: table:BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL
+    resource: table:ACME.TESSERA.SNOW_ORDERS_RLS_ACL
 
   action: Read
 
@@ -25,14 +25,14 @@ policy:
         selector: byDataset
         dataset:
           type: PrincipalSetFromTable
-          table: BRICETEST.TESSERA.RLS_ACL_MAPPING
+          table: ACME.TESSERA.RLS_ACL_MAPPING
           principalColumn: USERNAME
           resourceColumn: CODE_NAME
       condition:
         op: exists-in-dataset
         operands:
           - type: ResourceSetFromTable
-            table: BRICETEST.TESSERA.RLS_PRIORITY_ACL
+            table: ACME.TESSERA.RLS_PRIORITY_ACL
             principalColumn: CODE_NAME
             resourceColumn: O_ORDERPRIORITY
       effect: keep-matching-rows

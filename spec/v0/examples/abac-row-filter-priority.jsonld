@@ -4,13 +4,13 @@
   "@id": "policy:abac-row-filter-priority",
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
-  "description": "Three-branch row visibility on tables in bg_rls_demo whose o_orderpriority column is tagged for ABAC row filtering. Members of bg_rls_demo_all_priority_ops see all rows; members of bg_rls_demo_high_priority_ops see priority 1-URGENT and 2-HIGH only; everyone else sees priority 3-MEDIUM, 4-NOT SPECIFIED, 5-LOW.",
+  "description": "Three-branch row visibility on tables in acme whose o_orderpriority column is tagged for ABAC row filtering. Members of acme_all_priority_ops see all rows; members of acme_high_priority_ops see priority 1-URGENT and 2-HIGH only; everyone else sees priority 3-MEDIUM, 4-NOT SPECIFIED, 5-LOW.",
   "appliesTo": {
     "selector": "byScope",
-    "scope": "catalog:bg_rls_demo",
+    "scope": "catalog:acme",
     "matching": {
       "attributes": {
-        "bg:rowDiscriminator": "orderpriority"
+        "acme:rowDiscriminator": "orderpriority"
       }
     }
   },
@@ -20,14 +20,14 @@
     {
       "principal": {
         "selector": "byIdentity",
-        "resource": "group:bg_rls_demo_all_priority_ops"
+        "resource": "group:acme_all_priority_ops"
       },
       "effect": "keep-matching-rows"
     },
     {
       "principal": {
         "selector": "byIdentity",
-        "resource": "group:bg_rls_demo_high_priority_ops"
+        "resource": "group:acme_high_priority_ops"
       },
       "effect": "keep-matching-rows",
       "condition": {

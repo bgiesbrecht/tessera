@@ -127,11 +127,11 @@ class AdapterConfig:
     # PrincipalRef IRI (e.g., "principal:high_priority_ops") → platform principal id
     identity_bindings: dict[str, str] = field(default_factory=dict)
 
-    # ResourceRef IRI (e.g., "table:bg_rls_demo.tpch.orders") → platform-qualified identifier.
+    # ResourceRef IRI (e.g., "table:acme.tpch.orders") → platform-qualified identifier.
     # Mirrors identity_bindings for resources: a platform-neutral IR target lowers to a
     # platform-specific table / column / schema name. Surfaced by the parity exercise on
-    # 2026-05-19: the same IR targets Databricks `bg_rls_demo.tpch.orders` and Snowflake
-    # `BRICETEST.TESSERA.ORDERS`, and the adapter must not invent the mapping.
+    # 2026-05-19: the same IR targets Databricks `acme.tpch.orders` and Snowflake
+    # `ACME.TESSERA.ORDERS`, and the adapter must not invent the mapping.
     resource_bindings: dict[str, str] = field(default_factory=dict)
 
     # (axis IRI, axisValue) → (platform tag key, platform tag value)

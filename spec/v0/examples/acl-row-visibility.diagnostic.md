@@ -25,7 +25,7 @@ The pattern exercises `byDataset` / `PrincipalSetFromTable` for the first time i
 
 | Policy element | Category | Notes |
 |---|---|---|
-| Resource binding (`bg_rls_demo.tpch.orders_rls_acl`) | **Fully enforced** | `ALTER TABLE … SET ROW FILTER` attaches the filter to the protected table. |
+| Resource binding (`acme.tpch.orders_rls_acl`) | **Fully enforced** | `ALTER TABLE … SET ROW FILTER` attaches the filter to the protected table. |
 | Principal selector — single-table portion (`rls_acl_mapping`) | **Fully enforced** | The `byDataset` selector and `PrincipalSetFromTable` carry the principal-to-codename mapping; the SQL emits the corresponding lookup. |
 | Principal selector — codename indirection (`rls_priority_acl`) | **Partially enforced** | v0 `PrincipalSetFromTable` models a single ACL table. The second table reference lives in the `existsInDataset` condition operand as a best-effort representation; the adapter must compile the join from this structural shape plus its knowledge of the pattern. SQL emission is correct, IR is under-specified. See §4.1. |
 | Case-insensitive, whitespace-trimmed match | **Unenforced at the IR level; enforced by the adapter** | The IR does not declare a normalization modifier on `PrincipalSetFromTable`. The adapter applies `lower(trim(…))` based on convention from the inputs (§3.2). The match correctness is preserved; the policy file does not record the intent. See §4.2. |
@@ -132,7 +132,7 @@ A future Databricks adapter capability profile would declare these two timing ch
 | Requirement | Status |
 |---|---|
 | Row filter that Unity Catalog accepts via `ALTER TABLE … SET ROW FILTER` | ✓ — `acl-row-visibility.databricks.sql` produces a `CREATE FUNCTION` + `ALTER TABLE` pair structurally identical to the group exercise's accepted form. |
-| Reference the two ACL tables verbatim, with verbatim column names | ✓ — `bg_rls_demo.tpch.rls_acl_mapping` and `bg_rls_demo.tpch.rls_priority_acl` named directly; `username`, `code_name`, `orderpriority` named directly. |
+| Reference the two ACL tables verbatim, with verbatim column names | ✓ — `acme.tpch.rls_acl_mapping` and `acme.tpch.rls_priority_acl` named directly; `username`, `code_name`, `orderpriority` named directly. |
 | Case-insensitive, whitespace-trimmed match on the principal column | ✓ — `lower(trim(m.username)) = lower(trim(current_user()))` in the EXISTS body. |
 | `EXISTS` semantics for the join | ✓ — the SQL uses `EXISTS (SELECT 1 FROM … WHERE …)`. |
 | Fail-closed for principals without ACL entries | ✓ — single-rule Policy with `defaultStrategy: none`; principals matching no rule see no rows. The SQL's EXISTS returns FALSE for unmapped users. |

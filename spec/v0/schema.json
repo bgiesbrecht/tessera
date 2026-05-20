@@ -321,7 +321,7 @@
             "axis": {
               "type": "string",
               "minLength": 1,
-              "description": "Axis short-name (e.g., sensitivity, dataSubject) or CURIE (e.g., bg:rowDiscriminator). Adopter-namespaced axes use the prefix:name form."
+              "description": "Axis short-name (e.g., sensitivity, dataSubject) or CURIE (e.g., acme:rowDiscriminator). Adopter-namespaced axes use the prefix:name form."
             },
             "value": {
               "type": ["string", "number", "boolean"],

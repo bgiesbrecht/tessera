@@ -355,7 +355,7 @@ def _emit_row_visibility_by_scope(policy: dict[str, Any], config: AdapterConfig)
 
     case_body = "\n    ".join(case_lines)
 
-    # Function emitted into the bg_rls_demo.tpch schema by convention; the
+    # Function emitted into the acme.tpch schema by convention; the
     # adapter cannot know which schema to use without per-policy config. The
     # `extras["abac_function_schema"]` setting overrides; default uses the
     # scope catalog plus a conventional `tpch` schema. A real deployment

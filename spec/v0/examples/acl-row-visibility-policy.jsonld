@@ -4,10 +4,10 @@
   "@id": "policy:acl-row-visibility",
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
-  "description": "A principal sees rows of bg_rls_demo.tpch.orders_rls_acl whose o_orderpriority is granted to them via the two-table ACL join (rls_acl_mapping ⋈ rls_priority_acl on code_name). Principals not in the ACL mapping see no rows (fail-closed; defaultStrategy: none).",
+  "description": "A principal sees rows of acme.tpch.orders_rls_acl whose o_orderpriority is granted to them via the two-table ACL join (rls_acl_mapping ⋈ rls_priority_acl on code_name). Principals not in the ACL mapping see no rows (fail-closed; defaultStrategy: none).",
   "appliesTo": {
     "selector": "byIdentity",
-    "resource": "table:bg_rls_demo.tpch.orders_rls_acl"
+    "resource": "table:acme.tpch.orders_rls_acl"
   },
   "action": "Read",
   "defaultStrategy": "none",
@@ -17,7 +17,7 @@
         "selector": "byDataset",
         "dataset": {
           "@type": "PrincipalSetFromTable",
-          "table": "bg_rls_demo.tpch.rls_acl_mapping",
+          "table": "acme.tpch.rls_acl_mapping",
           "principalColumn": "username",
           "resourceColumn": "code_name"
         }
@@ -27,7 +27,7 @@
         "operands": [
           {
             "@type": "ResourceSetFromTable",
-            "table": "bg_rls_demo.tpch.rls_priority_acl",
+            "table": "acme.tpch.rls_priority_acl",
             "principalColumn": "code_name",
             "resourceColumn": "orderpriority"
           }

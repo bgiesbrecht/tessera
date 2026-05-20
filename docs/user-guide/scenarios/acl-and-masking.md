@@ -61,33 +61,33 @@ Pick whichever platform is convenient; the tutorial works against either or both
 
 ```sql
 -- Catalog + schema
-CREATE CATALOG IF NOT EXISTS bg_rls_demo;
-CREATE SCHEMA IF NOT EXISTS bg_rls_demo.tpch;
+CREATE CATALOG IF NOT EXISTS acme;
+CREATE SCHEMA IF NOT EXISTS acme.tpch;
 
 -- Protected table (TPC-H orders)
-CREATE TABLE IF NOT EXISTS bg_rls_demo.tpch.orders
+CREATE TABLE IF NOT EXISTS acme.tpch.orders
 AS SELECT * FROM samples.tpch.orders;
 
 -- ACL mapping tables — two-table indirection via "codenames"
-CREATE TABLE bg_rls_demo.tpch.rls_acl_mapping (
+CREATE TABLE acme.tpch.rls_acl_mapping (
   username  STRING,
   code_name STRING
 );
 
-CREATE TABLE bg_rls_demo.tpch.rls_priority_acl (
+CREATE TABLE acme.tpch.rls_priority_acl (
   code_name      STRING,
   orderpriority  STRING
 );
 
 -- Seed data — for behavioral verification
-INSERT INTO bg_rls_demo.tpch.rls_priority_acl VALUES
+INSERT INTO acme.tpch.rls_priority_acl VALUES
   ('urgent_priority_ops', '1-URGENT'),
   ('high_priority_ops',   '2-HIGH'),
   ('standard_ops',        '3-MEDIUM'),
   ('standard_ops',        '4-NOT SPECIFIED'),
   ('standard_ops',        '5-LOW');
 
-INSERT INTO bg_rls_demo.tpch.rls_acl_mapping VALUES
+INSERT INTO acme.tpch.rls_acl_mapping VALUES
   ('you@yourcompany.com', 'urgent_priority_ops'),
   ('you@yourcompany.com', 'high_priority_ops');
 ```
@@ -98,9 +98,9 @@ Make sure you've also created an account-level group `orders_full_access` for th
 
 ```sql
 USE ROLE ACCOUNTADMIN;
-CREATE DATABASE IF NOT EXISTS BRICETEST;
-CREATE SCHEMA  IF NOT EXISTS BRICETEST.TESSERA;
-USE SCHEMA BRICETEST.TESSERA;
+CREATE DATABASE IF NOT EXISTS ACME;
+CREATE SCHEMA  IF NOT EXISTS ACME.TESSERA;
+USE SCHEMA ACME.TESSERA;
 
 CREATE TABLE SNOW_ORDERS AS
   SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS;
@@ -153,7 +153,7 @@ policy:
 
   appliesTo:
     selector: byIdentity
-    resource: table:bg_rls_demo.tpch.orders
+    resource: table:acme.tpch.orders
 
   action: Read
   defaultStrategy: none      # principals matching no rule see nothing
@@ -163,14 +163,14 @@ policy:
         selector: byDataset
         dataset:
           type: PrincipalSetFromTable
-          table: bg_rls_demo.tpch.rls_acl_mapping
+          table: acme.tpch.rls_acl_mapping
           principalColumn: username
           resourceColumn: code_name
       condition:
         op: exists-in-dataset
         operands:
           - type: ResourceSetFromTable
-            table: bg_rls_demo.tpch.rls_priority_acl
+            table: acme.tpch.rls_priority_acl
             principalColumn: code_name
             resourceColumn: o_orderpriority
       effect: keep-matching-rows
@@ -210,7 +210,7 @@ policy:
 
   appliesTo:
     selector: byIdentity
-    resource: column:bg_rls_demo.tpch.orders.o_clerk
+    resource: column:acme.tpch.orders.o_clerk
 
   action: Read
   defaultStrategy: negated-complement   # "explicit rule + ELSE for everyone else"
@@ -329,10 +329,10 @@ sf_config = AdapterConfig(
         'group:orders_full_access': 'ORDERS_FULL_ACCESS',
     },
     resource_bindings={
-        'table:bg_rls_demo.tpch.orders':
-            'BRICETEST.TESSERA.SNOW_ORDERS',
-        'column:bg_rls_demo.tpch.orders.o_clerk':
-            'BRICETEST.TESSERA.SNOW_ORDERS.O_CLERK',
+        'table:acme.tpch.orders':
+            'ACME.TESSERA.SNOW_ORDERS',
+        'column:acme.tpch.orders.o_clerk':
+            'ACME.TESSERA.SNOW_ORDERS.O_CLERK',
     },
 )
 
@@ -385,8 +385,8 @@ def run(sql: str):
     return r.result.data_array if r.result else None
 
 # If you're re-applying, you may need to drop the previous attachment first.
-# run('ALTER TABLE bg_rls_demo.tpch.orders DROP ROW FILTER')
-# run('ALTER TABLE bg_rls_demo.tpch.orders ALTER COLUMN o_clerk DROP MASK')
+# run('ALTER TABLE acme.tpch.orders DROP ROW FILTER')
+# run('ALTER TABLE acme.tpch.orders ALTER COLUMN o_clerk DROP MASK')
 
 for stmt in uc_result.statements:   # Policy 1
     run(stmt)
@@ -400,15 +400,15 @@ for stmt in mask_uc_result.statements:   # Policy 2 (emit similarly)
 import snowflake.connector
 conn = snowflake.connector.connect(
     account='YOUR_ACCOUNT', user='YOUR_USER', password='...',
-    warehouse='YOUR_WAREHOUSE', database='BRICETEST', schema='TESSERA',
+    warehouse='YOUR_WAREHOUSE', database='ACME', schema='TESSERA',
     role='ACCOUNTADMIN',
 )
 cur = conn.cursor()
 
 # If re-applying:
-# cur.execute('ALTER TABLE BRICETEST.TESSERA.SNOW_ORDERS '
+# cur.execute('ALTER TABLE ACME.TESSERA.SNOW_ORDERS '
 #             'DROP ROW ACCESS POLICY ...')
-# cur.execute('ALTER TABLE BRICETEST.TESSERA.SNOW_ORDERS '
+# cur.execute('ALTER TABLE ACME.TESSERA.SNOW_ORDERS '
 #             'MODIFY COLUMN O_CLERK UNSET MASKING POLICY')
 
 for stmt in sf_result.statements:        # Policy 1
@@ -436,7 +436,7 @@ The point of policies is enforcement, so check that yours actually fires.
 Run as your own user:
 
 ```sql
-SELECT o_orderpriority, COUNT(*) FROM bg_rls_demo.tpch.orders
+SELECT o_orderpriority, COUNT(*) FROM acme.tpch.orders
 GROUP BY 1 ORDER BY 1;
 ```
 
@@ -447,14 +447,14 @@ After each scenario change, re-run the query. No re-grant needed; the policy rea
 If you're in `orders_full_access`:
 
 ```sql
-SELECT DISTINCT o_clerk FROM bg_rls_demo.tpch.orders LIMIT 3;
+SELECT DISTINCT o_clerk FROM acme.tpch.orders LIMIT 3;
 -- Expect: real Clerk#0000XXXXX values
 ```
 
 If you're not:
 
 ```sql
-SELECT DISTINCT o_clerk FROM bg_rls_demo.tpch.orders LIMIT 3;
+SELECT DISTINCT o_clerk FROM acme.tpch.orders LIMIT 3;
 -- Expect: 'CLERK-REDACTED' (single distinct value)
 ```
 

@@ -19,7 +19,7 @@ The Tessera-derived Policy expresses the three-branch row-visibility intent usin
 The exercise's substantive design outputs:
 
 1. **The three-branch case forces Mechanism B.** Databricks ABAC's `TO/EXCEPT` is binary, so three-or-more branches require the principal logic inside the UDF. Tessera's clean multi-rule IR compiles to one UDF; the IR's intent is preserved, the SQL collapses.
-2. **Adopter-namespaced axis (`bg:rowDiscriminator`) used because no v0 well-known axis fits.** v0's four axes (`sensitivity`, `dataSubject`, `regulatoryRegime`, `businessDomain`) don't have a slot for "row-classification-key column." Adopter extension is the right escape valve; v1 may absorb this if the pattern proves common.
+2. **Adopter-namespaced axis (`acme:rowDiscriminator`) used because no v0 well-known axis fits.** v0's four axes (`sensitivity`, `dataSubject`, `regulatoryRegime`, `businessDomain`) don't have a slot for "row-classification-key column." Adopter extension is the right escape valve; v1 may absorb this if the pattern proves common.
 3. **A condition-operand convention surfaced (`column:$matched`).** Per-rule conditions need to reference the value of the column matched by the policy's `MATCH COLUMNS` predicate, not a hardcoded column name. v0's condition algebra doesn't formalize this. The convention used here is a placeholder pending a v1 design pass.
 4. **Cross-policy combination for row filters is a Phase 3 observation.** Deferred to deployment.
 
@@ -29,8 +29,8 @@ The exercise's substantive design outputs:
 
 | Policy element | Category | Notes |
 |---|---|---|
-| Scoped attachment (`byScope` at `catalog:bg_rls_demo`) | **Fully enforced** | `CREATE POLICY ... ON CATALOG bg_rls_demo`. The policy auto-applies to any table in the catalog matching the MATCH COLUMNS predicate. |
-| Attribute matching (`bg:rowDiscriminator: orderpriority`) | **Fully enforced via taxonomy mapping** | Translates to `has_tag_value('abac_column', 'orderpriority')` per the configured taxonomy. |
+| Scoped attachment (`byScope` at `catalog:acme`) | **Fully enforced** | `CREATE POLICY ... ON CATALOG acme`. The policy auto-applies to any table in the catalog matching the MATCH COLUMNS predicate. |
+| Attribute matching (`acme:rowDiscriminator: orderpriority`) | **Fully enforced via taxonomy mapping** | Translates to `has_tag_value('abac_column', 'orderpriority')` per the configured taxonomy. |
 | Three-branch principal logic | **Fully enforced via UDF CASE expression** | Mechanism B. UDF body branches on `is_account_group_member` results in the same order as the IR's `rules`. |
 | `defaultStrategy: negated-complement` | **Preserved in IR, collapses at SQL emission** | The CASE's `ELSE` clause encodes the default branch. The IR's distinction between `negated-complement` and `explicit-baseline-group` is invisible at the SQL layer for Mechanism B; both compile to the same UDF. |
 | `effect: keep-matching-rows` on each rule | **Fully enforced** | UDF returns `BOOLEAN` (TRUE for the principal/row combinations that should be visible); ABAC retains rows where the function returns TRUE. |
@@ -56,7 +56,7 @@ The exercise's substantive design outputs:
 
 ### 4.1 Axis-naming for row-discriminator columns
 
-v0's four well-known axes are `sensitivity`, `dataSubject`, `regulatoryRegime`, `businessDomain`. None of them naturally name "this column carries the data that drives row-level access decisions." The Phase 2 artifact uses an adopter-namespaced axis (`bg:rowDiscriminator`) to surface the gap honestly.
+v0's four well-known axes are `sensitivity`, `dataSubject`, `regulatoryRegime`, `businessDomain`. None of them naturally name "this column carries the data that drives row-level access decisions." The Phase 2 artifact uses an adopter-namespaced axis (`acme:rowDiscriminator`) to surface the gap honestly.
 
 Two candidate v1 framings:
 
@@ -114,11 +114,11 @@ The row-filter mechanism on Databricks ABAC inherits the same account-group cach
 | Requirement | Status |
 |---|---|
 | Use verified ABAC ROW FILTER DDL form | ✓ — `CREATE POLICY ... ON CATALOG ... ROW FILTER fn TO ... FOR TABLES MATCH COLUMNS ... AS alias USING COLUMNS (alias)`. |
-| Reference all three groups verbatim | ✓ — `bg_rls_demo_all_priority_ops`, `bg_rls_demo_high_priority_ops`, and `account users` (broad TO). |
-| Catalog or narrower scope | ✓ — `ON CATALOG bg_rls_demo` (broader than schema; both valid). |
+| Reference all three groups verbatim | ✓ — `acme_all_priority_ops`, `acme_high_priority_ops`, and `account users` (broad TO). |
+| Catalog or narrower scope | ✓ — `ON CATALOG acme` (broader than schema; both valid). |
 | `MATCH COLUMNS has_tag_value('abac_column', 'orderpriority')` | ✓ |
 | `USING COLUMNS (...)` to pass matched value | ✓ — `USING COLUMNS (priority_col)`. |
-| Applies to `bg_rls_demo.tpch.orders_abac` | ✓ (catalog scope; only tagged column in scope). |
+| Applies to `acme.tpch.orders_abac` | ✓ (catalog scope; only tagged column in scope). |
 | Fail-closed for unmatched principals | ✓ — the UDF's ELSE branch catches "everyone else"; no principal sees nothing. The "fail-closed if UDF errors" case is platform-handled (Databricks returns no rows). |
 
 ---
@@ -137,7 +137,7 @@ The row-filter mechanism on Databricks ABAC inherits the same account-group cach
 ## 8. What this exercise is not
 
 - **Not a multi-policy combination test for row filters.** The Phase 1 inputs designed this as a single-policy exercise that surfaces the three-branch / Mechanism B shape. The multi-policy question for row filters (analogous to the column-mask exercise's α/β/γ) is a deferred observation, not the primary design point here.
-- **Not a hierarchical-axis subsumption test.** The `bg:rowDiscriminator` axis is flat (no subsumption); the values are independent. Hierarchical-axis behavior is a separate exercise.
+- **Not a hierarchical-axis subsumption test.** The `acme:rowDiscriminator` axis is flat (no subsumption); the values are independent. Hierarchical-axis behavior is a separate exercise.
 - **Not an attempt to validate every ABAC syntax variant.** WHEN clauses (table-level conditions), USING COLUMNS with multiple args, and other ABAC features the worked example doesn't exercise remain unvalidated.
 
 These are intentional scope choices.
@@ -146,13 +146,13 @@ These are intentional scope choices.
 
 ## 9. Postscript — adapter coverage 2026-05-19
 
-The Unity Catalog adapter now emits this policy. `_emit_row_visibility_by_scope` in `adapters/unity_catalog/emission.py` produces the three-piece DDL: `CREATE OR REPLACE FUNCTION` with the Mechanism B CASE body, `GRANT EXECUTE` (scaffolding per ADR-025), and `CREATE OR REPLACE POLICY ... ON CATALOG bg_rls_demo ROW FILTER ... FOR TABLES MATCH COLUMNS has_tag_value('abac_column', 'orderpriority') AS orderpriority USING COLUMNS (orderpriority)`.
+The Unity Catalog adapter now emits this policy. `_emit_row_visibility_by_scope` in `adapters/unity_catalog/emission.py` produces the three-piece DDL: `CREATE OR REPLACE FUNCTION` with the Mechanism B CASE body, `GRANT EXECUTE` (scaffolding per ADR-025), and `CREATE OR REPLACE POLICY ... ON CATALOG acme ROW FILTER ... FOR TABLES MATCH COLUMNS has_tag_value('abac_column', 'orderpriority') AS orderpriority USING COLUMNS (orderpriority)`.
 
 `AdapterConfig.tag_taxonomy` carries the Tessera-to-Databricks tag translation:
 
 ```python
 tag_taxonomy = {
-    ('bg:rowDiscriminator', 'orderpriority'): ('abac_column', 'orderpriority'),
+    ('acme:rowDiscriminator', 'orderpriority'): ('abac_column', 'orderpriority'),
 }
 ```
 

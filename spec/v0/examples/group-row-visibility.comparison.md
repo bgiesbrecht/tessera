@@ -18,7 +18,7 @@
 
 ## 1. Comparison summary
 
-The Tessera-derived Policy B and the existing notebook implementation are structurally close and behaviorally equivalent — verified against `bg_rls_demo.tpch.orders` on `e2-demo-field-eng` (see §2). The Tessera derivation additionally produces Policy A — an `explicit-baseline-group` variant the existing implementation has no analogue for — and four artifacts the existing implementation does not have: a canonical IR form, a structural intent declaration via `defaultStrategy`, a diagnostic report, and a traceable identifier linking the SQL back to the policy.
+The Tessera-derived Policy B and the existing notebook implementation are structurally close and behaviorally equivalent — verified against `acme.tpch.orders` on `e2-demo-field-eng` (see §2). The Tessera derivation additionally produces Policy A — an `explicit-baseline-group` variant the existing implementation has no analogue for — and four artifacts the existing implementation does not have: a canonical IR form, a structural intent declaration via `defaultStrategy`, a diagnostic report, and a traceable identifier linking the SQL back to the policy.
 
 The comparison surfaced no findings in the "spec is wrong" or "Tessera derivation is wrong" categories. Findings fall into three groups: existing-implementation observations that are reasonable but undocumented in the original, structural observations about what the framework adds, and confirmation of the four v0 gaps the diagnostic already surfaced — plus one operational observation about group-membership cache propagation that emerged during verification (§2.3).
 
@@ -28,12 +28,12 @@ The comparison surfaced no findings in the "spec is wrong" or "Tessera derivatio
 
 ### 2.1 Test scenarios per inputs §7.1
 
-Behavioral equivalence was established by deploying the Tessera-derived Policy B row filter (`bg_rls_demo.tpch.tessera__group_row_visibility_policy_b__row_filter`) to `bg_rls_demo.tpch.orders` and running `SELECT DISTINCT o_orderpriority` under three account-group membership states.
+Behavioral equivalence was established by deploying the Tessera-derived Policy B row filter (`acme.tpch.tessera__group_row_visibility_policy_b__row_filter`) to `acme.tpch.orders` and running `SELECT DISTINCT o_orderpriority` under three account-group membership states.
 
 | Scenario | Brice's group membership | Expected priorities | Observed (Tessera Policy B) | Match |
 |---|---|---|---|---|
-| 1 | `bg_rls_demo_all_priority_ops` (+ `account users`) | 1-URGENT, 2-HIGH, 3-MEDIUM, 4-NOT SPECIFIED, 5-LOW | Same | ✓ |
-| 2 | `bg_rls_demo_high_priority_ops` only | 1-URGENT, 2-HIGH | Same | ✓ |
+| 1 | `acme_all_priority_ops` (+ `account users`) | 1-URGENT, 2-HIGH, 3-MEDIUM, 4-NOT SPECIFIED, 5-LOW | Same | ✓ |
+| 2 | `acme_high_priority_ops` only | 1-URGENT, 2-HIGH | Same | ✓ |
 | 3 | Neither restrictive group (still in `account users`) | 3-MEDIUM, 4-NOT SPECIFIED, 5-LOW | Same | ✓ |
 
 Verification mechanics: Brice toggled account-group memberships in the Databricks account console; an SDK-driven verifier polled `is_account_group_member()` for each restrictive group until the live evaluation reflected the new state, then captured `SELECT DISTINCT o_orderpriority` and compared to the expected set. The existing notebook implementation was not re-verified against the same scenarios because its three-branch SQL is structurally identical (same `is_account_group_member` calls, same priority value strings, same `CASE`/`WHEN`/`ELSE` shape — see §3.1 of this document); its behavior follows from the same membership semantics under test here.
@@ -72,7 +72,7 @@ Observed structural differences:
 
 | Dimension | Existing implementation | Tessera-derived Policy B | Category |
 |---|---|---|---|
-| Function name | `priority_filter_by_group` (unqualified; relies on `USE` for schema) | `bg_rls_demo.tpch.tessera__group_row_visibility_policy_b__row_filter` — fully qualified, deterministic, traceable | **Accepted divergence** (inputs §7.2); the Tessera form is more rigorous and was selected as a feature, not by accident |
+| Function name | `priority_filter_by_group` (unqualified; relies on `USE` for schema) | `acme.tpch.tessera__group_row_visibility_policy_b__row_filter` — fully qualified, deterministic, traceable | **Accepted divergence** (inputs §7.2); the Tessera form is more rigorous and was selected as a feature, not by accident |
 | Parameter name | `orderpriority` | `o_orderpriority` | **Accepted divergence**. Both work — parameter names are local to the function body. |
 | `CASE`/`WHEN`/`ELSE` structure | Yes | Yes | **Match** |
 | Branch order | Most-permissive first | Most-permissive first | **Match** |

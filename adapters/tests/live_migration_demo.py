@@ -56,20 +56,20 @@ AUTH_PATH = Path.home() / "snowflake_auth.txt"
 SNOWFLAKE_ACCOUNT   = "FBGQMMZ-DCC90967"
 SNOWFLAKE_USER      = "BGIESBRECHT"
 SNOWFLAKE_WAREHOUSE = "COMPUTE_WH"
-SNOWFLAKE_DATABASE  = "BRICETEST"
+SNOWFLAKE_DATABASE  = "ACME"
 SOURCE_SCHEMA       = "MIGRATION_DEMO"
 
 DATABRICKS_PROFILE  = "adb-984752964297111"
 DATABRICKS_WAREHOUSE = "148ccb90800933a1"
-TARGET_CATALOG      = "bg_rls_demo"
+TARGET_CATALOG      = "acme"
 TARGET_SCHEMA       = "migration_demo"
 
 # Roles / groups used in the demo. These already exist on both platforms from
 # prior worked exercises; the demo reuses them rather than provisioning fresh.
-ROLE_HIGH_PRIORITY = "BG_RLS_DEMO_HIGH_PRIORITY_OPS"
-ROLE_ALL_PRIORITY  = "BG_RLS_DEMO_ALL_PRIORITY_OPS"
-GROUP_HIGH_PRIORITY = "bg_rls_demo_high_priority_ops"
-GROUP_ALL_PRIORITY  = "bg_rls_demo_all_priority_ops"
+ROLE_HIGH_PRIORITY = "ACME_HIGH_PRIORITY_OPS"
+ROLE_ALL_PRIORITY  = "ACME_ALL_PRIORITY_OPS"
+GROUP_HIGH_PRIORITY = "acme_high_priority_ops"
+GROUP_ALL_PRIORITY  = "acme_all_priority_ops"
 GROUP_ACCOUNT_USERS = "account users"
 
 # Caller identity to seed into the byDataset ACL on the target side.
@@ -208,8 +208,8 @@ def provision_snowflake_source(cur) -> None:
 def deploy_source_policies(cur) -> None:
     section("Phase 2 — Deploy three Tessera policies on Snowflake source")
 
-    # Bindings translate the Databricks-shaped IR (table:bg_rls_demo.tpch.orders
-    # and groups:bg_rls_demo_*) to the fresh Snowflake schema's identifiers.
+    # Bindings translate the Databricks-shaped IR (table:acme.tpch.orders
+    # and groups:acme_*) to the fresh Snowflake schema's identifiers.
     sf_config = AdapterConfig(
         identity_bindings={
             f"group:{GROUP_ALL_PRIORITY}":  ROLE_ALL_PRIORITY,
@@ -218,19 +218,19 @@ def deploy_source_policies(cur) -> None:
             "group:account-users":          "PUBLIC",
             "group:orders_full_access":     ROLE_HIGH_PRIORITY,  # same role used as the privileged group
             # RBAC demo principals — substitute existing demo roles.
-            "group:bg_rls_demo_marketing_analytics": ROLE_HIGH_PRIORITY,
-            "group:bg_rls_demo_data_engineering":    ROLE_ALL_PRIORITY,
+            "group:acme_marketing_analytics": ROLE_HIGH_PRIORITY,
+            "group:acme_data_engineering":    ROLE_ALL_PRIORITY,
         },
         resource_bindings={
-            "table:bg_rls_demo.tpch.orders":               fq_sf_table("demo_orders"),
-            "table:bg_rls_demo.tpch.orders_rls_acl":       fq_sf_table("demo_orders_rls_acl"),
-            "table:bg_rls_demo.tpch.rls_acl_mapping":      fq_sf_table("demo_rls_acl_mapping"),
-            "table:bg_rls_demo.tpch.rls_priority_acl":     fq_sf_table("demo_rls_priority_acl"),
-            "column:bg_rls_demo.tpch.orders.o_clerk":      f"{fq_sf_table('demo_orders')}.o_clerk",
+            "table:acme.tpch.orders":               fq_sf_table("demo_orders"),
+            "table:acme.tpch.orders_rls_acl":       fq_sf_table("demo_orders_rls_acl"),
+            "table:acme.tpch.rls_acl_mapping":      fq_sf_table("demo_rls_acl_mapping"),
+            "table:acme.tpch.rls_priority_acl":     fq_sf_table("demo_rls_priority_acl"),
+            "column:acme.tpch.orders.o_clerk":      f"{fq_sf_table('demo_orders')}.o_clerk",
             # RBAC additions — function and schema targets.
-            "function:bg_rls_demo.tpch.compute_customer_ltv":
+            "function:acme.tpch.compute_customer_ltv":
                 f"{fq_sf_table('compute_customer_ltv')}",
-            "scope:schema:bg_rls_demo.tpch_staging":
+            "scope:schema:acme.tpch_staging":
                 f"{SNOWFLAKE_DATABASE}.{SOURCE_SCHEMA}_STAGING",
         },
     )

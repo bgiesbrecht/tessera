@@ -33,9 +33,9 @@ Three structural findings worth recording from the Phase 2 derivation itself, in
 
 | Policy element | Category | Notes |
 |---|---|---|
-| Scoped attachment (`byScope` at `catalog:bg_rls_demo`) | **Fully enforced** | `CREATE POLICY ... ON CATALOG bg_rls_demo` attaches at the catalog level; Databricks ABAC propagates to all descendants matching the predicate. |
+| Scoped attachment (`byScope` at `catalog:acme`) | **Fully enforced** | `CREATE POLICY ... ON CATALOG acme` attaches at the catalog level; Databricks ABAC propagates to all descendants matching the predicate. |
 | Attribute matching (`sensitivity: PIIClerk`) | **Fully enforced via taxonomy mapping** | Translates to `has_tag_value('abac_column', 'clerk')` per the configured tag-taxonomy mapping (ADR-021). The mapping is per-environment adapter configuration, not in the policy file. |
-| Principal binding (`bg_rls_demo_all_priority_ops` privileged) | **Fully enforced** | `TO account users EXCEPT bg_rls_demo_all_priority_ops` in the DDL. Members of the privileged group bypass the mask; everyone else hits it. |
+| Principal binding (`acme_all_priority_ops` privileged) | **Fully enforced** | `TO account users EXCEPT acme_all_priority_ops` in the DDL. Members of the privileged group bypass the mask; everyone else hits it. |
 | `defaultStrategy: negated-complement` | **Fully enforced (structurally)** | The Databricks ABAC `TO account users EXCEPT group` form is structurally negated-complement: the policy applies to the universal set minus the exception. The Tessera `defaultStrategy` declaration matches the emission. |
 | Policy A — Redact with literal 'CLERK-REDACTED' | **Fully enforced** | UDF returns the literal unconditionally; ABAC invokes it for non-privileged principals. |
 | Policy B — Hash with sha256 | **Fully enforced** | UDF returns `sha2(val, 256)`; same evaluation path. |
@@ -50,7 +50,7 @@ Three structural findings worth recording from the Phase 2 derivation itself, in
 
 Two timing characteristics are relevant to this ABAC mechanism:
 
-1. **Account-group membership cache.** Same 2–4 minute propagation observed in the prior group-row-visibility exercise. Affects when changes to `bg_rls_demo_all_priority_ops` take effect on the ABAC policy's `EXCEPT` evaluation. Not new; recorded for completeness.
+1. **Account-group membership cache.** Same 2–4 minute propagation observed in the prior group-row-visibility exercise. Affects when changes to `acme_all_priority_ops` take effect on the ABAC policy's `EXCEPT` evaluation. Not new; recorded for completeness.
 
 2. **Tag-binding cache (potentially new).** Databricks ABAC may cache the `has_tag_value` evaluations for some interval to avoid repeated metastore lookups. The propagation behavior of tag changes — adding a new column tag, removing one, retagging a column — is a separate timing characteristic. Phase 3 observation should measure this; if it differs from the account-group cache window, it is a per-mechanism timing finding that the Databricks adapter's capability profile should declare separately.
 
@@ -109,8 +109,8 @@ Until the adapter exists, these are decorative. Stage 4 should formalize the cap
 
 The Phase 3 comparison document is currently a stub. After deployment, it captures:
 
-- What Databricks does for a principal **in** `bg_rls_demo_all_priority_ops` (predicted: pass-through, both policies have the same EXCEPT, so both bypass — the principal sees the real clerk value).
-- What Databricks does for a principal **not** in `bg_rls_demo_all_priority_ops` — the substantive observation. Both Policy A and Policy B apply; both transformations are defined; what value does Databricks return?
+- What Databricks does for a principal **in** `acme_all_priority_ops` (predicted: pass-through, both policies have the same EXCEPT, so both bypass — the principal sees the real clerk value).
+- What Databricks does for a principal **not** in `acme_all_priority_ops` — the substantive observation. Both Policy A and Policy B apply; both transformations are defined; what value does Databricks return?
   - **α candidate observation**: Databricks deterministically picks one (e.g., by policy creation order, alphabetical name, or some other rule). The principal sees either `'CLERK-REDACTED'` or `sha2(clerk_value, 256)` deterministically.
   - **β candidate observation**: Databricks blends the two somehow (unlikely but possible — e.g., applying both transformations in sequence). The principal sees `sha2('CLERK-REDACTED', 256)` or similar chained result.
   - **γ candidate observation**: Databricks refuses to attach both policies, or rejects the configuration at policy-evaluation time with an error. The composition is not supported.
@@ -126,9 +126,9 @@ A secondary observation worth measuring: **policy attachment ordering**. Does it
 | Requirement | Status |
 |---|---|
 | Use verified ABAC DDL form | ✓ — `CREATE POLICY … ON CATALOG … COLUMN MASK … TO … EXCEPT … FOR TABLES MATCH COLUMNS … AS … ON COLUMN …` matches the Stage 1 verification. |
-| Reference `bg_rls_demo_all_priority_ops` verbatim | ✓ — in both policies' EXCEPT clauses. |
+| Reference `acme_all_priority_ops` verbatim | ✓ — in both policies' EXCEPT clauses. |
 | Map `sensitivity: PIIClerk` to `has_tag_value('abac_column', 'clerk')` | ✓ — for both policies. |
-| Attach both at catalog scope `bg_rls_demo` | ✓ — both `ON CATALOG bg_rls_demo`. |
+| Attach both at catalog scope `acme` | ✓ — both `ON CATALOG acme`. |
 
 ---
 

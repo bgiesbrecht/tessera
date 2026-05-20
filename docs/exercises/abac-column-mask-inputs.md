@@ -11,7 +11,7 @@
 
 **0.1 — Demo or production scope?**
 
-Demo. Same `bg_rls_demo` environment as the prior three exercises.
+Demo. Same `acme` environment as the prior three exercises.
 
 **0.2 — Target platform**
 
@@ -21,7 +21,7 @@ Databricks Unity Catalog. This exercise specifically targets the **newer ABAC me
 
 A **two-policy** ABAC column-masking exercise designed to surface the cross-policy combination question that ADR-019 deliberately deferred (the α/β/γ resolution paths in scoping doc §8 Q3).
 
-Two policies attach at the same catalog scope (`bg_rls_demo`). They overlap on the `o_clerk` column intentionally. They specify different transformations. The question Stage 3 answers: what does Databricks ABAC actually do when both policies match? The answer discriminates between three resolution paths:
+Two policies attach at the same catalog scope (`acme`). They overlap on the `o_clerk` column intentionally. They specify different transformations. The question Stage 3 answers: what does Databricks ABAC actually do when both policies match? The answer discriminates between three resolution paths:
 
 - **α** — Tessera ignores cross-policy combination; adapters defer to platform conventions.
 - **β** — Tessera adopts a single algorithm (e.g., deny-overrides).
@@ -33,7 +33,7 @@ Two policies attach at the same catalog scope (`bg_rls_demo`). They overlap on t
 
 **1.1 — Protected column**
 
-`bg_rls_demo.tpch.orders_abac.o_clerk` (STRING). Same column as the prior column-mask exercise — re-tagged for ABAC.
+`acme.tpch.orders_abac.o_clerk` (STRING). Same column as the prior column-mask exercise — re-tagged for ABAC.
 
 **1.2 — Tag to apply**
 
@@ -83,11 +83,11 @@ The mapping is bidirectional: emission lowers `sensitivity: PIIClerk` to `has_ta
 
 **3.1 — Privileged group**
 
-`bg_rls_demo_all_priority_ops`. Members see the unredacted `o_clerk` value. Reused from the group row-visibility exercise so no new group is needed.
+`acme_all_priority_ops`. Members see the unredacted `o_clerk` value. Reused from the group row-visibility exercise so no new group is needed.
 
 **3.2 — Default principals**
 
-Every account user not in `bg_rls_demo_all_priority_ops` falls into the default branch of each policy and sees the policy's transformed value.
+Every account user not in `acme_all_priority_ops` falls into the default branch of each policy and sees the policy's transformed value.
 
 **3.3 — Group hierarchy**
 
@@ -105,7 +105,7 @@ Every account user not in `bg_rls_demo_all_priority_ops` falls into the default 
 policyKind: ColumnVisibilityConstraint
 appliesTo:
   selector: byScope
-  scope: catalog:bg_rls_demo
+  scope: catalog:acme
   matching:
     attributes:
       sensitivity: PIIClerk
@@ -114,7 +114,7 @@ defaultStrategy: negated-complement
 rules:
   - principal:
       selector: byIdentity
-      resource: group:bg_rls_demo_all_priority_ops
+      resource: group:acme_all_priority_ops
     effect: allow
 defaultBranch:
   effect: transform
@@ -123,7 +123,7 @@ defaultBranch:
     replacement: 'CLERK-REDACTED'
 ```
 
-Policy A matches the **specific** `sensitivity: PIIClerk` attribute. Members of `bg_rls_demo_all_priority_ops` pass through; everyone else sees `'CLERK-REDACTED'`.
+Policy A matches the **specific** `sensitivity: PIIClerk` attribute. Members of `acme_all_priority_ops` pass through; everyone else sees `'CLERK-REDACTED'`.
 
 ### 4.2 Policy B — same matcher, hash transformation
 
@@ -133,7 +133,7 @@ Policy A matches the **specific** `sensitivity: PIIClerk` attribute. Members of 
 policyKind: ColumnVisibilityConstraint
 appliesTo:
   selector: byScope
-  scope: catalog:bg_rls_demo
+  scope: catalog:acme
   matching:
     attributes:
       sensitivity: PIIClerk
@@ -142,7 +142,7 @@ defaultStrategy: negated-complement
 rules:
   - principal:
       selector: byIdentity
-      resource: group:bg_rls_demo_all_priority_ops
+      resource: group:acme_all_priority_ops
     effect: allow
 defaultBranch:
   effect: transform
@@ -151,11 +151,11 @@ defaultBranch:
     algorithm: sha256
 ```
 
-Policy B matches the **same** `sensitivity: PIIClerk` attribute as Policy A. The two policies target an identical set of columns. Members of `bg_rls_demo_all_priority_ops` pass through; everyone else sees a SHA-256 hash.
+Policy B matches the **same** `sensitivity: PIIClerk` attribute as Policy A. The two policies target an identical set of columns. Members of `acme_all_priority_ops` pass through; everyone else sees a SHA-256 hash.
 
 ### 4.3 The deliberate overlap
 
-For a principal **not** in `bg_rls_demo_all_priority_ops`, both policies match `o_clerk` and want to apply different transformations:
+For a principal **not** in `acme_all_priority_ops`, both policies match `o_clerk` and want to apply different transformations:
 
 - Policy A: replace with literal `'CLERK-REDACTED'`.
 - Policy B: replace with `sha256(o_clerk)`.
@@ -172,11 +172,11 @@ An earlier draft of this exercise had Policy B match the broader hierarchical pa
 
 ## 5. Edge cases
 
-**5.1 — Brice in `bg_rls_demo_all_priority_ops`**
+**5.1 — Brice in `acme_all_priority_ops`**
 
 Pass-through for both policies. `o_clerk` shows real clerk values regardless of which policy is "in effect."
 
-**5.2 — Brice not in `bg_rls_demo_all_priority_ops`**
+**5.2 — Brice not in `acme_all_priority_ops`**
 
 The cross-policy combination case. Observe and record what Databricks emits.
 
@@ -190,7 +190,7 @@ Subject to the same 2–4 minute account-group cache lag observed in the prior e
 
 **5.5 — Columns not tagged**
 
-Other columns in `bg_rls_demo.tpch.orders_abac` (`o_orderkey`, `o_orderstatus`, etc.) are not tagged with `abac_column = clerk`; neither policy matches them; they remain visible. Note: `o_orderpriority` is separately tagged `abac_column = orderpriority` for a hypothetical row-filter follow-on exercise; neither column-mask policy in this exercise matches it.
+Other columns in `acme.tpch.orders_abac` (`o_orderkey`, `o_orderstatus`, etc.) are not tagged with `abac_column = clerk`; neither policy matches them; they remain visible. Note: `o_orderpriority` is separately tagged `abac_column = orderpriority` for a hypothetical row-filter follow-on exercise; neither column-mask policy in this exercise matches it.
 
 ---
 
@@ -204,12 +204,12 @@ Not applicable for the demo. Standard ABAC policy evaluation overhead per query.
 
 **7.1 — Behavioral verification criteria**
 
-Two scenarios against `bg_rls_demo.tpch.orders_abac.o_clerk`:
+Two scenarios against `acme.tpch.orders_abac.o_clerk`:
 
 | Scenario | Setup | Expected `o_clerk` |
 |---|---|---|
-| 1 | Brice in `bg_rls_demo_all_priority_ops`, both ABAC policies attached | Real clerk values (both policies' allow branch wins for him) |
-| 2 | Brice not in `bg_rls_demo_all_priority_ops`, both ABAC policies attached | **Observation, not prediction.** What Databricks returns answers the cross-policy combination question. |
+| 1 | Brice in `acme_all_priority_ops`, both ABAC policies attached | Real clerk values (both policies' allow branch wins for him) |
+| 2 | Brice not in `acme_all_priority_ops`, both ABAC policies attached | **Observation, not prediction.** What Databricks returns answers the cross-policy combination question. |
 
 Scenario 2 is the substantive observation. There is no a-priori expected value; the result discriminates between α/β/γ.
 
@@ -222,9 +222,9 @@ Tessera-derived emission may differ from any future canonical emission in functi
 The Tessera derivation must:
 
 - Use the verified ABAC DDL form (`CREATE POLICY ... ON CATALOG ... COLUMN MASK fn TO ... EXCEPT ... FOR TABLES MATCH COLUMNS ... AS alias ON COLUMN alias`).
-- Reference `bg_rls_demo_all_priority_ops` verbatim.
+- Reference `acme_all_priority_ops` verbatim.
 - Map `sensitivity: PIIClerk` to `has_tag_value('abac_column', 'clerk')` for **both** Policy A and Policy B (same matching predicate; the policies differ only in their transformation).
-- Both policies must attach at catalog scope `bg_rls_demo`.
+- Both policies must attach at catalog scope `acme`.
 
 ---
 
@@ -246,19 +246,19 @@ The exercise is structurally designed to surface findings, not to validate a hyp
 
 **Status: completed 2026-05-19 on workspace `adb-984752964297111.11.azuredatabricks.net`** (Azure Databricks, different from the AWS `e2-demo-field-eng` workspace the prior exercises used). State at handoff:
 
-- Catalog `bg_rls_demo` and schema `tpch` exist.
-- Dedicated table `bg_rls_demo.tpch.orders_abac` created (TPC-H orders shape, 4.5M rows, managed Delta) — separate from `orders` to keep the ABAC exercise isolated from the prior column-mask exercise's table.
+- Catalog `acme` and schema `tpch` exist.
+- Dedicated table `acme.tpch.orders_abac` created (TPC-H orders shape, 4.5M rows, managed Delta) — separate from `orders` to keep the ABAC exercise isolated from the prior column-mask exercise's table.
 - Column `o_clerk` tagged `abac_column = clerk`. Column `o_orderpriority` separately tagged `abac_column = orderpriority` (reserved for a row-filter follow-on exercise; not used here).
 - Two prior ABAC policies (`orders_clerk_mask`, `orders_priority_rls`) that Brice had set up earlier were dropped at the start of this Phase 2 work to give the derivation a clean state to attach into. **Brice has not shared the policy DDL or the function bodies for the existing impl** — this preserves the blind-derivation property of the exercise framework. Phase 3 comparison happens after Phase 2 artifacts are committed.
-- Brice's group membership in `bg_rls_demo_all_priority_ops` is **not** currently asserted (live `is_account_group_member` check returns false). Scenario 1 verification (pass-through) requires re-adding membership and waiting out the standard 2–4 minute cache propagation lag.
+- Brice's group membership in `acme_all_priority_ops` is **not** currently asserted (live `is_account_group_member` check returns false). Scenario 1 verification (pass-through) requires re-adding membership and waiting out the standard 2–4 minute cache propagation lag.
 
 The original setup steps are preserved below as historical record of what the brief asked for:
 
 1. Create the `abac_column` tag (governed tag preferred; account admin).
-2. Apply to column: `ALTER TABLE bg_rls_demo.tpch.orders_abac ALTER COLUMN o_clerk SET TAGS ('abac_column' = 'clerk');`
+2. Apply to column: `ALTER TABLE acme.tpch.orders_abac ALTER COLUMN o_clerk SET TAGS ('abac_column' = 'clerk');`
 3. (Not applicable in practice — `orders_abac` is a fresh table; no prior masks to detach.)
-4. Re-add `brice.giesbrecht@databricks.com` to `bg_rls_demo_all_priority_ops` for Scenario 1 testing (still pending; not blocking Phase 2 authoring).
-5. Verify with `SELECT * FROM bg_rls_demo.information_schema.column_tags WHERE table_name = 'orders_abac'` and `SELECT is_account_group_member('bg_rls_demo_all_priority_ops')`.
+4. Re-add `brice.giesbrecht@databricks.com` to `acme_all_priority_ops` for Scenario 1 testing (still pending; not blocking Phase 2 authoring).
+5. Verify with `SELECT * FROM acme.information_schema.column_tags WHERE table_name = 'orders_abac'` and `SELECT is_account_group_member('acme_all_priority_ops')`.
 
 ---
 

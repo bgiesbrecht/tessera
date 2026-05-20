@@ -10,17 +10,17 @@
 -- rather than the parameter when names match, which would degenerate the
 -- predicate to `col = col` (always true).
 
-CREATE OR REPLACE ROW ACCESS POLICY BRICETEST.TESSERA.snowflake_byDataset_row_visibility_rap
+CREATE OR REPLACE ROW ACCESS POLICY ACME.TESSERA.snowflake_byDataset_row_visibility_rap
 AS (POLICY_INPUT_VALUE VARCHAR) RETURNS BOOLEAN ->
         EXISTS (
             SELECT 1
-            FROM BRICETEST.TESSERA.RLS_ACL_MAPPING m
-            JOIN BRICETEST.TESSERA.RLS_PRIORITY_ACL p
+            FROM ACME.TESSERA.RLS_ACL_MAPPING m
+            JOIN ACME.TESSERA.RLS_PRIORITY_ACL p
               ON m.CODE_NAME = p.CODE_NAME
             WHERE m.USERNAME = CURRENT_USER()
               AND p.O_ORDERPRIORITY = POLICY_INPUT_VALUE
         );
 
-ALTER TABLE BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL
-  ADD ROW ACCESS POLICY BRICETEST.TESSERA.snowflake_byDataset_row_visibility_rap
+ALTER TABLE ACME.TESSERA.SNOW_ORDERS_RLS_ACL
+  ADD ROW ACCESS POLICY ACME.TESSERA.snowflake_byDataset_row_visibility_rap
   ON (O_ORDERPRIORITY);

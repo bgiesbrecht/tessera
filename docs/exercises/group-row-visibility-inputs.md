@@ -36,7 +36,7 @@ Both policies produce the same observable behavior. The semantic distinction bet
 
 **1.1 — Protected table**
 
-`bg_rls_demo.tpch.orders`. Derived from the TPC-H `orders` sample data.
+`acme.tpch.orders`. Derived from the TPC-H `orders` sample data.
 
 **1.2 — Relevant columns**
 
@@ -92,12 +92,12 @@ None. All visibility is determined by group membership. No admin bypass, no brea
 
 **4.1 — In plain English**
 
-Members of `bg_rls_demo_all_priority_ops` see all rows. Members of `bg_rls_demo_high_priority_ops` see rows with `o_orderpriority` in (`1-URGENT`, `2-HIGH`). All other users see rows with `o_orderpriority` in (`3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW`).
+Members of `acme_all_priority_ops` see all rows. Members of `acme_high_priority_ops` see rows with `o_orderpriority` in (`1-URGENT`, `2-HIGH`). All other users see rows with `o_orderpriority` in (`3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW`).
 
 **4.2 — Principals with an entry**
 
-- Members of `bg_rls_demo_all_priority_ops`: see all rows regardless of `o_orderpriority`.
-- Members of `bg_rls_demo_high_priority_ops`: see rows with `o_orderpriority IN ('1-URGENT', '2-HIGH')`.
+- Members of `acme_all_priority_ops`: see all rows regardless of `o_orderpriority`.
+- Members of `acme_high_priority_ops`: see rows with `o_orderpriority IN ('1-URGENT', '2-HIGH')`.
 - (If a principal is in both, the more permissive grant applies, which is `all_priority_ops`. Standard union semantics; the policies should not require explicit overlap resolution.)
 
 **4.3 — Principals without an entry**
@@ -150,7 +150,7 @@ If `is_account_group_member` cannot determine membership (Databricks internal fa
 
 **5.8 — Empty membership for restrictive groups**
 
-If `bg_rls_demo_all_priority_ops` and `bg_rls_demo_high_priority_ops` are both empty (no members), all users fall into the default branch and see priorities 3-5. This is the expected behavior, not a degenerate case.
+If `acme_all_priority_ops` and `acme_high_priority_ops` are both empty (no members), all users fall into the default branch and see priorities 3-5. This is the expected behavior, not a degenerate case.
 
 **5.9 — Cross-tenant or cross-region**
 
@@ -158,7 +158,7 @@ Not applicable.
 
 **5.10 — Other edge cases**
 
-The interesting case for this exercise: a principal who is removed from `bg_rls_demo_high_priority_ops` mid-session should, on the next query, fall into the default branch (priorities 3-5) and lose visibility of priorities 1-2. Brice will exercise this scenario by changing his own group memberships and re-running queries.
+The interesting case for this exercise: a principal who is removed from `acme_high_priority_ops` mid-session should, on the next query, fall into the default branch (priorities 3-5) and lose visibility of priorities 1-2. Brice will exercise this scenario by changing his own group memberships and re-running queries.
 
 ---
 
@@ -176,11 +176,11 @@ Brice will exercise three scenarios using his own account, manipulating group me
 
 | Scenario | Brice's membership | Expected priorities visible |
 |---|---|---|
-| 1 | Member of `bg_rls_demo_all_priority_ops` | All five (`1-URGENT`, `2-HIGH`, `3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW`) |
-| 2 | Member of `bg_rls_demo_high_priority_ops` only | `1-URGENT`, `2-HIGH` |
+| 1 | Member of `acme_all_priority_ops` | All five (`1-URGENT`, `2-HIGH`, `3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW`) |
+| 2 | Member of `acme_high_priority_ops` only | `1-URGENT`, `2-HIGH` |
 | 3 | Member of neither restrictive group | `3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW` |
 
-A query `SELECT DISTINCT o_orderpriority FROM bg_rls_demo.tpch.orders` under each scenario should return exactly the rows in the expected column. Row counts per priority should match the unfiltered table's distribution.
+A query `SELECT DISTINCT o_orderpriority FROM acme.tpch.orders` under each scenario should return exactly the rows in the expected column. Row counts per priority should match the unfiltered table's distribution.
 
 The Tessera derivation is behaviorally equivalent if all three scenarios produce the expected priorities.
 
@@ -198,7 +198,7 @@ The Tessera-derived row filter function may differ from the existing implementat
 The Tessera derivation must:
 
 - Produce a row filter that Unity Catalog accepts via `ALTER TABLE ... SET ROW FILTER`.
-- Reference the two restrictive group names verbatim (`bg_rls_demo_all_priority_ops`, `bg_rls_demo_high_priority_ops`). These appear in the policy file directly; no identity-binding indirection in this exercise.
+- Reference the two restrictive group names verbatim (`acme_all_priority_ops`, `acme_high_priority_ops`). These appear in the policy file directly; no identity-binding indirection in this exercise.
 - For Policy A, reference `account users` verbatim as the baseline group.
 - Produce a `CASE`/`WHEN`/`ELSE` row filter for Policy B. This is the readability preference noted above. If the Tessera framework's natural derivation produces a structurally different form (explicit `NOT is_account_group_member(...) AND ...`), the diagnostic report should note this as adapter quality-of-output work to be improved, but it does not disqualify the exercise.
 

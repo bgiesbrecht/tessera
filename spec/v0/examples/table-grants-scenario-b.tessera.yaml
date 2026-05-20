@@ -11,18 +11,18 @@ policy:
   version: 1.0.0
   kind: AccessGrantConstraint
   description: |
-    Data engineering team can Read every table in bg_rls_demo.tpch_staging,
+    Data engineering team can Read every table in acme.tpch_staging,
     including tables added after the policy is applied. No explicit
     enumeration; byScope at schema level propagates downward.
 
   appliesTo:
     selector: byScope
-    scope: schema:bg_rls_demo.tpch_staging
+    scope: schema:acme.tpch_staging
 
   action: Read
 
   rules:
     - principal:
         selector: byIdentity
-        resource: group:bg_rls_demo_data_engineering
+        resource: group:acme_data_engineering
       effect: allow

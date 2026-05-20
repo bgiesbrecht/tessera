@@ -11,7 +11,7 @@
 
 **0.1 — Demo or production scope?**
 
-Demo. The implementation lives in the same `bg_rls_demo` test environment as the prior two row-visibility exercises. Edge cases around concurrency, hot paths, audit, and operational resilience are out of scope.
+Demo. The implementation lives in the same `acme` test environment as the prior two row-visibility exercises. Edge cases around concurrency, hot paths, audit, and operational resilience are out of scope.
 
 **0.2 — Target platform**
 
@@ -19,7 +19,7 @@ Databricks Unity Catalog. The existing implementation uses the pre-ABAC `ALTER C
 
 **0.3 — Scope of this exercise**
 
-A single-column column-mask pattern. The protected column is `o_clerk` on `bg_rls_demo.tpch.orders`. Visibility is binary: principals in the `orders_full_access` group see the real value; everyone else sees the literal redaction `'CLERK-REDACTED'`.
+A single-column column-mask pattern. The protected column is `o_clerk` on `acme.tpch.orders`. Visibility is binary: principals in the `orders_full_access` group see the real value; everyone else sees the literal redaction `'CLERK-REDACTED'`.
 
 This is the simplest non-trivial column-masking case: one column, two branches (full-access pass-through; default redact), one masking function. Sufficient to exercise the IR's column-visibility shape and the `TransformationInstance` parameterization (ADR-016).
 
@@ -29,7 +29,7 @@ This is the simplest non-trivial column-masking case: one column, two branches (
 
 **1.1 — Protected table**
 
-`bg_rls_demo.tpch.orders`. The same table the group-based row-visibility exercise used. Existing row filter (`tessera__group_row_visibility_policy_b__row_filter`) may still be attached from that exercise; the column-mask exercise is orthogonal — column masks and row filters compose at evaluation time on Unity Catalog without conflict.
+`acme.tpch.orders`. The same table the group-based row-visibility exercise used. Existing row filter (`tessera__group_row_visibility_policy_b__row_filter`) may still be attached from that exercise; the column-mask exercise is orthogonal — column masks and row filters compose at evaluation time on Unity Catalog without conflict.
 
 **1.2 — Protected column**
 
@@ -116,7 +116,7 @@ Subject to the same 2–4 minute account-group cache propagation observed in the
 
 **4.3 — Interaction with the existing row filter on the table**
 
-The `o_clerk` column mask and the `o_orderpriority` row filter (deployed during the group exercise) compose at evaluation time: the row filter narrows which rows are visible; the column mask redacts `o_clerk` on those visible rows. Members of `orders_full_access` who are not in `bg_rls_demo_all_priority_ops` see only the rows the row filter admits, with `o_clerk` unredacted on those rows. This is standard Unity Catalog composition and is not a finding.
+The `o_clerk` column mask and the `o_orderpriority` row filter (deployed during the group exercise) compose at evaluation time: the row filter narrows which rows are visible; the column mask redacts `o_clerk` on those visible rows. Members of `orders_full_access` who are not in `acme_all_priority_ops` see only the rows the row filter admits, with `o_clerk` unredacted on those rows. This is standard Unity Catalog composition and is not a finding.
 
 **4.4 — Joins, views**
 
@@ -138,7 +138,7 @@ Not applicable for the demo. The masking function is a single `CASE` evaluated p
 
 **6.1 — Behavioral equivalence criteria**
 
-Verify two scenarios against `bg_rls_demo.tpch.orders.o_clerk`:
+Verify two scenarios against `acme.tpch.orders.o_clerk`:
 
 | Scenario | Setup | Expected `o_clerk` value |
 |---|---|---|

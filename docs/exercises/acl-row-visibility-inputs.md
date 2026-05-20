@@ -31,7 +31,7 @@ A single Tessera policy is requested, not two parallel policies (no Mechanism A 
 
 **1.1 — Protected table**
 
-`bg_rls_demo.tpch.orders_rls_acl`. A copy of TPC-H orders, separate from the group-based exercise's table.
+`acme.tpch.orders_rls_acl`. A copy of TPC-H orders, separate from the group-based exercise's table.
 
 **1.2 — Relevant columns**
 
@@ -61,8 +61,8 @@ Not for this exercise. The policy selects against a specific table by name. The 
 
 Two tables work together for this pattern, forming a logical many-to-many between users and priority values:
 
-- `bg_rls_demo.tpch.rls_acl_mapping` — maps usernames to ACL codenames.
-- `bg_rls_demo.tpch.rls_priority_acl` — maps ACL codenames to order priority values.
+- `acme.tpch.rls_acl_mapping` — maps usernames to ACL codenames.
+- `acme.tpch.rls_priority_acl` — maps ACL codenames to order priority values.
 
 **2.2 — ACL schema**
 
@@ -258,7 +258,7 @@ Behavioral equivalence is established against the seed data in §2.8. Three scen
 | 2 | Add `('brice.giesbrecht@databricks.com', 'standard_ops')` to `rls_acl_mapping` | Brice's account: all five priorities |
 | 3 | Remove all rows for Brice from `rls_acl_mapping` | Brice's account: zero rows |
 
-Each scenario should be verified by running `SELECT DISTINCT o_orderpriority FROM bg_rls_demo.tpch.orders_rls_acl` and comparing the result to the expected set. The Tessera-derived row filter should produce identical results to the existing implementation in all three scenarios.
+Each scenario should be verified by running `SELECT DISTINCT o_orderpriority FROM acme.tpch.orders_rls_acl` and comparing the result to the expected set. The Tessera-derived row filter should produce identical results to the existing implementation in all three scenarios.
 
 A fourth scenario worth considering: query as a user not in `rls_acl_mapping` at all (the implicit-fail-closed case). Optional; can be addressed by Scenario 3 if the existing implementation's behavior matches.
 
@@ -276,7 +276,7 @@ Same as the group exercise:
 The Tessera derivation must:
 
 - Produce a row filter that Unity Catalog accepts via `ALTER TABLE … SET ROW FILTER`.
-- Reference the two ACL tables verbatim (`bg_rls_demo.tpch.rls_acl_mapping`, `bg_rls_demo.tpch.rls_priority_acl`) and their column names verbatim.
+- Reference the two ACL tables verbatim (`acme.tpch.rls_acl_mapping`, `acme.tpch.rls_priority_acl`) and their column names verbatim.
 - Apply the same case-insensitive, whitespace-trimmed match on the principal column.
 - Use `EXISTS` semantics for the join (or equivalent — any result that depends on the *existence* of a matching row chain rather than on counting).
 - Be fail-closed for principals without ACL entries (no implicit `ELSE` granting visibility).

@@ -4,6 +4,42 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.6.2] — 2026-05-20
+
+A repo-wide cleanup: personal identifiers replaced with the conventional "any adopter" stand-in `acme` / `ACME` / `acme:`. No spec semantics change; no adapter logic change. 80 files updated mechanically; regression tests (converter + parity) pass; all worked-example YAMLs re-validate clean against JSON Schema and SHACL.
+
+### Changed
+
+**Infrastructure identifiers — Databricks side**
+- Catalog `bg_rls_demo` → `acme`
+- Groups `bg_rls_demo_all_priority_ops` → `acme_all_priority_ops`; `bg_rls_demo_high_priority_ops` → `acme_high_priority_ops` (any other `bg_rls_demo_*` group follows the same prefix swap)
+- Uppercase variants `BG_RLS_DEMO_*` → `ACME_*` in `AdapterConfig.bind_resource` examples and Snowflake role identity-bindings
+
+**Infrastructure identifiers — Snowflake side**
+- Database `BRICETEST` → `ACME` (schema name `TESSERA` unchanged)
+- Roles `BG_RLS_DEMO_*` → `ACME_*` consistently across worked-example DDL, live-test scripts, and capability profile prose
+
+**Adopter-namespace IRI prefix in worked examples**
+- `bg:rowDiscriminator` → `acme:rowDiscriminator` in `spec/v0/examples/abac-row-filter-priority.{jsonld,tessera.yaml}` and prose in `docs/technical-design-v0.2.md`, `spec/v0/schema.json` description, the `abac-row-filter-priority` comparison and diagnostic, and the ABAC scoping document.
+
+### What this does not change
+
+- **Spec semantics.** No ontology, JSON-LD context, schema, or SHACL shape changed. The rename is purely identifier substitution.
+- **Adapter logic.** Adapters take identifiers from `AdapterConfig` bindings, not from hardcoded constants. The capability-profile prose was updated for honesty; the emission code paths are unchanged.
+- **Person-name attribution.** "Per Brice's framing," `@bgiesbrecht`, `bgiesbrecht.github.io/tessera/` (canonical namespace URLs per ADR-011), and the Snowflake user `BGIESBRECHT` and email `brice.giesbrecht@databricks.com` remain in place. Those are legitimate identity references, not "names scattered."
+
+### Operational implication (follow-up needed)
+
+Live integration scripts (`live_databricks.py`, `live_snowflake.py`, `live_snowflake_bydataset.py`, `live_migration_demo.py` and reverse, etc.) now target the new identifiers. Running them requires the new infrastructure to exist on each platform:
+- **Databricks:** `acme` catalog (created), schema `tpch` plus seed tables, groups `acme_all_priority_ops` and `acme_high_priority_ops`.
+- **Snowflake:** database `ACME`, schema `TESSERA`, seed tables (`SNOW_ORDERS`, `SNOW_ORDERS_RLS_ACL`, `RLS_ACL_MAPPING`, `RLS_PRIORITY_ACL`), roles `ACME_ALL_PRIORITY_OPS` and `ACME_HIGH_PRIORITY_OPS`.
+
+The migration demos provision their own schemas (`migration_demo` and `migration_demo_staging`) at runtime under whichever catalog/DB is configured, so those just need the parent catalog/DB to exist.
+
+### Why this is a patch version
+
+No new ADR; no spec or adapter semantics changed; no API surface added or removed. Worked-example artifacts now read generically (`acme` as the conventional adopter stand-in), making the repo cleaner for any future third-party reader. Patch-bump per the CHANGELOG framing.
+
 ## [0.6.1] — 2026-05-20
 
 A documentation-and-principle increment. No spec or adapter changes. Captures a recurring framing slip as a recorded ADR so the next instance gets caught at the principle layer rather than after seven docs have to be corrected.
@@ -68,12 +104,12 @@ Migration demo runs end-to-end on fresh schemas both sides with all six policy s
 
 | Policy kind | Target | Verified |
 |---|---|---|
-| RowVisibilityConstraint (group, multi-rule) | `bg_rls_demo.migration_demo.demo_orders` | 59,998 rows visible (third branch) |
-| RowVisibilityConstraint (byDataset, EXISTS) | `bg_rls_demo.migration_demo.demo_orders_rls_acl` | 40,002 rows (caller's ACL codenames) |
-| ColumnVisibilityConstraint (mask) | `bg_rls_demo.migration_demo.demo_orders.o_clerk` | `CLERK-REDACTED` |
-| AccessGrantConstraint (table) | `bg_rls_demo.migration_demo.demo_orders` SELECT | 3 grants visible via SHOW GRANTS |
-| AccessGrantConstraint (schema → all tables) | `bg_rls_demo.migration_demo_staging.staged_orders` SELECT | 1 grant visible via SHOW GRANTS |
-| AccessGrantConstraint (function) | `bg_rls_demo.migration_demo.compute_customer_ltv` EXECUTE | 1 grant visible via SHOW GRANTS |
+| RowVisibilityConstraint (group, multi-rule) | `acme.migration_demo.demo_orders` | 59,998 rows visible (third branch) |
+| RowVisibilityConstraint (byDataset, EXISTS) | `acme.migration_demo.demo_orders_rls_acl` | 40,002 rows (caller's ACL codenames) |
+| ColumnVisibilityConstraint (mask) | `acme.migration_demo.demo_orders.o_clerk` | `CLERK-REDACTED` |
+| AccessGrantConstraint (table) | `acme.migration_demo.demo_orders` SELECT | 3 grants visible via SHOW GRANTS |
+| AccessGrantConstraint (schema → all tables) | `acme.migration_demo_staging.staged_orders` SELECT | 1 grant visible via SHOW GRANTS |
+| AccessGrantConstraint (function) | `acme.migration_demo.compute_customer_ltv` EXECUTE | 1 grant visible via SHOW GRANTS |
 
 ### Issue tracker activity
 
@@ -100,7 +136,7 @@ Parallel to the Snowflake equivalent. discover() walks `SHOW TABLES IN <schema>`
 - byIdentity multi-OR row filter (`is_account_group_member('A') OR (is_account_group_member('B') AND col IN (…))`).
 - byIdentity column mask (`CASE WHEN is_account_group_member('X') THEN col ELSE 'literal' END`).
 
-Live-verified against `bg_rls_demo.migration_demo`: all three deployed policies discovered and extracted with confidence ≥ 0.9. The adapter stays SDK-agnostic — caller supplies a `run_sql` callable via `config.extras["run_sql"]`. Closes [#27](https://github.com/bgiesbrecht/tessera/issues/27).
+Live-verified against `acme.migration_demo`: all three deployed policies discovered and extracted with confidence ≥ 0.9. The adapter stays SDK-agnostic — caller supplies a `run_sql` callable via `config.extras["run_sql"]`. Closes [#27](https://github.com/bgiesbrecht/tessera/issues/27).
 
 **Platform-neutral `reconcile()` — `adapters/contract/reconcile.py`.**
 
@@ -108,7 +144,7 @@ The fourth ADR-024 responsibility, implemented as a default on `Adapter` so both
 
 Matching is by `(appliesTo.resource, action)` key, case-folded on the identifier portion of `prefix:id` strings. The diff compares only structural fields (`policyKind`, `action`, `defaultStrategy`, `rules`, `defaultBranch`) — descriptive fields (`@id`, `description`, `provenance`) are noise for reconcile purposes.
 
-Live-verified against `bg_rls_demo.migration_demo`: 0 additions, 0 removals, 3 modifications (the modifications reflect real differences between the source YAMLs and the migration-bindings-translated deployed form). Closes [#26](https://github.com/bgiesbrecht/tessera/issues/26).
+Live-verified against `acme.migration_demo`: 0 additions, 0 removals, 3 modifications (the modifications reflect real differences between the source YAMLs and the migration-bindings-translated deployed form). Closes [#26](https://github.com/bgiesbrecht/tessera/issues/26).
 
 ### Changed (documentation)
 
@@ -146,7 +182,7 @@ Five-commit increment focused on closing the migration cycle: `discover` and `ex
 - **UC byDataset row-visibility emission** — `_emit_row_visibility_by_dataset` produces the row-filter UDF body matching the hand-derived `spec/v0/examples/acl-row-visibility.databricks.sql`. `CREATE FUNCTION ... RETURN EXISTS (SELECT 1 FROM map JOIN acl ... WHERE m.user = current_user() AND p.col = <param>)` + `ALTER TABLE ... SET ROW FILTER`. Uses a fixed parameter alias (`policy_input_value`) to avoid the case-insensitive-identifier collision that would otherwise degenerate the predicate to `col = col` (always TRUE — the bug the second deploy uncovered).
 
 **Tooling.**
-- **`adapters/tests/live_snowflake_to_uc_migration.py`** — the first round-trip migration runner. Discovers the policies already deployed on `BRICETEST.TESSERA`, extracts to IR, emits UC DDL, deploys on `bg_rls_demo.tpch`, verifies behavior under the calling user.
+- **`adapters/tests/live_snowflake_to_uc_migration.py`** — the first round-trip migration runner. Discovers the policies already deployed on `ACME.TESSERA`, extracts to IR, emits UC DDL, deploys on `acme.tpch`, verifies behavior under the calling user.
 - **`adapters/tests/live_migration_demo.py`** — the repeatable, clean-schemas-both-sides migration demo. Eight phases from fresh-Snowflake-schema provisioning through Databricks verification, plus `--cleanup` to teardown. Idempotent; safe to re-run. The runnable answer to the "could we migrate Snowflake → UC by end of day" aspiration.
 
 **Documentation.**
@@ -170,9 +206,9 @@ The repeatable migration demo (`adapters/tests/live_migration_demo.py`) runs the
 
 | Policy | Target object | Visible result |
 |---|---|---|
-| Group row visibility | `bg_rls_demo.migration_demo.demo_orders` | 59,998 rows (priorities 3-MEDIUM / 4-NOT SPECIFIED / 5-LOW — third branch fires) |
-| byDataset row visibility | `bg_rls_demo.migration_demo.demo_orders_rls_acl` | 40,002 rows (priorities 1-URGENT + 2-HIGH — caller's ACL codenames) |
-| Column mask | `bg_rls_demo.migration_demo.demo_orders.o_clerk` | `'CLERK-REDACTED'` for all distinct values |
+| Group row visibility | `acme.migration_demo.demo_orders` | 59,998 rows (priorities 3-MEDIUM / 4-NOT SPECIFIED / 5-LOW — third branch fires) |
+| byDataset row visibility | `acme.migration_demo.demo_orders_rls_acl` | 40,002 rows (priorities 1-URGENT + 2-HIGH — caller's ACL codenames) |
+| Column mask | `acme.migration_demo.demo_orders.o_clerk` | `'CLERK-REDACTED'` for all distinct values |
 
 ### Issue tracker activity
 
@@ -199,9 +235,9 @@ Five-commit increment on top of 0.2.0. New tool (YAML → JSON-LD converter), th
 - `tools/converter/` — Python YAML → JSON-LD converter. v1 accepts both envelope-form (`policy: { id, kind, … }`) and flat-form YAML. Mechanical mapping (envelope unwrap, `id → @id` with `policy:` prefix, `kind → policyKind`, context-aware `type → @type`, canonical `@context` injection, trailing-whitespace normalization). CLI: `python -m tools.converter <file> [--out path]`. Library: `tools.converter.yaml_to_jsonld(path)` / `yaml_to_jsonld_str(text)` / `convert_file(in, out)`. Uses `ruamel.yaml` from the start so comment preservation (deferred to v2) is a one-step addition. Regression test covers all 11 worked-example YAMLs.
 
 **Adapter coverage.**
-- UC `ColumnVisibilityConstraint` emission — `CREATE OR REPLACE FUNCTION` returning the masked value, `GRANT EXECUTE` adapter scaffolding (per ADR-025 boundary), `ALTER TABLE … ALTER COLUMN … SET MASK`. Live-verified against `bg_rls_demo.tpch.orders.o_clerk`. Covers byIdentity column targets; Redact transformation; Mask/Hash emit `NULL` placeholders pending future scaffold passes.
-- UC ABAC byScope `RowVisibilityConstraint` emission — three-piece DDL: `CREATE FUNCTION` with Mechanism B CASE body, `GRANT EXECUTE`, `CREATE POLICY … ON CATALOG/SCHEMA/TABLE … ROW FILTER … FOR TABLES MATCH COLUMNS has_tag_value(<tag_key>, <tag_value>) AS alias USING COLUMNS (alias)`. Exercises `AdapterConfig.tag_taxonomy` (ADR-021). Live-verified against `bg_rls_demo.tpch.orders_abac`.
-- Snowflake `ColumnVisibilityConstraint` emission — `CREATE OR REPLACE MASKING POLICY … AS (col VARCHAR) RETURNS VARCHAR -> CASE … END` plus `ALTER TABLE … MODIFY COLUMN … SET MASKING POLICY`. Live-verified against `BRICETEST.TESSERA.SNOW_ORDERS.O_CLERK` with `USE SECONDARY ROLES NONE`; role-discrimination is Intent B (IS_ROLE_IN_SESSION) per Snowflake's recommendation and issue #14.
+- UC `ColumnVisibilityConstraint` emission — `CREATE OR REPLACE FUNCTION` returning the masked value, `GRANT EXECUTE` adapter scaffolding (per ADR-025 boundary), `ALTER TABLE … ALTER COLUMN … SET MASK`. Live-verified against `acme.tpch.orders.o_clerk`. Covers byIdentity column targets; Redact transformation; Mask/Hash emit `NULL` placeholders pending future scaffold passes.
+- UC ABAC byScope `RowVisibilityConstraint` emission — three-piece DDL: `CREATE FUNCTION` with Mechanism B CASE body, `GRANT EXECUTE`, `CREATE POLICY … ON CATALOG/SCHEMA/TABLE … ROW FILTER … FOR TABLES MATCH COLUMNS has_tag_value(<tag_key>, <tag_value>) AS alias USING COLUMNS (alias)`. Exercises `AdapterConfig.tag_taxonomy` (ADR-021). Live-verified against `acme.tpch.orders_abac`.
+- Snowflake `ColumnVisibilityConstraint` emission — `CREATE OR REPLACE MASKING POLICY … AS (col VARCHAR) RETURNS VARCHAR -> CASE … END` plus `ALTER TABLE … MODIFY COLUMN … SET MASKING POLICY`. Live-verified against `ACME.TESSERA.SNOW_ORDERS.O_CLERK` with `USE SECONDARY ROLES NONE`; role-discrimination is Intent B (IS_ROLE_IN_SESSION) per Snowflake's recommendation and issue #14.
 
 **Documentation.**
 - `docs/w3c-overview.md` — semantic-web-savvy overview of how the project uses OWL, JSON-LD 1.1, SHACL, SKOS, and the W3C stack. Shows the architecture honestly without overclaiming (no SPARQL in eval, no OWL DL reasoning, no formal vocabulary imports, no standards-body submission).
@@ -264,7 +300,7 @@ Substantial inflection: spec v0 reaches feature-complete-for-the-current-evidenc
 
 **Worked exercises (eight total, three added in this version).**
 - **Cross-platform live emission** — same IR (`group-row-visibility-policy-a`) lowered through both adapters; both row filters enforce correctly on Databricks (7.5M rows) and Snowflake (1.5M rows). Drove `AdapterConfig.resource_bindings` and the empirical reframing of Snowflake secondary-roles behavior.
-- **Snowflake `byDataset` row visibility** — `BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL`; four scenarios pass including secondary-roles immunity (`USE SECONDARY ROLES NONE` and `ALL` produce identical row counts because `CURRENT_USER()` ignores role activation). Surfaced one v1 candidate (#13).
+- **Snowflake `byDataset` row visibility** — `ACME.TESSERA.SNOW_ORDERS_RLS_ACL`; four scenarios pass including secondary-roles immunity (`USE SECONDARY ROLES NONE` and `ALL` produce identical row counts because `CURRENT_USER()` ignores role activation). Surfaced one v1 candidate (#13).
 - **Table-grants RBAC** — three scenarios (single-table read, schema-level read with propagation, function execute). Drove ADR-025 (`Execute`) and surfaced #15 (`AccessGrantConstraint` candidate). Closed #10 (policy-execute-grants).
 
 Previously committed exercise artifacts (group, ACL, column-mask, ABAC column-mask, ABAC row-filter) now live in `spec/v0/examples/` alongside the new ones.

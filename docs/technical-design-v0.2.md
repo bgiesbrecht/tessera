@@ -123,7 +123,7 @@ Resources carry zero or more **attribute assignments**, each on an independent s
 
 Each axis declares its structural type. Hierarchical axes' values participate in `rdfs:subClassOf` subsumption — `sensitivity: PIIEmail` implies `sensitivity: PII`. Flat axes' values are independent enumeration members; no subsumption is inferred.
 
-Adopters extend the axis set by declaring new `AttributeAxis` instances under their own namespace (e.g., `bg:rowDiscriminator`). Each adopter-declared axis declares its own structural type.
+Adopters extend the axis set by declaring new `AttributeAxis` instances under their own namespace (e.g., `acme:rowDiscriminator`). Each adopter-declared axis declares its own structural type.
 
 The existing `Classification` hierarchy is preserved as the value set of the `sensitivity` axis. Pre-ABAC references via the `byClassification` selector continue to validate; the post-ABAC canonical form references the value on the `sensitivity` axis.
 
@@ -228,36 +228,36 @@ policyKind: RowVisibilityConstraint
 # — the universal baseline group on Databricks.
 
 description: >
-  Members of bg_rls_demo_all_priority_ops see all rows; members of
-  bg_rls_demo_high_priority_ops see rows with high priority; all other
+  Members of acme_all_priority_ops see all rows; members of
+  acme_high_priority_ops see rows with high priority; all other
   principals (caught by the baseline `account users` rule) see rows
   with lower priority.
 
 appliesTo:
   selector: byIdentity
-  resource: table:bg_rls_demo.tpch.orders
+  resource: table:acme.tpch.orders
 
 action: Read
 defaultStrategy: explicit-baseline-group
 baselineGroup: "account users"
 
 rules:
-  - principal: { selector: byIdentity, resource: group:bg_rls_demo_all_priority_ops }
+  - principal: { selector: byIdentity, resource: group:acme_all_priority_ops }
     effect: keep-matching-rows
     # No condition — every row is kept for matching principals.
 
-  - principal: { selector: byIdentity, resource: group:bg_rls_demo_high_priority_ops }
+  - principal: { selector: byIdentity, resource: group:acme_high_priority_ops }
     effect: keep-matching-rows
     condition:
       op: in
-      operands: [column:bg_rls_demo.tpch.orders.o_orderpriority]
+      operands: [column:acme.tpch.orders.o_orderpriority]
       values: ["1-URGENT", "2-HIGH"]
 
   - principal: { selector: byIdentity, resource: group:account-users }
     effect: keep-matching-rows
     condition:
       op: in
-      operands: [column:bg_rls_demo.tpch.orders.o_orderpriority]
+      operands: [column:acme.tpch.orders.o_orderpriority]
       values: ["3-MEDIUM", "4-NOT SPECIFIED", "5-LOW"]
 
 provenance:
@@ -269,7 +269,7 @@ Notes on the shape:
 - `appliesTo`, `action`, `defaultStrategy`, and `baselineGroup` live on the Policy, not on individual rules.
 - Each rule is structurally slimmer than a freestanding constraint: just `principal`, optional `condition`, and `effect`.
 - The third rule's principal references the baseline group named in `baselineGroup`. The framework recognizes this as the default branch (per ADR-013 and ADR-014).
-- The rules are evaluated in order under first-match combining (§4.7 and ADR-015). A principal in both `bg_rls_demo_all_priority_ops` and `bg_rls_demo_high_priority_ops` matches the first rule (sees all rows); ordering determines the effect.
+- The rules are evaluated in order under first-match combining (§4.7 and ADR-015). A principal in both `acme_all_priority_ops` and `acme_high_priority_ops` matches the first rule (sees all rows); ordering determines the effect.
 
 The corresponding JSON-LD is the same structure with comments dropped or mapped to `rdfs:comment`. Adapters consume the JSON-LD; reviewers see the YAML.
 

@@ -25,12 +25,12 @@ from adapters.contract.types import AdapterConfig
 config = AdapterConfig(
     identity_bindings={
         # IR PrincipalRef IRI → platform principal identifier
-        'group:bg_rls_demo_high_priority_ops': 'bg_rls_demo_high_priority_ops',     # Databricks
+        'group:acme_high_priority_ops': 'acme_high_priority_ops',     # Databricks
         # … or per-platform variant on Snowflake
     },
     resource_bindings={
         # IR ResourceRef IRI → platform-qualified identifier
-        'table:bg_rls_demo.tpch.orders': 'BRICETEST.TESSERA.SNOW_ORDERS',
+        'table:acme.tpch.orders': 'ACME.TESSERA.SNOW_ORDERS',
     },
     tag_taxonomy={
         # (axis IRI, axis value) → (platform tag key, platform tag value)
@@ -56,7 +56,7 @@ Per ADR-021, the IR carries semantic intent (`sensitivity: PII`) and the adapter
 
 ### Identifier case in extracted IR
 
-When an adapter `extract()`s a deployed policy back into Tessera IR, the IR carries the source platform's identifier case **verbatim**. Snowflake folds to uppercase, so a Snowflake-extracted IR has `table:BRICETEST.TESSERA.SNOW_ORDERS`. Databricks is mixed-case, so a UC-extracted IR has `table:bg_rls_demo.tpch.orders`. The IR is lossless about what the source actually stored.
+When an adapter `extract()`s a deployed policy back into Tessera IR, the IR carries the source platform's identifier case **verbatim**. Snowflake folds to uppercase, so a Snowflake-extracted IR has `table:ACME.TESSERA.SNOW_ORDERS`. Databricks is mixed-case, so a UC-extracted IR has `table:acme.tpch.orders`. The IR is lossless about what the source actually stored.
 
 `AdapterConfig.bind_principal` and `bind_resource` are **case-insensitive on the identifier portion** after the IRI prefix to bridge the gap. The prefix (`table:`, `column:`, `group:`) is the semantic discriminator and stays case-sensitive; the identifier after the colon is matched case-folded. This means you can author bindings in whatever case is natural for the target platform — Databricks-mixed for UC targets, uppercase for Snowflake targets, lowercase for normalized records — and the lookup will find it regardless of the case the IR carries.
 
@@ -64,13 +64,13 @@ When an adapter `extract()`s a deployed policy back into Tessera IR, the IR carr
 config = AdapterConfig(
     resource_bindings={
         # Authored in target-platform case; matches IR identifiers regardless of source case.
-        "table:bg_rls_demo.migration_demo.demo_orders":
-            "bg_rls_demo.migration_demo.demo_orders",
+        "table:acme.migration_demo.demo_orders":
+            "acme.migration_demo.demo_orders",
     },
 )
 # Both lookups succeed:
-config.bind_resource("table:bg_rls_demo.migration_demo.demo_orders")             # exact
-config.bind_resource("table:BG_RLS_DEMO.MIGRATION_DEMO.DEMO_ORDERS")              # case-folded
+config.bind_resource("table:acme.migration_demo.demo_orders")             # exact
+config.bind_resource("table:ACME.MIGRATION_DEMO.DEMO_ORDERS")              # case-folded
 ```
 
 The convention going forward: **carry source case in the IR; rely on the binding-layer case-insensitivity for cross-platform lookups.** Don't pre-normalize identifiers during extraction (the source case is provenance information worth preserving). Issue [#29](https://github.com/bgiesbrecht/tessera/issues/29) tracks the design discussion that produced this convention.
@@ -153,7 +153,7 @@ Tessera principal IRIs (`group:foo`) lower to Unity Catalog **account-level grou
 
 ```python
 identity_bindings = {
-    'group:bg_rls_demo_all_priority_ops': 'bg_rls_demo_all_priority_ops',
+    'group:acme_all_priority_ops': 'acme_all_priority_ops',
     'group:account-users': 'account users',
 }
 ```
@@ -205,7 +205,7 @@ Snowflake roles, not groups. Roles are uppercase by convention; the adapter pass
 
 ```python
 identity_bindings = {
-    'group:bg_rls_demo_all_priority_ops': 'BG_RLS_DEMO_ALL_PRIORITY_OPS',
+    'group:acme_all_priority_ops': 'ACME_ALL_PRIORITY_OPS',
     'group:account-users': 'PUBLIC',
 }
 ```

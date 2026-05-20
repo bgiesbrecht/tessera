@@ -7,14 +7,14 @@
 
 **Inputs:** `docs/exercises/column-mask-orders-clerk-inputs.md`
 **Exercise mode:** Single-pass / combined-input. The existing implementation was shared by Brice up front; Phase 2 derivation and Phase 3 comparison collapsed into one cycle. The blind-derivation property of the canonical worked-example framework is intentionally relaxed for this run.
-**Existing implementation reference:** SQL pasted by Brice (chat context, 2026-05-18). The mechanism is the pre-ABAC `ALTER COLUMN ... SET MASK` form on `bg_rls_demo.tpch.orders.o_clerk`.
+**Existing implementation reference:** SQL pasted by Brice (chat context, 2026-05-18). The mechanism is the pre-ABAC `ALTER COLUMN ... SET MASK` form on `acme.tpch.orders.o_clerk`.
 
 ---
 
 ## 1. The existing implementation
 
 ```sql
-USE CATALOG bg_rls_demo;
+USE CATALOG acme;
 USE SCHEMA tpch;
 
 CREATE OR REPLACE FUNCTION tpch.mask_order_clerk(clerk STRING)
@@ -23,7 +23,7 @@ RETURN CASE
   ELSE 'CLERK-REDACTED'
 END;
 
-ALTER TABLE bg_rls_demo.tpch.orders
+ALTER TABLE acme.tpch.orders
 ALTER COLUMN o_clerk
 SET MASK tpch.mask_order_clerk;
 ```
@@ -45,7 +45,7 @@ The Tessera-derived masking function (`tessera__column_mask_orders_clerk__mask`)
 A live query against the protected table also confirmed the pass-through branch:
 
 ```sql
-SELECT o_orderkey, o_clerk, o_orderpriority FROM bg_rls_demo.tpch.orders LIMIT 5;
+SELECT o_orderkey, o_clerk, o_orderpriority FROM acme.tpch.orders LIMIT 5;
 -- Returned real clerk values (Clerk#000004689, Clerk#000001450, …), not 'CLERK-REDACTED'.
 ```
 
@@ -67,7 +67,7 @@ All observed cases fall into the "both implementations agree" category. No findi
 
 | Dimension | Existing implementation | Tessera-derived | Category |
 |---|---|---|---|
-| Function name | `tpch.mask_order_clerk` (qualified via USE) | `bg_rls_demo.tpch.tessera__column_mask_orders_clerk__mask` (fully qualified, deterministic) | **Accepted divergence** per inputs §6.2. |
+| Function name | `tpch.mask_order_clerk` (qualified via USE) | `acme.tpch.tessera__column_mask_orders_clerk__mask` (fully qualified, deterministic) | **Accepted divergence** per inputs §6.2. |
 | Parameter name | `clerk` | `o_clerk` | **Accepted divergence**. Both work — parameter names are local to the function body. |
 | `RETURNS STRING` declaration | Implicit (inferred from CASE branches) | Explicit | **Accepted divergence**. Behaviorally identical. |
 | `CASE` body | `WHEN is_account_group_member('orders_full_access') THEN clerk ELSE 'CLERK-REDACTED' END` | `WHEN is_account_group_member('orders_full_access') THEN o_clerk ELSE 'CLERK-REDACTED' END` | **Match** modulo parameter name. |
@@ -93,7 +93,7 @@ This is a Phase 2 finding (surfaced during derivation, not during comparison). T
 
 ### 3.4 What the existing implementation has that Tessera does not capture
 
-- **`USE CATALOG` / `USE SCHEMA` setup.** The existing SQL begins with `USE CATALOG bg_rls_demo; USE SCHEMA tpch;`, which is session-level configuration rather than policy content. Tessera correctly does not model this — fully qualified names in the emission make it unnecessary.
+- **`USE CATALOG` / `USE SCHEMA` setup.** The existing SQL begins with `USE CATALOG acme; USE SCHEMA tpch;`, which is session-level configuration rather than policy content. Tessera correctly does not model this — fully qualified names in the emission make it unnecessary.
 - **`SELECT` verification query.** The notebook's final cell is `SELECT o_orderkey, o_clerk, ... LIMIT 10` for manual verification. This is exercise scaffolding, not policy. Tessera's parallel is the (not-committed) verification script that would run the inputs §6.1 scenarios.
 
 ### 3.5 What Tessera has that the existing implementation does not capture
@@ -141,7 +141,7 @@ No new v1 candidates from this exercise. The existing #10 (`policy-execute-grant
 1. ✓ **Draft ADR-022** recording the schema-constraint correction. (Done 2026-05-18.)
 2. ✓ **Apply the schema and technical-design fixes** per §4.1 above. (Done.)
 3. ✓ **Re-validate** the exercise's YAML and JSON-LD after the fix; both passed cleanly along with the three prior exercises' artifacts.
-4. ✓ **Behaviorally verify** the column-mask SQL against `bg_rls_demo.tpch.orders.o_clerk`. Scenario 1 verified empirically (§2.1); Scenario 2 verified by construction (§2.2). Optional follow-on: empirical Scenario 2 with explicit group toggling and cache-lag measurement, if desired.
+4. ✓ **Behaviorally verify** the column-mask SQL against `acme.tpch.orders.o_clerk`. Scenario 1 verified empirically (§2.1); Scenario 2 verified by construction (§2.2). Optional follow-on: empirical Scenario 2 with explicit group toggling and cache-lag measurement, if desired.
 5. **(Optional) Deploy Tessera's mask function to the table.** Currently the existing `mask_order_clerk` remains attached; the Tessera function `tessera__column_mask_orders_clerk__mask` is defined in the workspace but not attached. Switching the table to Tessera's version is a one-line `ALTER TABLE … ALTER COLUMN … SET MASK …` statement. Not done by default because the structural and behavioral equivalence is already established and the existing mask is functionally correct.
 
 The exercise is complete pending any optional follow-on items in Actions 4 and 5.

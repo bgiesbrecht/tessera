@@ -4,10 +4,10 @@
   "@id": "policy:abac-column-mask-clerk-hash",
   "version": "1.0.0",
   "policyKind": "ColumnVisibilityConstraint",
-  "description": "ABAC column-mask policy attached at catalog scope. Matches the same PIIClerk-tagged columns as Policy A; replaces values with their SHA-256 hash for principals outside bg_rls_demo_all_priority_ops.",
+  "description": "ABAC column-mask policy attached at catalog scope. Matches the same PIIClerk-tagged columns as Policy A; replaces values with their SHA-256 hash for principals outside acme_all_priority_ops.",
   "appliesTo": {
     "selector": "byScope",
-    "scope": "catalog:bg_rls_demo",
+    "scope": "catalog:acme",
     "matching": {
       "attributes": {
         "sensitivity": "PIIClerk"
@@ -20,7 +20,7 @@
     {
       "principal": {
         "selector": "byIdentity",
-        "resource": "group:bg_rls_demo_all_priority_ops"
+        "resource": "group:acme_all_priority_ops"
       },
       "effect": "allow"
     }

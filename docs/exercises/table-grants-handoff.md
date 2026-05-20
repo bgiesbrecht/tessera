@@ -25,8 +25,8 @@ This framing was sharpened in conversation 2026-05-19; the exercise's value is n
 **Business intent.** "The marketing analytics team needs to query our customer orders table for reporting. They should be able to read it but not modify it."
 
 **Testable particulars.**
-- Resource: `bg_rls_demo.tpch.orders`
-- Principal: `bg_rls_demo_marketing_analytics` (account-level group; substituted as convenient for testing)
+- Resource: `acme.tpch.orders`
+- Principal: `acme_marketing_analytics` (account-level group; substituted as convenient for testing)
 - Action: `Read`
 - Effect: `allow`
 - Default for non-members: not specified; the grant is purely affirmative. Principals not in the group fall through to whatever other policies or defaults apply.
@@ -44,8 +44,8 @@ This framing was sharpened in conversation 2026-05-19; the exercise's value is n
 **Business intent.** "The data engineering team needs read access to every table in our staging schema, including tables that will be added later. We don't want to enumerate tables or update the grant every time a new table appears."
 
 **Testable particulars.**
-- Resource scope: schema `bg_rls_demo.tpch_staging` (substituted as convenient).
-- Principal: `bg_rls_demo_data_engineering`
+- Resource scope: schema `acme.tpch_staging` (substituted as convenient).
+- Principal: `acme_data_engineering`
 - Action: `Read`
 - Effect: `allow`
 - Downward propagation: the grant applies to all current and future tables in the schema. The Tessera framing of this is via `byScope` at schema level.
@@ -60,8 +60,8 @@ This framing was sharpened in conversation 2026-05-19; the exercise's value is n
 **Business intent.** "We've defined a function that computes customer lifetime value. Analysts in the marketing analytics team should be able to call this function in their queries; nobody else should be able to invoke it."
 
 **Testable particulars.**
-- Resource: a function `bg_rls_demo.tpch.compute_customer_ltv` (defined as a no-op in setup).
-- Principal: `bg_rls_demo_marketing_analytics`
+- Resource: a function `acme.tpch.compute_customer_ltv` (defined as a no-op in setup).
+- Principal: `acme_marketing_analytics`
 - Action: `Execute`
 - Effect: `allow`
 
@@ -76,8 +76,8 @@ This framing was sharpened in conversation 2026-05-19; the exercise's value is n
 
 The annotation legend in claude.ai's draft is resolved as follows:
 
-- **Group names.** Use `bg_rls_demo_marketing_analytics` and `bg_rls_demo_data_engineering` for testing. Names don't matter for documentation; if testing prefers different names (existing groups), substitute freely. Document choices in the setup script.
-- **Schema for Scenario B.** Use `bg_rls_demo.tpch_staging` (new; created in setup).
+- **Group names.** Use `acme_marketing_analytics` and `acme_data_engineering` for testing. Names don't matter for documentation; if testing prefers different names (existing groups), substitute freely. Document choices in the setup script.
+- **Schema for Scenario B.** Use `acme.tpch_staging` (new; created in setup).
 - **Function for Scenario C.** No-op SQL UDF: `RETURN 0` against an integer argument. Real computation isn't needed for behavioral verification.
 
 Two design questions, resolved:
@@ -119,19 +119,19 @@ After the Phase 2 artifacts are committed:
 
 For Scenario A (single table grant):
 
-1. Brice in `bg_rls_demo_marketing_analytics`, queries `SELECT * FROM bg_rls_demo.tpch.orders` — should succeed.
+1. Brice in `acme_marketing_analytics`, queries `SELECT * FROM acme.tpch.orders` — should succeed.
 2. Brice not in that group, queries the same — should fail (assuming no other policy grants access).
-3. Brice in the group attempts `UPDATE bg_rls_demo.tpch.orders SET ... WHERE ...` — should fail (only Read is granted).
+3. Brice in the group attempts `UPDATE acme.tpch.orders SET ... WHERE ...` — should fail (only Read is granted).
 
 For Scenario B (schema-level grant with propagation):
 
-1. Brice in `bg_rls_demo_data_engineering`, queries any existing table in `bg_rls_demo.tpch_staging` — should succeed.
+1. Brice in `acme_data_engineering`, queries any existing table in `acme.tpch_staging` — should succeed.
 2. Brice not in that group, queries the same — should fail.
 3. **The propagation test.** Create a new table in the schema after the policy is applied. Brice in the group queries it — should succeed without any additional grant.
 
 For Scenario C (function execute):
 
-1. Brice in `bg_rls_demo_marketing_analytics`, calls `SELECT bg_rls_demo.tpch.compute_customer_ltv(123)` — should succeed.
+1. Brice in `acme_marketing_analytics`, calls `SELECT acme.tpch.compute_customer_ltv(123)` — should succeed.
 2. Brice not in that group, calls the same — should fail.
 3. Brice in the group attempts to redefine or drop the function — should fail (only Execute is granted).
 
@@ -142,8 +142,8 @@ For Scenario C (function execute):
 The setup script will idempotently:
 
 - Create the groups at the account level (if Brice authorizes account-level group changes; otherwise the script provisions them as workspace-level).
-- Create the schema `bg_rls_demo.tpch_staging` with at least one initial table.
-- Create the function `bg_rls_demo.tpch.compute_customer_ltv` as a no-op SQL UDF.
+- Create the schema `acme.tpch_staging` with at least one initial table.
+- Create the function `acme.tpch.compute_customer_ltv` as a no-op SQL UDF.
 - Print group memberships needed for the three scenarios; Brice toggles membership manually (the cached membership propagation lag of 2–4 minutes documented in technical-design §5.2 applies).
 
 These prerequisites are not blockers for Phase 2 (Claude Code derives the Tessera artifacts without them existing).

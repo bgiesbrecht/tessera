@@ -86,12 +86,12 @@ The verification numbers from a real run on real workspaces:
 
 | Policy | Surface after migration | Caller-visible result |
 |---|---|---|
-| Group row visibility (3-branch CASE) | `bg_rls_demo.migration_demo.demo_orders` | 59,998 rows visible (priorities 3-MEDIUM / 4-NOT SPECIFIED / 5-LOW — the third branch fires because the caller is in `account users` only) |
-| byDataset row visibility (mapping-table EXISTS) | `bg_rls_demo.migration_demo.demo_orders_rls_acl` | 40,002 rows visible (priorities 1-URGENT + 2-HIGH — the caller's ACL codenames) |
-| Column mask (Redact, group exception) | `bg_rls_demo.migration_demo.demo_orders.o_clerk` | `'CLERK-REDACTED'` for every distinct value |
-| Table grant (SELECT) | `bg_rls_demo.migration_demo.demo_orders` | Three explicit grants visible via `SHOW GRANTS` |
-| Schema grant (fans out to per-table) | `bg_rls_demo.migration_demo_staging.staged_orders` | `SELECT` grant visible (the schema-level intent landed as a per-table grant on Databricks) |
-| Function grant (EXECUTE) | `bg_rls_demo.migration_demo.compute_customer_ltv` | `EXECUTE` grant visible |
+| Group row visibility (3-branch CASE) | `acme.migration_demo.demo_orders` | 59,998 rows visible (priorities 3-MEDIUM / 4-NOT SPECIFIED / 5-LOW — the third branch fires because the caller is in `account users` only) |
+| byDataset row visibility (mapping-table EXISTS) | `acme.migration_demo.demo_orders_rls_acl` | 40,002 rows visible (priorities 1-URGENT + 2-HIGH — the caller's ACL codenames) |
+| Column mask (Redact, group exception) | `acme.migration_demo.demo_orders.o_clerk` | `'CLERK-REDACTED'` for every distinct value |
+| Table grant (SELECT) | `acme.migration_demo.demo_orders` | Three explicit grants visible via `SHOW GRANTS` |
+| Schema grant (fans out to per-table) | `acme.migration_demo_staging.staged_orders` | `SELECT` grant visible (the schema-level intent landed as a per-table grant on Databricks) |
+| Function grant (EXECUTE) | `acme.migration_demo.compute_customer_ltv` | `EXECUTE` grant visible |
 
 All six policies enforcing. Bidirectional cycle. Run it yourself: the scripts are idempotent and ship with a `--cleanup` flag.
 

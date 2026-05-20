@@ -28,9 +28,9 @@ The exercise surfaced three real gaps in the v0 IR. They are described in §4. N
 
 | Policy element | Category | Notes |
 |---|---|---|
-| Resource binding (`bg_rls_demo.tpch.orders`) | **Fully enforced** | The `ALTER TABLE … SET ROW FILTER` statement attaches the function to the protected table. |
-| Restrictive group: `bg_rls_demo_all_priority_ops` | **Fully enforced** | `is_account_group_member('bg_rls_demo_all_priority_ops')` returns `TRUE` for all rows when matched. |
-| Restrictive group: `bg_rls_demo_high_priority_ops` | **Fully enforced** | Row filter narrows to `o_orderpriority IN ('1-URGENT', '2-HIGH')` when matched. |
+| Resource binding (`acme.tpch.orders`) | **Fully enforced** | The `ALTER TABLE … SET ROW FILTER` statement attaches the function to the protected table. |
+| Restrictive group: `acme_all_priority_ops` | **Fully enforced** | `is_account_group_member('acme_all_priority_ops')` returns `TRUE` for all rows when matched. |
+| Restrictive group: `acme_high_priority_ops` | **Fully enforced** | Row filter narrows to `o_orderpriority IN ('1-URGENT', '2-HIGH')` when matched. |
 | Default branch — Policy A (`account users` baseline) | **Fully enforced** | Explicit `WHEN is_account_group_member('account users')` branch; trailing `ELSE FALSE` fail-closes for principals not even in the universal group (defense in depth). |
 | Default branch — Policy B (negated complement) | **Fully enforced** | Trailing `ELSE` branch handles principals matching neither restrictive group. |
 | `defaultStrategy` semantic distinction | **Fully enforced** (at SQL emission) | Policy A and Policy B emit structurally different SQL (extra `WHEN` vs. `ELSE`) reflecting the intent difference declared in the IR. The audit-semantics benefit of `explicit-baseline-group` (per ADR-013) is preserved by the explicit `account users` branch being present in Policy A's SQL. |
@@ -106,8 +106,8 @@ Inputs §7.3 explicitly notes that the readable `CASE`/`WHEN`/`ELSE` form is a D
 A naive Tessera adapter that emitted each rule in isolation would produce three `WHEN` branches, the third of which would be:
 
 ```sql
-WHEN NOT is_account_group_member('bg_rls_demo_all_priority_ops')
- AND NOT is_account_group_member('bg_rls_demo_high_priority_ops')
+WHEN NOT is_account_group_member('acme_all_priority_ops')
+ AND NOT is_account_group_member('acme_high_priority_ops')
 THEN o_orderpriority IN ('3-MEDIUM', '4-NOT SPECIFIED', '5-LOW')
 ```
 

@@ -9,8 +9,8 @@
 # Inputs: docs/exercises/abac-row-filter-priority-inputs.md
 #
 # Three-branch row visibility driven by ABAC tag-matching:
-#   1. Members of bg_rls_demo_all_priority_ops see all rows.
-#   2. Members of bg_rls_demo_high_priority_ops see rows with priority 1, 2.
+#   1. Members of acme_all_priority_ops see all rows.
+#   2. Members of acme_high_priority_ops see rows with priority 1, 2.
 #   3. Everyone else (the default branch) sees rows with priority 3, 4, 5.
 #
 # defaultStrategy is negated-complement: principals matching neither
@@ -22,7 +22,7 @@
 #     is used as if ADRs 018–021's spec changes were in place. Stage 4
 #     hasn't landed yet; this artifact will NOT validate against the
 #     current schema.json.
-#   - The matching axis `bg:rowDiscriminator` is an adopter-namespaced
+#   - The matching axis `acme:rowDiscriminator` is an adopter-namespaced
 #     axis declared specifically for this exercise. v0's four
 #     well-known axes (sensitivity, dataSubject, regulatoryRegime,
 #     businessDomain) don't fit "row-classification-key column." The
@@ -38,18 +38,18 @@
 version: 1.0.0
 policyKind: RowVisibilityConstraint
 description: >
-  Three-branch row visibility on tables in bg_rls_demo whose
+  Three-branch row visibility on tables in acme whose
   o_orderpriority column is tagged for ABAC row filtering. Members of
-  bg_rls_demo_all_priority_ops see all rows; members of
-  bg_rls_demo_high_priority_ops see priority 1-URGENT and 2-HIGH only;
+  acme_all_priority_ops see all rows; members of
+  acme_high_priority_ops see priority 1-URGENT and 2-HIGH only;
   everyone else sees priority 3-MEDIUM, 4-NOT SPECIFIED, 5-LOW.
 
 appliesTo:
   selector: byScope
-  scope: catalog:bg_rls_demo
+  scope: catalog:acme
   matching:
     attributes:
-      bg:rowDiscriminator: orderpriority
+      acme:rowDiscriminator: orderpriority
 
 action: Read
 
@@ -63,14 +63,14 @@ rules:
   # Rule 1 — all_priority_ops sees every row.
   - principal:
       selector: byIdentity
-      resource: group:bg_rls_demo_all_priority_ops
+      resource: group:acme_all_priority_ops
     effect: keep-matching-rows
     # No condition — every row is kept for matching principals.
 
   # Rule 2 — high_priority_ops sees the high-priority rows only.
   - principal:
       selector: byIdentity
-      resource: group:bg_rls_demo_high_priority_ops
+      resource: group:acme_high_priority_ops
     effect: keep-matching-rows
     condition:
       op: in

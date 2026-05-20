@@ -22,7 +22,7 @@ This is the `group-row-visibility-policy-a` worked example. All file paths in th
 
 Plain English, no platform vocabulary:
 
-> Members of `bg_rls_demo_all_priority_ops` see all order rows. Members of `bg_rls_demo_high_priority_ops` see only orders with priority `1-URGENT` or `2-HIGH`. Everyone else (the catch-all `account-users` group on Databricks; `PUBLIC` on Snowflake) sees only orders with priority `3-MEDIUM`, `4-NOT SPECIFIED`, or `5-LOW`. A user belonging to none of these groups sees nothing.
+> Members of `acme_all_priority_ops` see all order rows. Members of `acme_high_priority_ops` see only orders with priority `1-URGENT` or `2-HIGH`. Everyone else (the catch-all `account-users` group on Databricks; `PUBLIC` on Snowflake) sees only orders with priority `3-MEDIUM`, `4-NOT SPECIFIED`, or `5-LOW`. A user belonging to none of these groups sees nothing.
 
 The IR's job is to express this intent **once**, in a form that lowers to platform-native enforcement on Databricks (a row filter on the table) and on Snowflake (a row-access policy on the table). The platforms don't need to know each other's vocabulary; the adapter does the translation.
 
@@ -40,7 +40,7 @@ policy:
 
   appliesTo:                              # Which resource the policy is attached to
     selector: byIdentity
-    resource: table:bg_rls_demo.tpch.orders
+    resource: table:acme.tpch.orders
 
   action: Read                            # The action being governed (Read, Write, Delete, …)
 
@@ -49,15 +49,15 @@ policy:
   rules:
     - principal:                          # Who this rule applies to
         selector: byIdentity
-        resource: group:bg_rls_demo_all_priority_ops
+        resource: group:acme_all_priority_ops
       effect: keep-matching-rows          # No condition ⇒ keep all rows for this principal
 
     - principal:
         selector: byIdentity
-        resource: group:bg_rls_demo_high_priority_ops
+        resource: group:acme_high_priority_ops
       condition:
         op: in
-        operands: [column:bg_rls_demo.tpch.orders.o_orderpriority]
+        operands: [column:acme.tpch.orders.o_orderpriority]
         values: ['1-URGENT', '2-HIGH']
       effect: keep-matching-rows
 
@@ -66,7 +66,7 @@ policy:
         resource: group:account-users
       condition:
         op: in
-        operands: [column:bg_rls_demo.tpch.orders.o_orderpriority]
+        operands: [column:acme.tpch.orders.o_orderpriority]
         values: ['3-MEDIUM', '4-NOT SPECIFIED', '5-LOW']
       effect: keep-matching-rows
 ```
@@ -143,13 +143,13 @@ from adapters.contract.types import AdapterConfig
 config = AdapterConfig(
     identity_bindings={
         # IR PrincipalRef IRI → platform principal identifier
-        'group:bg_rls_demo_all_priority_ops': 'bg_rls_demo_all_priority_ops',
-        'group:bg_rls_demo_high_priority_ops': 'bg_rls_demo_high_priority_ops',
+        'group:acme_all_priority_ops': 'acme_all_priority_ops',
+        'group:acme_high_priority_ops': 'acme_high_priority_ops',
         'group:account-users': 'account users',
     },
     resource_bindings={
         # IR ResourceRef IRI → platform-qualified table identifier
-        'table:bg_rls_demo.tpch.orders': 'bg_rls_demo.tpch.orders',
+        'table:acme.tpch.orders': 'acme.tpch.orders',
     },
 )
 ```
@@ -176,18 +176,18 @@ for stmt in result.statements:
 For this policy, the adapter emits:
 
 ```sql
-CREATE OR REPLACE FUNCTION bg_rls_demo.tpch.orders__group_row_visibility_policy_a_filter(
+CREATE OR REPLACE FUNCTION acme.tpch.orders__group_row_visibility_policy_a_filter(
   o_orderpriority STRING
 ) RETURNS BOOLEAN
 RETURN
-        is_account_group_member('bg_rls_demo_all_priority_ops')
-        OR (is_account_group_member('bg_rls_demo_high_priority_ops')
+        is_account_group_member('acme_all_priority_ops')
+        OR (is_account_group_member('acme_high_priority_ops')
             AND o_orderpriority IN ('1-URGENT', '2-HIGH'))
         OR (is_account_group_member('account users')
             AND o_orderpriority IN ('3-MEDIUM', '4-NOT SPECIFIED', '5-LOW'));
 
-ALTER TABLE bg_rls_demo.tpch.orders
-  SET ROW FILTER bg_rls_demo.tpch.orders__group_row_visibility_policy_a_filter
+ALTER TABLE acme.tpch.orders
+  SET ROW FILTER acme.tpch.orders__group_row_visibility_policy_a_filter
   ON (o_orderpriority);
 ```
 
@@ -222,12 +222,12 @@ from adapters.snowflake import SnowflakeAdapter
 
 snowflake_config = AdapterConfig(
     identity_bindings={
-        'group:bg_rls_demo_all_priority_ops': 'BG_RLS_DEMO_ALL_PRIORITY_OPS',
-        'group:bg_rls_demo_high_priority_ops': 'BG_RLS_DEMO_HIGH_PRIORITY_OPS',
+        'group:acme_all_priority_ops': 'ACME_ALL_PRIORITY_OPS',
+        'group:acme_high_priority_ops': 'ACME_HIGH_PRIORITY_OPS',
         'group:account-users': 'PUBLIC',
     },
     resource_bindings={
-        'table:bg_rls_demo.tpch.orders': 'BRICETEST.TESSERA.SNOW_ORDERS',
+        'table:acme.tpch.orders': 'ACME.TESSERA.SNOW_ORDERS',
     },
 )
 result = SnowflakeAdapter(config=snowflake_config).emit(policy)
@@ -236,16 +236,16 @@ result = SnowflakeAdapter(config=snowflake_config).emit(policy)
 The Snowflake adapter emits:
 
 ```sql
-CREATE OR REPLACE ROW ACCESS POLICY BRICETEST.TESSERA.group_row_visibility_policy_a_rap
+CREATE OR REPLACE ROW ACCESS POLICY ACME.TESSERA.group_row_visibility_policy_a_rap
 AS (o_orderpriority VARCHAR) RETURNS BOOLEAN ->
-        IS_ROLE_IN_SESSION('BG_RLS_DEMO_ALL_PRIORITY_OPS')
-        OR (IS_ROLE_IN_SESSION('BG_RLS_DEMO_HIGH_PRIORITY_OPS')
+        IS_ROLE_IN_SESSION('ACME_ALL_PRIORITY_OPS')
+        OR (IS_ROLE_IN_SESSION('ACME_HIGH_PRIORITY_OPS')
             AND o_orderpriority IN ('1-URGENT', '2-HIGH'))
         OR (IS_ROLE_IN_SESSION('PUBLIC')
             AND o_orderpriority IN ('3-MEDIUM', '4-NOT SPECIFIED', '5-LOW'));
 
-ALTER TABLE BRICETEST.TESSERA.SNOW_ORDERS
-  ADD ROW ACCESS POLICY BRICETEST.TESSERA.group_row_visibility_policy_a_rap
+ALTER TABLE ACME.TESSERA.SNOW_ORDERS
+  ADD ROW ACCESS POLICY ACME.TESSERA.group_row_visibility_policy_a_rap
   ON (o_orderpriority);
 ```
 
@@ -262,7 +262,7 @@ Same IR; platform-divergent DDL. Note the differences:
 import snowflake.connector
 conn = snowflake.connector.connect(
     account='YOUR_ACCOUNT', user='YOUR_USER', password='...',
-    warehouse='COMPUTE_WH', database='BRICETEST', schema='TESSERA',
+    warehouse='COMPUTE_WH', database='ACME', schema='TESSERA',
 )
 cur = conn.cursor()
 for stmt in result.statements:
@@ -285,14 +285,14 @@ rules:
       selector: byDataset
       dataset:
         type: PrincipalSetFromTable
-        table: BRICETEST.TESSERA.RLS_ACL_MAPPING
+        table: ACME.TESSERA.RLS_ACL_MAPPING
         principalColumn: USERNAME
         resourceColumn: CODE_NAME
     condition:
       op: exists-in-dataset
       operands:
         - type: ResourceSetFromTable
-          table: BRICETEST.TESSERA.RLS_PRIORITY_ACL
+          table: ACME.TESSERA.RLS_PRIORITY_ACL
           principalColumn: CODE_NAME
           resourceColumn: O_ORDERPRIORITY
     effect: keep-matching-rows
@@ -305,15 +305,15 @@ CREATE OR REPLACE ROW ACCESS POLICY ...
 AS (POLICY_INPUT_VALUE VARCHAR) RETURNS BOOLEAN ->
         EXISTS (
             SELECT 1
-            FROM BRICETEST.TESSERA.RLS_ACL_MAPPING m
-            JOIN BRICETEST.TESSERA.RLS_PRIORITY_ACL p
+            FROM ACME.TESSERA.RLS_ACL_MAPPING m
+            JOIN ACME.TESSERA.RLS_PRIORITY_ACL p
               ON m.CODE_NAME = p.CODE_NAME
             WHERE m.USERNAME = CURRENT_USER()
               AND p.O_ORDERPRIORITY = POLICY_INPUT_VALUE
         );
 ```
 
-**This pattern was empirically verified** on 2026-05-19 against `BRICETEST.TESSERA`. The full exercise (Phase 1 brief, Phase 2 IR + adapter emission, Phase 3 live verification) is at `docs/exercises/snowflake-byDataset-row-visibility-inputs.md` and `spec/v0/examples/snowflake-byDataset-row-visibility.diagnostic.md`. The key verification: row counts under `USE SECONDARY ROLES NONE` and `USE SECONDARY ROLES ALL` are identical, because `CURRENT_USER()` ignores role activation. See [`authoring.md`](./authoring.md) for when to use `byDataset` vs `byIdentity`.
+**This pattern was empirically verified** on 2026-05-19 against `ACME.TESSERA`. The full exercise (Phase 1 brief, Phase 2 IR + adapter emission, Phase 3 live verification) is at `docs/exercises/snowflake-byDataset-row-visibility-inputs.md` and `spec/v0/examples/snowflake-byDataset-row-visibility.diagnostic.md`. The key verification: row counts under `USE SECONDARY ROLES NONE` and `USE SECONDARY ROLES ALL` are identical, because `CURRENT_USER()` ignores role activation. See [`authoring.md`](./authoring.md) for when to use `byDataset` vs `byIdentity`.
 
 ---
 

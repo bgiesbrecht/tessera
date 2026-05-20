@@ -25,22 +25,22 @@ The existing-implementation structural comparison (§3) is still pending Brice's
 
 ### 2.1 Test scenarios — results
 
-Verified 2026-05-19 against `bg_rls_demo.tpch.orders_abac` on `adb-984752964297111.azuredatabricks.net` (Azure). Brice was **not** in `bg_rls_demo_all_priority_ops` during all runs — i.e., we ran Scenario 2 (the load-bearing one) directly without needing Scenario 1 first.
+Verified 2026-05-19 against `acme.tpch.orders_abac` on `adb-984752964297111.azuredatabricks.net` (Azure). Brice was **not** in `acme_all_priority_ops` during all runs — i.e., we ran Scenario 2 (the load-bearing one) directly without needing Scenario 1 first.
 
 | Scenario | Setup | Observed |
 |---|---|---|
 | 2a — Policy A only | Brice not in privileged group; only Policy A (Redact) attached at catalog scope | `o_clerk` returned `'CLERK-REDACTED'`. Single-policy redaction works. ✓ |
-| 2b — Both policies attached | Brice not in privileged group; both Policy A and Policy B attached at catalog scope | Both policies attached successfully (`SHOW POLICIES ON CATALOG bg_rls_demo` listed both). **`SELECT o_clerk` failed with `COLUMN_MASKS_FEATURE_NOT_SUPPORTED.MULTIPLE_MASKS`.** Databricks ABAC rejects the multi-mask evaluation. |
+| 2b — Both policies attached | Brice not in privileged group; both Policy A and Policy B attached at catalog scope | Both policies attached successfully (`SHOW POLICIES ON CATALOG acme` listed both). **`SELECT o_clerk` failed with `COLUMN_MASKS_FEATURE_NOT_SUPPORTED.MULTIPLE_MASKS`.** Databricks ABAC rejects the multi-mask evaluation. |
 
 The verbatim error from Scenario 2b:
 
 ```
 [COLUMN_MASKS_FEATURE_NOT_SUPPORTED.MULTIPLE_MASKS]
-Column mask policies for `bg_rls_demo`.`tpch`.`orders_abac` are not supported:
-Table `bg_rls_demo`.`tpch`.`orders_abac` has access control policies resulting in
+Column mask policies for `acme`.`tpch`.`orders_abac` are not supported:
+Table `acme`.`tpch`.`orders_abac` has access control policies resulting in
 multiple column masks
-  `ColumnMask(o_clerk, List(bg_rls_demo, tpch, tessera__abac_column_mask_clerk_redact__mask), Vector())`,
-  `ColumnMask(o_clerk, List(bg_rls_demo, tpch, tessera__abac_column_mask_clerk_hash__mask), Vector())`
+  `ColumnMask(o_clerk, List(acme, tpch, tessera__abac_column_mask_clerk_redact__mask), Vector())`,
+  `ColumnMask(o_clerk, List(acme, tpch, tessera__abac_column_mask_clerk_hash__mask), Vector())`
 applying to the same column(s) `o_clerk`. Please contact the table owner or policy
 definer to resolve the issue by updating policies such that at most one mask appl[ies]
 ```
@@ -65,11 +65,11 @@ The right framing in Tessera terms: the IR remains expressive enough to declare 
 
 Performed in a single SDK script that:
 
-1. Pre-checked Brice's group membership via `is_account_group_member('bg_rls_demo_all_priority_ops')` — returned `false`, i.e., Scenario 2 state.
+1. Pre-checked Brice's group membership via `is_account_group_member('acme_all_priority_ops')` — returned `false`, i.e., Scenario 2 state.
 2. Deployed both UDFs and granted `EXECUTE` to `account users`.
 3. Attached Policy A (Redact) at catalog scope. Queried `o_clerk` → returned `'CLERK-REDACTED'`. Single-policy result confirmed.
 4. Attached Policy B (Hash) at catalog scope. Queried `o_clerk` → `MULTIPLE_MASKS` error.
-5. Verified both policies attached via `SHOW POLICIES ON CATALOG bg_rls_demo`.
+5. Verified both policies attached via `SHOW POLICIES ON CATALOG acme`.
 6. Dropped Policy B. Re-queried `o_clerk` → returned `'CLERK-REDACTED'` again. Recovery confirmed.
 
 A reverse-order test (Policy B first, then Policy A) is not needed — the rejection is symmetric and order-independent because both policies are equally "in conflict" once both are attached.
@@ -102,11 +102,11 @@ The Tessera derivation chose Mechanism A. The match against Brice's primary reco
 | UDF body | `RETURN 'CLERK-REDACTED'` (unconditional literal) | Same | **Match.** Both Mechanism-A-flavored: the principal logic lives in the policy header, not the UDF. |
 | `RETURNS STRING` declaration | Explicit | Explicit | **Match.** |
 | Policy name | `orders_clerk_mask` | `tessera__abac_column_mask_clerk_redact` | **Accepted divergence.** |
-| Policy attachment scope | `ON SCHEMA bg_rls_demo.tpch` | `ON CATALOG bg_rls_demo` | **Real divergence.** See §3.4. |
+| Policy attachment scope | `ON SCHEMA acme.tpch` | `ON CATALOG acme` | **Real divergence.** See §3.4. |
 | `COMMENT` | Yes (`'ABAC column mask for TPCH orders clerk'`) | Yes (`'Tessera ABAC column mask — policy:abac-column-mask-clerk-redact'`) | **Match on form**, content differs (Tessera form encodes policy ID). |
 | `COLUMN MASK function_name` | Same | Same | **Match.** |
 | `TO account users` | Same | Same | **Match.** |
-| `EXCEPT bg_rls_demo_all_priority_ops` | Same | Same | **Match.** |
+| `EXCEPT acme_all_priority_ops` | Same | Same | **Match.** |
 | `FOR TABLES` | Same | Same | **Match.** |
 | `MATCH COLUMNS has_tag_value('abac_column', 'clerk') AS alias` | Same (`AS clerk_col`) | Same (`AS pii_clerk_col`) | **Match** on form; alias name differs (Tessera form encodes the semantic axis). |
 | `ON COLUMN alias` | Same | Same | **Match.** |
@@ -144,7 +144,7 @@ If a future exercise surfaces a case where Mechanism B is necessary (e.g., a fou
 Brice's existing impl includes:
 
 ```sql
-GRANT SELECT ON TABLE bg_rls_demo.tpch.orders_abac TO `account users`;
+GRANT SELECT ON TABLE acme.tpch.orders_abac TO `account users`;
 ```
 
 with the comment *"ABAC restricts or masks data; it does not grant base access."*
@@ -163,14 +163,14 @@ The `GRANT EXECUTE ON FUNCTION` finding (issue #10) is similar in shape — both
 
 ### 3.4 Scope choice: schema vs. catalog
 
-Brice attached at `ON SCHEMA bg_rls_demo.tpch`. The Tessera derivation attached at `ON CATALOG bg_rls_demo`. Both work because the only tagged column in the catalog right now is `o_clerk` on `orders_abac` (which lives in the `tpch` schema); whichever scope is narrower than or equal to the resource's actual location is correct.
+Brice attached at `ON SCHEMA acme.tpch`. The Tessera derivation attached at `ON CATALOG acme`. Both work because the only tagged column in the catalog right now is `o_clerk` on `orders_abac` (which lives in the `tpch` schema); whichever scope is narrower than or equal to the resource's actual location is correct.
 
 **The choice reflects intent:**
 
 - Schema scope (Brice's choice): "This policy is for the TPCH demo data; not intended to leak into other schemas if they're added later."
-- Catalog scope (Tessera's choice): "This policy applies to anywhere in `bg_rls_demo` where columns are tagged `abac_column=clerk`."
+- Catalog scope (Tessera's choice): "This policy applies to anywhere in `acme` where columns are tagged `abac_column=clerk`."
 
-Both are legitimate readings of the inputs §3 framing. The Phase 1 inputs §0.3 and §4.1 specified catalog scope ("`scope: catalog:bg_rls_demo`") — the Tessera derivation followed the spec. Brice's existing impl chose schema scope, perhaps reflecting a tighter intent than the inputs captured.
+Both are legitimate readings of the inputs §3 framing. The Phase 1 inputs §0.3 and §4.1 specified catalog scope ("`scope: catalog:acme`") — the Tessera derivation followed the spec. Brice's existing impl chose schema scope, perhaps reflecting a tighter intent than the inputs captured.
 
 **Finding (mild):** ADR-019's `byScope` framing supports all of `catalog:`, `schema:`, `table:`, `column:`. The Phase 1 inputs picked one without justifying the choice. A real Tessera policy author would presumably pick the narrowest scope that captures the intent; the inputs document should probably guide that choice in the inputs template for future exercises. Not a v0 spec finding; just a documentation-quality note.
 

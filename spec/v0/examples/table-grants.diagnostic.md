@@ -14,20 +14,20 @@ All three IR shapes validate cleanly against `schema.json` and `shapes.ttl` post
 
 ## 2. Live verification (Phase 3)
 
-Live-executed against `bg_rls_demo` on workspace `adb-984752964297111` on 2026-05-19. Group substitutions for testing (the intended business-named groups don't exist in this workspace, per the brief's "names don't matter for docs, do for testing" framing):
+Live-executed against `acme` on workspace `adb-984752964297111` on 2026-05-19. Group substitutions for testing (the intended business-named groups don't exist in this workspace, per the brief's "names don't matter for docs, do for testing" framing):
 
-- `bg_rls_demo_marketing_analytics` → substituted with existing `bg_rls_demo_high_priority_ops`.
-- `bg_rls_demo_data_engineering` → substituted with existing `bg_rls_demo_all_priority_ops`.
+- `acme_marketing_analytics` → substituted with existing `acme_high_priority_ops`.
+- `acme_data_engineering` → substituted with existing `acme_all_priority_ops`.
 
 ### Scenario A live result
 
 ```sql
-> GRANT SELECT ON TABLE bg_rls_demo.tpch.orders TO `bg_rls_demo_high_priority_ops`;
+> GRANT SELECT ON TABLE acme.tpch.orders TO `acme_high_priority_ops`;
 OK
 
-> SHOW GRANTS ON TABLE bg_rls_demo.tpch.orders;
-['bg_rls_demo_high_priority_ops', 'SELECT', 'TABLE', 'bg_rls_demo.tpch.orders']
-['account users', 'SELECT', 'TABLE', 'bg_rls_demo.tpch.orders']
+> SHOW GRANTS ON TABLE acme.tpch.orders;
+['acme_high_priority_ops', 'SELECT', 'TABLE', 'acme.tpch.orders']
+['account users', 'SELECT', 'TABLE', 'acme.tpch.orders']
 ```
 
 The grant is recorded against the named principal. The pre-existing `account users` grant from prior exercise setup is also visible, consistent with the additive nature of GRANT statements.
@@ -35,24 +35,24 @@ The grant is recorded against the named principal. The pre-existing `account use
 ### Scenario B live result, including propagation
 
 ```sql
-> GRANT USE SCHEMA ON SCHEMA bg_rls_demo.tpch_staging TO `bg_rls_demo_all_priority_ops`;
+> GRANT USE SCHEMA ON SCHEMA acme.tpch_staging TO `acme_all_priority_ops`;
 OK
-> GRANT SELECT ON SCHEMA bg_rls_demo.tpch_staging TO `bg_rls_demo_all_priority_ops`;
+> GRANT SELECT ON SCHEMA acme.tpch_staging TO `acme_all_priority_ops`;
 OK
 
-> SHOW GRANTS ON SCHEMA bg_rls_demo.tpch_staging;
-['bg_rls_demo_all_priority_ops', 'SELECT', 'SCHEMA', 'bg_rls_demo.tpch_staging']
-['bg_rls_demo_all_priority_ops', 'USE SCHEMA', 'SCHEMA', 'bg_rls_demo.tpch_staging']
+> SHOW GRANTS ON SCHEMA acme.tpch_staging;
+['acme_all_priority_ops', 'SELECT', 'SCHEMA', 'acme.tpch_staging']
+['acme_all_priority_ops', 'USE SCHEMA', 'SCHEMA', 'acme.tpch_staging']
 ```
 
 **Propagation test.** After applying the schema-level grant, a new table was created in the staging schema:
 
 ```sql
-> CREATE TABLE bg_rls_demo.tpch_staging.propagation_test AS SELECT 1 AS x, 2 AS y;
+> CREATE TABLE acme.tpch_staging.propagation_test AS SELECT 1 AS x, 2 AS y;
 OK
 
-> SHOW GRANTS ON TABLE bg_rls_demo.tpch_staging.propagation_test;
-['bg_rls_demo_all_priority_ops', 'SELECT', 'SCHEMA', 'bg_rls_demo.tpch_staging']
+> SHOW GRANTS ON TABLE acme.tpch_staging.propagation_test;
+['acme_all_priority_ops', 'SELECT', 'SCHEMA', 'acme.tpch_staging']
 ```
 
 The schema-level grant is visible at the table level *without* additional administrative action. Note that Databricks reports the grant's source object type as `SCHEMA`, which is the correct way to surface inherited grants — the platform tracks the grant at the schema level and resolves it at query time for child objects. The ADR-019 downward-propagation semantics that `byScope` was designed to express are working as documented.
@@ -60,13 +60,13 @@ The schema-level grant is visible at the table level *without* additional admini
 ### Scenario C live result
 
 ```sql
-> GRANT EXECUTE ON FUNCTION bg_rls_demo.tpch.compute_customer_ltv
-    TO `bg_rls_demo_high_priority_ops`;
+> GRANT EXECUTE ON FUNCTION acme.tpch.compute_customer_ltv
+    TO `acme_high_priority_ops`;
 OK
 
-> SHOW GRANTS ON FUNCTION bg_rls_demo.tpch.compute_customer_ltv;
-['bg_rls_demo_high_priority_ops', 'EXECUTE', 'FUNCTION',
- 'bg_rls_demo.tpch.compute_customer_ltv']
+> SHOW GRANTS ON FUNCTION acme.tpch.compute_customer_ltv;
+['acme_high_priority_ops', 'EXECUTE', 'FUNCTION',
+ 'acme.tpch.compute_customer_ltv']
 ```
 
 The `Execute` action lowers cleanly to Databricks `EXECUTE`. The grant is recorded against the function as a first-class governed object.
@@ -91,7 +91,7 @@ This finding becomes ADR-025.
 
 ### 3.2 — `function:` IRI prefix is a new informal convention
 
-Scenario C uses `function:bg_rls_demo.tpch.compute_customer_ltv` as a `byIdentity` resource. The `function:` prefix is not declared in `context.jsonld` (only `table:`, `column:`, `group:`, and `principal:` are used by prior exercises as informal conventions). This exercise extends the informal-convention space.
+Scenario C uses `function:acme.tpch.compute_customer_ltv` as a `byIdentity` resource. The `function:` prefix is not declared in `context.jsonld` (only `table:`, `column:`, `group:`, and `principal:` are used by prior exercises as informal conventions). This exercise extends the informal-convention space.
 
 The same approach as before — informal prefixes are not validated by the IR layer; they are operator-recognizable strings that adapters interpret per platform. Future formalization (declaring the prefixes in context.jsonld, validating with SHACL) is a queued v0 doc item that may land alongside [#4](https://github.com/bgiesbrecht/tessera/issues/4) (iri-safety-convention).
 
@@ -145,9 +145,9 @@ The migration use case requires lowering existing platform grants into IR. The e
 ### Databricks `SHOW GRANTS` → Tessera IR
 
 ```
-SHOW GRANTS ON TABLE bg_rls_demo.tpch.orders
+SHOW GRANTS ON TABLE acme.tpch.orders
 ==>
-['bg_rls_demo_high_priority_ops', 'SELECT', 'TABLE', 'bg_rls_demo.tpch.orders']
+['acme_high_priority_ops', 'SELECT', 'TABLE', 'acme.tpch.orders']
 ```
 
 Lowers to:
@@ -158,14 +158,14 @@ policy:
   kind: RowVisibilityConstraint                  # or AccessGrantConstraint, when added
   appliesTo:
     selector: byIdentity
-    resource: table:bg_rls_demo.tpch.orders
+    resource: table:acme.tpch.orders
   action: Read                                   # SELECT → Read
   rules:
-    - principal: {selector: byIdentity, resource: group:bg_rls_demo_high_priority_ops}
+    - principal: {selector: byIdentity, resource: group:acme_high_priority_ops}
       effect: allow
 provenance:
   extractedFrom: databricks-grant
-  notes: SHOW GRANTS row [bg_rls_demo_high_priority_ops, SELECT, TABLE, ...]
+  notes: SHOW GRANTS row [acme_high_priority_ops, SELECT, TABLE, ...]
 ```
 
 Field-by-field mapping:
@@ -210,5 +210,5 @@ What this exercise did NOT exercise but the migration use case will need:
 - **Spec changes landed**: `Execute` action across all four v0 spec files; will be documented in ADR-025.
 - **IR finding open**: `AccessGrantConstraint` policyKind candidate; not landing in this exercise.
 - **IR finding open**: `USE SCHEMA` and other implicit-scaffolding privileges; defer until migration exercise drives the design.
-- **Workspace artifacts**: `bg_rls_demo.tpch_staging` schema and `bg_rls_demo.tpch.compute_customer_ltv` function exist and are reusable. Run `adapters/tests/setup_table_grants.py` to re-provision.
+- **Workspace artifacts**: `acme.tpch_staging` schema and `acme.tpch.compute_customer_ltv` function exist and are reusable. Run `adapters/tests/setup_table_grants.py` to re-provision.
 - **Issue [#10](https://github.com/bgiesbrecht/tessera/issues/10) — policy-execute-grants**: substantially closed by this exercise's adoption of `Execute` with the semantic-only boundary. Worth closing on GitHub with a pointer to this diagnostic.

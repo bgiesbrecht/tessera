@@ -35,11 +35,11 @@ policyKind: ColumnVisibilityConstraint
 description: >
   ABAC column-mask policy attached at catalog scope. Matches columns whose
   sensitivity attribute is PIIClerk; redacts to the literal 'CLERK-REDACTED'
-  for principals outside bg_rls_demo_all_priority_ops.
+  for principals outside acme_all_priority_ops.
 
 appliesTo:
   selector: byScope
-  scope: catalog:bg_rls_demo
+  scope: catalog:acme
   matching:
     attributes:
       sensitivity: PIIClerk
@@ -48,12 +48,12 @@ action: Read
 
 defaultStrategy: negated-complement
 
-# One rule: members of bg_rls_demo_all_priority_ops pass through. Under
+# One rule: members of acme_all_priority_ops pass through. Under
 # negated-complement, the default branch (below) handles everyone else.
 rules:
   - principal:
       selector: byIdentity
-      resource: group:bg_rls_demo_all_priority_ops
+      resource: group:acme_all_priority_ops
     effect: allow
 
 defaultBranch:

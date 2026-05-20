@@ -6,7 +6,7 @@ Run from the repo root with the .venv interpreter:
 The script:
     1. Loads spec/v0/examples/group-row-visibility-policy-a.jsonld.
     2. Emits Unity Catalog DDL via UnityCatalogAdapter with explicit bindings.
-    3. Executes the DDL against bg_rls_demo.tpch.orders.
+    3. Executes the DDL against acme.tpch.orders.
     4. Verifies row counts under the current user (whose group membership controls
        what the row filter returns).
 """
@@ -28,7 +28,7 @@ EXAMPLES = REPO_ROOT / "spec" / "v0" / "examples"
 
 PROFILE = "adb-984752964297111"
 WAREHOUSE_ID = "148ccb90800933a1"   # "Shared Endpoint" — currently RUNNING
-TARGET_TABLE = "bg_rls_demo.tpch.orders"
+TARGET_TABLE = "acme.tpch.orders"
 
 
 def run_sql(w: WorkspaceClient, sql: str):
@@ -47,12 +47,12 @@ def main() -> None:
 
     config = AdapterConfig(
         identity_bindings={
-            "group:bg_rls_demo_all_priority_ops": "bg_rls_demo_all_priority_ops",
-            "group:bg_rls_demo_high_priority_ops": "bg_rls_demo_high_priority_ops",
+            "group:acme_all_priority_ops": "acme_all_priority_ops",
+            "group:acme_high_priority_ops": "acme_high_priority_ops",
             "group:account-users": "account users",   # Databricks built-in
         },
         resource_bindings={
-            "table:bg_rls_demo.tpch.orders": TARGET_TABLE,
+            "table:acme.tpch.orders": TARGET_TABLE,
         },
     )
     result = UnityCatalogAdapter(config=config).emit(policy)
@@ -97,8 +97,8 @@ def main() -> None:
     membership = run_sql(
         w,
         "SELECT "
-        "is_account_group_member('bg_rls_demo_all_priority_ops') AS all_priority, "
-        "is_account_group_member('bg_rls_demo_high_priority_ops') AS high_priority, "
+        "is_account_group_member('acme_all_priority_ops') AS all_priority, "
+        "is_account_group_member('acme_high_priority_ops') AS high_priority, "
         "is_account_group_member('account users') AS account_users",
     )
     if membership:

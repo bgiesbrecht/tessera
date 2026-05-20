@@ -4,12 +4,12 @@ Run from the repo root with the .venv interpreter:
     .venv/bin/python -m adapters.tests.setup_table_grants
 
 The script:
-    1. Creates BG_RLS_DEMO catalog and TPCH / TPCH_STAGING schemas if absent.
+    1. Creates ACME catalog and TPCH / TPCH_STAGING schemas if absent.
     2. Creates an initial table in TPCH_STAGING (for the propagation test in
        Scenario B; Phase 3 adds another table mid-exercise to verify forward
        propagation).
     3. Creates a no-op UDF compute_customer_ltv (for Scenario C).
-    4. Recreates bg_rls_demo.tpch.orders if missing (re-using sample TPCH data).
+    4. Recreates acme.tpch.orders if missing (re-using sample TPCH data).
     5. Drops any pre-existing grants on the three target objects so the
        exercise can re-apply cleanly.
 
@@ -45,9 +45,9 @@ def main() -> None:
 
     print("=== Catalog / schemas ===")
     for stmt in [
-        "CREATE CATALOG IF NOT EXISTS bg_rls_demo",
-        "CREATE SCHEMA IF NOT EXISTS bg_rls_demo.tpch",
-        "CREATE SCHEMA IF NOT EXISTS bg_rls_demo.tpch_staging",
+        "CREATE CATALOG IF NOT EXISTS acme",
+        "CREATE SCHEMA IF NOT EXISTS acme.tpch",
+        "CREATE SCHEMA IF NOT EXISTS acme.tpch_staging",
     ]:
         run_sql(w, stmt)
         print(f"  OK: {stmt}")
@@ -58,17 +58,17 @@ def main() -> None:
     # Databricks SQL and skips the CTAS body if the table already exists.
     run_sql(
         w,
-        "CREATE TABLE IF NOT EXISTS bg_rls_demo.tpch.orders AS SELECT * FROM samples.tpch.orders",
+        "CREATE TABLE IF NOT EXISTS acme.tpch.orders AS SELECT * FROM samples.tpch.orders",
     )
-    print("  ensured: bg_rls_demo.tpch.orders")
+    print("  ensured: acme.tpch.orders")
 
     # Scenario B target — initial table in the staging schema.
     run_sql(
         w,
-        "CREATE TABLE IF NOT EXISTS bg_rls_demo.tpch_staging.initial_table "
+        "CREATE TABLE IF NOT EXISTS acme.tpch_staging.initial_table "
         "AS SELECT * FROM samples.tpch.orders LIMIT 100",
     )
-    print("  ensured: bg_rls_demo.tpch_staging.initial_table")
+    print("  ensured: acme.tpch_staging.initial_table")
 
     print()
     print("=== Scenario C function ===")
@@ -76,22 +76,22 @@ def main() -> None:
     # the test to call. CREATE OR REPLACE so re-runs are idempotent.
     run_sql(
         w,
-        "CREATE OR REPLACE FUNCTION bg_rls_demo.tpch.compute_customer_ltv("
+        "CREATE OR REPLACE FUNCTION acme.tpch.compute_customer_ltv("
         "  customer_key BIGINT"
         ") RETURNS DOUBLE "
         "RETURN 0.0",
     )
-    print("  OK: bg_rls_demo.tpch.compute_customer_ltv")
+    print("  OK: acme.tpch.compute_customer_ltv")
 
     print()
     print("=== Pre-clean any existing grants on the targets (idempotent re-runs) ===")
     # Best-effort revokes; the GRANT statements in Phase 3 will re-apply cleanly.
     revokes = [
-        "REVOKE SELECT ON TABLE bg_rls_demo.tpch.orders FROM `bg_rls_demo_marketing_analytics`",
-        "REVOKE SELECT ON SCHEMA bg_rls_demo.tpch_staging FROM `bg_rls_demo_data_engineering`",
-        "REVOKE USE SCHEMA ON SCHEMA bg_rls_demo.tpch_staging FROM `bg_rls_demo_data_engineering`",
-        "REVOKE EXECUTE ON FUNCTION bg_rls_demo.tpch.compute_customer_ltv "
-        "  FROM `bg_rls_demo_marketing_analytics`",
+        "REVOKE SELECT ON TABLE acme.tpch.orders FROM `acme_marketing_analytics`",
+        "REVOKE SELECT ON SCHEMA acme.tpch_staging FROM `acme_data_engineering`",
+        "REVOKE USE SCHEMA ON SCHEMA acme.tpch_staging FROM `acme_data_engineering`",
+        "REVOKE EXECUTE ON FUNCTION acme.tpch.compute_customer_ltv "
+        "  FROM `acme_marketing_analytics`",
     ]
     for stmt in revokes:
         run_sql(w, stmt, ignore_errors=True)
@@ -102,8 +102,8 @@ def main() -> None:
     print("  This script does NOT create account-level groups.")
     print("  Manual step required (Brice): create or confirm the following groups exist")
     print("  and that you are a member of them as appropriate for the test scenarios:")
-    print("    - bg_rls_demo_marketing_analytics")
-    print("    - bg_rls_demo_data_engineering")
+    print("    - acme_marketing_analytics")
+    print("    - acme_data_engineering")
     print()
     print("  Group propagation lag is 2-4 minutes after membership changes.")
 

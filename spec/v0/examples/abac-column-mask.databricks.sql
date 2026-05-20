@@ -11,7 +11,7 @@
 -- configured tag-taxonomy mapping (ADR-021) that translates
 --   sensitivity:PIIClerk ↔ has_tag_value('abac_column', 'clerk')
 -- and identity mapping that translates
---   group:bg_rls_demo_all_priority_ops ↔ `bg_rls_demo_all_priority_ops`.
+--   group:acme_all_priority_ops ↔ `acme_all_priority_ops`.
 --
 -- Companion artifacts:
 --   ../examples/abac-column-mask-policy-a.{tessera.yaml,jsonld}
@@ -29,18 +29,18 @@
 
 -- ─── Policy A — Redact ───────────────────────────────────────────────────
 
-CREATE OR REPLACE FUNCTION bg_rls_demo.tpch.tessera__abac_column_mask_clerk_redact__mask(val STRING)
+CREATE OR REPLACE FUNCTION acme.tpch.tessera__abac_column_mask_clerk_redact__mask(val STRING)
 RETURNS STRING
 RETURN 'CLERK-REDACTED';
 
-GRANT EXECUTE ON FUNCTION bg_rls_demo.tpch.tessera__abac_column_mask_clerk_redact__mask TO `account users`;
+GRANT EXECUTE ON FUNCTION acme.tpch.tessera__abac_column_mask_clerk_redact__mask TO `account users`;
 
 CREATE OR REPLACE POLICY tessera__abac_column_mask_clerk_redact
-  ON CATALOG bg_rls_demo
+  ON CATALOG acme
   COMMENT 'Tessera ABAC column mask — policy:abac-column-mask-clerk-redact'
-  COLUMN MASK bg_rls_demo.tpch.tessera__abac_column_mask_clerk_redact__mask
+  COLUMN MASK acme.tpch.tessera__abac_column_mask_clerk_redact__mask
     TO `account users`
-    EXCEPT `bg_rls_demo_all_priority_ops`
+    EXCEPT `acme_all_priority_ops`
     FOR TABLES
     MATCH COLUMNS has_tag_value('abac_column', 'clerk') AS pii_clerk_col
     ON COLUMN pii_clerk_col;
@@ -48,18 +48,18 @@ CREATE OR REPLACE POLICY tessera__abac_column_mask_clerk_redact
 
 -- ─── Policy B — Hash ─────────────────────────────────────────────────────
 
-CREATE OR REPLACE FUNCTION bg_rls_demo.tpch.tessera__abac_column_mask_clerk_hash__mask(val STRING)
+CREATE OR REPLACE FUNCTION acme.tpch.tessera__abac_column_mask_clerk_hash__mask(val STRING)
 RETURNS STRING
 RETURN sha2(val, 256);
 
-GRANT EXECUTE ON FUNCTION bg_rls_demo.tpch.tessera__abac_column_mask_clerk_hash__mask TO `account users`;
+GRANT EXECUTE ON FUNCTION acme.tpch.tessera__abac_column_mask_clerk_hash__mask TO `account users`;
 
 CREATE OR REPLACE POLICY tessera__abac_column_mask_clerk_hash
-  ON CATALOG bg_rls_demo
+  ON CATALOG acme
   COMMENT 'Tessera ABAC column mask — policy:abac-column-mask-clerk-hash'
-  COLUMN MASK bg_rls_demo.tpch.tessera__abac_column_mask_clerk_hash__mask
+  COLUMN MASK acme.tpch.tessera__abac_column_mask_clerk_hash__mask
     TO `account users`
-    EXCEPT `bg_rls_demo_all_priority_ops`
+    EXCEPT `acme_all_priority_ops`
     FOR TABLES
     MATCH COLUMNS has_tag_value('abac_column', 'clerk') AS pii_clerk_col
     ON COLUMN pii_clerk_col;
@@ -67,7 +67,7 @@ CREATE OR REPLACE POLICY tessera__abac_column_mask_clerk_hash
 
 -- ─── Notes on emission choices ────────────────────────────────────────────
 --
--- * Both policies attach at CATALOG scope (bg_rls_demo) per the policies'
+-- * Both policies attach at CATALOG scope (acme) per the policies'
 --   appliesTo.scope. They auto-apply to every column in the catalog whose
 --   abac_column tag value is 'clerk' — currently just o_clerk on orders_abac,
 --   but the scope is intentionally broader to demonstrate scoped attachment.
@@ -85,7 +85,7 @@ CREATE OR REPLACE POLICY tessera__abac_column_mask_clerk_hash
 -- * For Policy B's UDF, sha2(val, 256) is the documented Databricks
 --   built-in for SHA-256 over a STRING input. Returns a 64-char hex string.
 --
--- * Both policies use `TO account users EXCEPT bg_rls_demo_all_priority_ops`.
+-- * Both policies use `TO account users EXCEPT acme_all_priority_ops`.
 --   This expresses the negated-complement default-handling: members of
 --   the privileged group pass through (allow); everyone else (the
 --   universal complement) gets the masked value.

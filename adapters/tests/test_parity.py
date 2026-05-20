@@ -34,10 +34,10 @@ def test_row_visibility_parity_emits_clean_on_both_adapters():
     policy = _load("group-row-visibility-policy-a.jsonld")
 
     uc_config = AdapterConfig(
-        identity_bindings={"principal:bg_rls_demo_high_priority_ops": "bg_rls_demo_high_priority_ops"},
+        identity_bindings={"principal:acme_high_priority_ops": "acme_high_priority_ops"},
     )
     sf_config = AdapterConfig(
-        identity_bindings={"principal:bg_rls_demo_high_priority_ops": "BG_RLS_DEMO_HIGH_PRIORITY_OPS"},
+        identity_bindings={"principal:acme_high_priority_ops": "ACME_HIGH_PRIORITY_OPS"},
     )
 
     uc = UnityCatalogAdapter(config=uc_config).emit(policy)
@@ -70,7 +70,7 @@ def test_column_visibility_parity_emits_clean_on_both_adapters():
     sf_config = AdapterConfig(
         identity_bindings={"group:orders_full_access": "ORDERS_FULL_ACCESS"},
         resource_bindings={
-            "column:bg_rls_demo.tpch.orders.o_clerk": "BRICETEST.TESSERA.SNOW_ORDERS.O_CLERK",
+            "column:acme.tpch.orders.o_clerk": "ACME.TESSERA.SNOW_ORDERS.O_CLERK",
         },
     )
 

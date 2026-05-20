@@ -24,7 +24,7 @@ UNITY_CATALOG_PROFILE = CapabilityProfile(
             CapabilitySupport.SUPPORTED,
             "Emitted via CREATE OR REPLACE FUNCTION returning the masked value plus "
             "ALTER TABLE ... ALTER COLUMN ... SET MASK. Live-verified 2026-05-19 against "
-            "bg_rls_demo.tpch.orders.o_clerk: the same IR that produced the hand-derived "
+            "acme.tpch.orders.o_clerk: the same IR that produced the hand-derived "
             "spec/v0/examples/column-mask-orders-clerk.databricks.sql now emits byte-equivalent "
             "DDL through the adapter; the mask enforces correctly for non-members of the "
             "granted group (caller sees CLERK-REDACTED). Coverage: byIdentity column targets; "
@@ -38,7 +38,7 @@ UNITY_CATALOG_PROFILE = CapabilityProfile(
         Capability.ATTRIBUTE_BASED_SCOPING: (
             CapabilitySupport.PARTIAL,
             "ABAC row visibility via byScope + matching is implemented and live-verified 2026-05-19 "
-            "against bg_rls_demo.tpch.orders_abac. Emission produces the three-piece DDL: "
+            "against acme.tpch.orders_abac. Emission produces the three-piece DDL: "
             "(1) CREATE OR REPLACE FUNCTION ... RETURNS BOOLEAN with CASE branching (Mechanism B); "
             "(2) GRANT EXECUTE ... TO `account users` (adapter scaffolding per ADR-025); "
             "(3) CREATE OR REPLACE POLICY ... ON CATALOG/SCHEMA/TABLE ... ROW FILTER ... "

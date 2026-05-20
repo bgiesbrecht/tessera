@@ -14,11 +14,11 @@ from databricks.sdk.service.sql import StatementState
 
 EXPECTED = {
     "S1": (
-        "in bg_rls_demo_all_priority_ops",
+        "in acme_all_priority_ops",
         ["1-URGENT", "2-HIGH", "3-MEDIUM", "4-NOT SPECIFIED", "5-LOW"],
     ),
     "S2": (
-        "in bg_rls_demo_high_priority_ops only",
+        "in acme_high_priority_ops only",
         ["1-URGENT", "2-HIGH"],
     ),
     "S3": (
@@ -40,7 +40,7 @@ def _run(sql):
         warehouse_id=warehouse.id,
         statement=sql,
         wait_timeout="30s",
-        catalog="bg_rls_demo",
+        catalog="acme",
         schema="tpch",
     )
     while resp.status.state in (StatementState.PENDING, StatementState.RUNNING):
@@ -54,8 +54,8 @@ def _run(sql):
 def membership():
     rows = _run(
         "SELECT "
-        "is_account_group_member('bg_rls_demo_all_priority_ops') AS in_all, "
-        "is_account_group_member('bg_rls_demo_high_priority_ops') AS in_high"
+        "is_account_group_member('acme_all_priority_ops') AS in_all, "
+        "is_account_group_member('acme_high_priority_ops') AS in_high"
     )
     in_all, in_high = rows[0]
     return in_all in (True, "true"), in_high in (True, "true")
@@ -64,7 +64,7 @@ def membership():
 def priorities():
     rows = _run(
         "SELECT DISTINCT o_orderpriority AS p "
-        "FROM bg_rls_demo.tpch.orders ORDER BY p"
+        "FROM acme.tpch.orders ORDER BY p"
     )
     return [r[0] for r in rows]
 

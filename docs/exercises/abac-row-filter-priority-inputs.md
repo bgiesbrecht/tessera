@@ -11,7 +11,7 @@
 
 **0.1 — Demo or production scope?**
 
-Demo. Same `bg_rls_demo` environment, same target table (`bg_rls_demo.tpch.orders_abac` on the Azure workspace `adb-984752964297111`) as the ABAC column-mask exercise.
+Demo. Same `acme` environment, same target table (`acme.tpch.orders_abac` on the Azure workspace `adb-984752964297111`) as the ABAC column-mask exercise.
 
 **0.2 — Target platform**
 
@@ -25,7 +25,7 @@ This exercise's design output, in order of expected substance:
 
 1. **Mechanism A vs Mechanism B forced into Mechanism B.** The prior ABAC column-mask exercise surfaced two ways to encode the principal split (TO/EXCEPT in policy header vs. `is_account_group_member` inside the UDF). For binary exempt/not-exempt cases, A is cleaner. For *three-branch* cases, A cannot express it — Databricks ABAC's principal binding is binary (`TO ... EXCEPT ...`). Tessera's three-rule IR must compile to a single UDF with CASE branches (Mechanism B). The exercise validates that the IR's clean multi-rule shape compiles correctly to the single-UDF emission.
 2. **An axis-naming gap.** The `abac_column=orderpriority` tag doesn't fit any of the four well-known v0 axes (`sensitivity`, `dataSubject`, `regulatoryRegime`, `businessDomain`). The exercise surfaces what axis a "row-classification-key column" belongs to. Likely a v1-candidate finding.
-3. **A condition-operand reference gap.** Per-rule conditions in the IR reference column values (`column:bg_rls_demo.tpch.orders.o_orderpriority`). For ABAC row filters, the column is identified by `MATCH COLUMNS` and aliased; the rule's `condition.operands` should reference the alias, not a hardcoded column name. v0's condition algebra doesn't have a clean syntax for "the matched-attribute column's value." Likely another v1-candidate finding.
+3. **A condition-operand reference gap.** Per-rule conditions in the IR reference column values (`column:acme.tpch.orders.o_orderpriority`). For ABAC row filters, the column is identified by `MATCH COLUMNS` and aliased; the rule's `condition.operands` should reference the alias, not a hardcoded column name. v0's condition algebra doesn't have a clean syntax for "the matched-attribute column's value." Likely another v1-candidate finding.
 4. **Cross-policy combination for row filters.** Does Databricks ABAC reject multiple row filters on the same table (analogous to the multi-mask error from the column-mask exercise)? Empirical observation deferred to Phase 3 deployment.
 
 ---
@@ -34,7 +34,7 @@ This exercise's design output, in order of expected substance:
 
 **1.1 — Protected table**
 
-`bg_rls_demo.tpch.orders_abac` on workspace `adb-984752964297111`. Same table as the column-mask exercise; the row filter and column mask compose at evaluation time on Unity Catalog.
+`acme.tpch.orders_abac` on workspace `adb-984752964297111`. Same table as the column-mask exercise; the row filter and column mask compose at evaluation time on Unity Catalog.
 
 **1.2 — Discriminator column**
 
@@ -63,8 +63,8 @@ This is a real design choice. The tag `abac_column=orderpriority` doesn't fit th
 **Interpretive choice for this exercise:** declare an **adopter-namespaced axis** to make the gap visible. Specifically:
 
 - Adopter namespace: `bg` (placeholder for Brice's deployment).
-- New axis: `bg:rowDiscriminator`.
-- Value for `o_orderpriority`: `bg:rowDiscriminator: orderpriority`.
+- New axis: `acme:rowDiscriminator`.
+- Value for `o_orderpriority`: `acme:rowDiscriminator: orderpriority`.
 
 The intent: "this column is the row-classification key for ABAC row-filter policies." Adopters who model the same pattern under their own namespace declare their own values. v1 may absorb this into a well-known axis (e.g., a new `rowKey` or `accessKey` axis) if the pattern proves common; the exercise surfaces the need.
 
@@ -72,7 +72,7 @@ The intent: "this column is the row-classification key for ABAC row-filter polic
 
 ```yaml
 tagTaxonomy:
-  - axis: bg:rowDiscriminator
+  - axis: acme:rowDiscriminator
     axisValue: orderpriority
     tagKey: abac_column
     tagValue: orderpriority
@@ -98,8 +98,8 @@ Standard Databricks: `is_account_group_member('group_name')` evaluated at sessio
 
 **3.2 — Three groups**
 
-- `bg_rls_demo_all_priority_ops` — privileged group, sees all rows.
-- `bg_rls_demo_high_priority_ops` — restricted group, sees `1-URGENT` and `2-HIGH` rows only.
+- `acme_all_priority_ops` — privileged group, sees all rows.
+- `acme_high_priority_ops` — restricted group, sees `1-URGENT` and `2-HIGH` rows only.
 - (Implicit default) — everyone else (including all `account users` not in either restrictive group), sees `3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW` rows.
 
 All three groups already exist (the first two from the original group row-visibility exercise; the implicit default is "everyone else in `account users`").
@@ -112,8 +112,8 @@ All three groups already exist (the first two from the original group row-visibi
 
 A row in `orders_abac` is visible to a principal if and only if:
 
-- The principal is in `bg_rls_demo_all_priority_ops`, OR
-- The principal is in `bg_rls_demo_high_priority_ops` AND the row's `o_orderpriority` is `1-URGENT` or `2-HIGH`, OR
+- The principal is in `acme_all_priority_ops`, OR
+- The principal is in `acme_high_priority_ops` AND the row's `o_orderpriority` is `1-URGENT` or `2-HIGH`, OR
 - The principal is in neither restrictive group AND the row's `o_orderpriority` is `3-MEDIUM`, `4-NOT SPECIFIED`, or `5-LOW`.
 
 (Per the input requirements, every principal is in at least one of these three brackets — the default catches everyone not in either restrictive group, regardless of any other group membership.)
@@ -178,12 +178,12 @@ Phase 3 deploys both this exercise's row filter and (optionally) a second row fi
 
 **7.1 — Behavioral verification criteria**
 
-Three scenarios against `bg_rls_demo.tpch.orders_abac`, mirroring the original group exercise but via ABAC mechanism:
+Three scenarios against `acme.tpch.orders_abac`, mirroring the original group exercise but via ABAC mechanism:
 
 | Scenario | Brice's membership | Expected priorities visible |
 |---|---|---|
-| 1 | Member of `bg_rls_demo_all_priority_ops` | All five |
-| 2 | Member of `bg_rls_demo_high_priority_ops` only | `1-URGENT`, `2-HIGH` |
+| 1 | Member of `acme_all_priority_ops` | All five |
+| 2 | Member of `acme_high_priority_ops` only | `1-URGENT`, `2-HIGH` |
 | 3 | Neither restrictive group | `3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW` |
 
 Brice's current state at Phase 1 commit (per discovery 2026-05-19): not in either restrictive group. Scenario 3 is the immediately-testable state; Scenarios 1 and 2 require Brice to add himself to one of the groups (with the standard 2–4 minute cache lag).
@@ -198,10 +198,10 @@ The Tessera derivation must:
 
 - Use the verified ABAC ROW FILTER DDL form per Databricks docs.
 - Reference all three groups verbatim.
-- Apply at scope `catalog:bg_rls_demo` (or narrower; schema scope is also valid).
+- Apply at scope `catalog:acme` (or narrower; schema scope is also valid).
 - Use `MATCH COLUMNS has_tag_value('abac_column', 'orderpriority')` for column selection.
 - Use `USING COLUMNS (...)` to pass the matched column's value into the UDF.
-- Apply to `bg_rls_demo.tpch.orders_abac` (and any other tables in scope with the same tag, though none currently exist).
+- Apply to `acme.tpch.orders_abac` (and any other tables in scope with the same tag, though none currently exist).
 - Be fail-closed for principals matching no rule — though under the three-branch design, "everyone else" catches the default, so fail-closed only applies if the UDF errors.
 
 ---
@@ -224,7 +224,7 @@ The Tessera derivation must:
 
 After this inputs commit, Phase 2 produces (all under `spec/v0/examples/`):
 
-- `abac-row-filter-priority.tessera.yaml` — Single Policy, three rules + defaultBranch, RowVisibilityConstraint kind, byScope + matching on `bg:rowDiscriminator: orderpriority`.
+- `abac-row-filter-priority.tessera.yaml` — Single Policy, three rules + defaultBranch, RowVisibilityConstraint kind, byScope + matching on `acme:rowDiscriminator: orderpriority`.
 - `abac-row-filter-priority.jsonld` — canonical form.
 - `abac-row-filter-priority.databricks.sql` — `CREATE FUNCTION` (returns BOOLEAN, CASE over `is_account_group_member`) + `CREATE POLICY … ROW FILTER` with MATCH COLUMNS and USING COLUMNS.
 - `abac-row-filter-priority.diagnostic.md` — per-element enforcement, surfaces the three anticipated findings explicitly.

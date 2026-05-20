@@ -48,7 +48,7 @@ SNOWFLAKE_PROFILE = CapabilityProfile(
             CapabilitySupport.SUPPORTED,
             "Emitted via CREATE OR REPLACE MASKING POLICY ... AS (col VARCHAR) RETURNS VARCHAR -> CASE ... END "
             "plus ALTER TABLE ... MODIFY COLUMN ... SET MASKING POLICY. Live-verified 2026-05-19 against "
-            "BRICETEST.TESSERA.SNOW_ORDERS.O_CLERK: identity-bound role sees real values; all other "
+            "ACME.TESSERA.SNOW_ORDERS.O_CLERK: identity-bound role sees real values; all other "
             "tested roles (ACCOUNTADMIN, ALL_PRIORITY_OPS, PUBLIC) see the Redact replacement literal. "
             "Coverage: byIdentity column targets; rules with effect=allow or effect=transform; "
             "defaultBranch with effect=transform; Redact transformation. Role-discrimination semantics "
@@ -66,7 +66,7 @@ SNOWFLAKE_PROFILE = CapabilityProfile(
             CapabilitySupport.PARTIAL,
             "PrincipalSetFromTable lowers to a correlated EXISTS subquery inside the row-access policy body, "
             "joining the IR's mapping table to the IR's resource-ACL table on the shared codename column. "
-            "Live-verified on 2026-05-19 against BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL — all four scenarios "
+            "Live-verified on 2026-05-19 against ACME.TESSERA.SNOW_ORDERS_RLS_ACL — all four scenarios "
             "(seed, additive grant, removal, secondary-roles immunity) pass. This is the pattern Snowflake "
             "documents for data-driven entitlement (membership is a relation, not a role): see "
             "docs.snowflake.com/en/user-guide/security-row-using — 'A row access policy condition can reference "

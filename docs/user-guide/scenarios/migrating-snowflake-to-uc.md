@@ -8,13 +8,13 @@ It is the answer to the question that motivated the project: *can the same gover
 
 ## What's deployed on Snowflake before we start
 
-Three policies on `BRICETEST.TESSERA`, deployed during the earlier worked exercises:
+Three policies on `ACME.TESSERA`, deployed during the earlier worked exercises:
 
 | Policy | Shape | Attached to | Body summary |
 |---|---|---|---|
 | `GROUP_ROW_VISIBILITY_POLICY_A_RAP` | Role-based row-access policy with multi-branch CASE | `SNOW_ORDERS.O_ORDERPRIORITY` | `IS_ROLE_IN_SESSION('ALL_PRIORITY_OPS') OR (IS_ROLE_IN_SESSION('HIGH_PRIORITY_OPS') AND o_orderpriority IN ('1-URGENT','2-HIGH')) OR (IS_ROLE_IN_SESSION('PUBLIC') AND o_orderpriority IN ('3-MEDIUM','4-NOT SPECIFIED','5-LOW'))` |
 | `SNOWFLAKE_BYDATASET_ROW_VISIBILITY_RAP` | Mapping-table byDataset row-access policy | `SNOW_ORDERS_RLS_ACL.O_ORDERPRIORITY` | `EXISTS (SELECT 1 FROM RLS_ACL_MAPPING m JOIN RLS_PRIORITY_ACL p ON m.CODE_NAME = p.CODE_NAME WHERE m.USERNAME = CURRENT_USER() AND p.O_ORDERPRIORITY = <param>)` |
-| `COLUMN_MASK_ORDERS_CLERK_MASK` | Role-based masking policy | `SNOW_ORDERS.O_CLERK` | `CASE WHEN IS_ROLE_IN_SESSION('BG_RLS_DEMO_HIGH_PRIORITY_OPS') THEN O_CLERK ELSE 'CLERK-REDACTED' END` |
+| `COLUMN_MASK_ORDERS_CLERK_MASK` | Role-based masking policy | `SNOW_ORDERS.O_CLERK` | `CASE WHEN IS_ROLE_IN_SESSION('ACME_HIGH_PRIORITY_OPS') THEN O_CLERK ELSE 'CLERK-REDACTED' END` |
 
 Together they cover three distinct enforcement patterns. The migration has to handle all three.
 
@@ -28,7 +28,7 @@ The runnable script lives at `adapters/tests/live_snowflake_to_uc_migration.py`.
 
 ```python
 sf = SnowflakeAdapter(config=AdapterConfig(extras={
-    "discover_database": "BRICETEST",
+    "discover_database": "ACME",
     "discover_schema":   "TESSERA",
     "snowflake_cursor":  cur,
 }))
@@ -38,9 +38,9 @@ result = sf.discover()
 `SnowflakeAdapter.discover()` walks `SHOW ROW ACCESS POLICIES`, `SHOW MASKING POLICIES`, and `INFORMATION_SCHEMA.POLICY_REFERENCES`, gathering each policy's body via `DESCRIBE` and its attachments. The result carries one artifact per policy:
 
 ```
-• [row_access_policy] BRICETEST.TESSERA.GROUP_ROW_VISIBILITY_POLICY_A_RAP   → SNOW_ORDERS
-• [row_access_policy] BRICETEST.TESSERA.SNOWFLAKE_BYDATASET_ROW_VISIBILITY_RAP → SNOW_ORDERS_RLS_ACL
-• [masking_policy]    BRICETEST.TESSERA.COLUMN_MASK_ORDERS_CLERK_MASK         → SNOW_ORDERS.O_CLERK
+• [row_access_policy] ACME.TESSERA.GROUP_ROW_VISIBILITY_POLICY_A_RAP   → SNOW_ORDERS
+• [row_access_policy] ACME.TESSERA.SNOWFLAKE_BYDATASET_ROW_VISIBILITY_RAP → SNOW_ORDERS_RLS_ACL
+• [masking_policy]    ACME.TESSERA.COLUMN_MASK_ORDERS_CLERK_MASK         → SNOW_ORDERS.O_CLERK
 ```
 
 ### Phase 2 — Extract
@@ -66,13 +66,13 @@ A real production extractor would parse a SQL AST rather than regex over the bod
 
 ```python
 uc = UnityCatalogAdapter(config=AdapterConfig(
-    identity_bindings={ "group:bg_rls_demo_high_priority_ops": "bg_rls_demo_high_priority_ops", ... },
+    identity_bindings={ "group:acme_high_priority_ops": "acme_high_priority_ops", ... },
     resource_bindings={
-        "table:BRICETEST.TESSERA.SNOW_ORDERS":            "bg_rls_demo.tpch.orders",
-        "table:BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL":    "bg_rls_demo.tpch.orders_rls_acl",
-        "column:BRICETEST.TESSERA.SNOW_ORDERS.o_clerk":   "bg_rls_demo.tpch.orders.o_clerk",
-        "table:BRICETEST.TESSERA.RLS_ACL_MAPPING":        "bg_rls_demo.tpch.rls_acl_mapping",
-        "table:BRICETEST.TESSERA.RLS_PRIORITY_ACL":       "bg_rls_demo.tpch.rls_priority_acl",
+        "table:ACME.TESSERA.SNOW_ORDERS":            "acme.tpch.orders",
+        "table:ACME.TESSERA.SNOW_ORDERS_RLS_ACL":    "acme.tpch.orders_rls_acl",
+        "column:ACME.TESSERA.SNOW_ORDERS.o_clerk":   "acme.tpch.orders.o_clerk",
+        "table:ACME.TESSERA.RLS_ACL_MAPPING":        "acme.tpch.rls_acl_mapping",
+        "table:ACME.TESSERA.RLS_PRIORITY_ACL":       "acme.tpch.rls_priority_acl",
     },
 ))
 for policy in extracted:
@@ -81,13 +81,13 @@ for policy in extracted:
 
 The Tessera IR is platform-neutral. The Unity Catalog adapter lowers it to Databricks DDL: row-filter UDFs + `ALTER TABLE ... SET ROW FILTER`, column-mask UDFs + `ALTER TABLE ... ALTER COLUMN ... SET MASK`. Identity and resource bindings translate Snowflake-side identifiers to their Databricks-side counterparts.
 
-**Resource bindings cover both protected tables and data tables referenced inside policy bodies.** The byDataset policy's body reaches into the ACL mapping tables; those references get remapped via `resource_bindings` too (the IR carries the source-platform table name as data, the adapter looks up the binding via `table:<raw>` key). Without this, the emitted DDL would reference `BRICETEST.TESSERA.RLS_ACL_MAPPING` — a table Databricks can't see.
+**Resource bindings cover both protected tables and data tables referenced inside policy bodies.** The byDataset policy's body reaches into the ACL mapping tables; those references get remapped via `resource_bindings` too (the IR carries the source-platform table name as data, the adapter looks up the binding via `table:<raw>` key). Without this, the emitted DDL would reference `ACME.TESSERA.RLS_ACL_MAPPING` — a table Databricks can't see.
 
 ### Phase 4 — Deploy
 
 The script provisions the data side of the migration alongside the policy DDL:
 
-- The protected tables (`bg_rls_demo.tpch.orders`, `bg_rls_demo.tpch.orders_rls_acl`) are created from the Databricks TPC-H samples if absent.
+- The protected tables (`acme.tpch.orders`, `acme.tpch.orders_rls_acl`) are created from the Databricks TPC-H samples if absent.
 - The ACL mapping data (`rls_acl_mapping`, `rls_priority_acl`) is created and seeded — the byDataset policy's body needs this data to exist on the target platform, not just on the source.
 - Any existing row filter / column mask on the targets is dropped (idempotent re-run).
 - The migrated DDL is applied via the Databricks SDK's Statement Execution API.
@@ -95,13 +95,13 @@ The script provisions the data side of the migration alongside the policy DDL:
 All three policies apply cleanly:
 
 ```
-OK: CREATE OR REPLACE FUNCTION bg_rls_demo.tpch.orders__extracted_group_row_visibility_policy_a_filter(...)
-OK: ALTER TABLE bg_rls_demo.tpch.orders SET ROW FILTER ...
-OK: CREATE OR REPLACE FUNCTION bg_rls_demo.tpch.tessera__extracted_snowflake_bydataset_row_visibility__row_filter(...)
-OK: ALTER TABLE bg_rls_demo.tpch.orders_rls_acl SET ROW FILTER ...
-OK: CREATE OR REPLACE FUNCTION bg_rls_demo.tpch.tessera__extracted_column_mask_orders_clerk__mask(...)
+OK: CREATE OR REPLACE FUNCTION acme.tpch.orders__extracted_group_row_visibility_policy_a_filter(...)
+OK: ALTER TABLE acme.tpch.orders SET ROW FILTER ...
+OK: CREATE OR REPLACE FUNCTION acme.tpch.tessera__extracted_snowflake_bydataset_row_visibility__row_filter(...)
+OK: ALTER TABLE acme.tpch.orders_rls_acl SET ROW FILTER ...
+OK: CREATE OR REPLACE FUNCTION acme.tpch.tessera__extracted_column_mask_orders_clerk__mask(...)
 OK: GRANT EXECUTE ON FUNCTION ... TO `account users`
-OK: ALTER TABLE bg_rls_demo.tpch.orders ALTER COLUMN o_clerk SET MASK ...
+OK: ALTER TABLE acme.tpch.orders ALTER COLUMN o_clerk SET MASK ...
 ```
 
 ### Phase 5 — Verify
@@ -112,7 +112,7 @@ The caller (`brice.giesbrecht@databricks.com`) has membership probe `[all_priori
 |---|---|---|
 | `SELECT o_orderpriority, COUNT(*) FROM orders GROUP BY 1` | 4,499,708 rows; priorities 3-MEDIUM / 4-NOT SPECIFIED / 5-LOW only | Multi-rule policy's third branch fires (caller is in `account users` only) |
 | `SELECT o_orderpriority, COUNT(*) FROM orders_rls_acl GROUP BY 1` | 3,000,292 rows; priorities 1-URGENT (1,501,100) + 2-HIGH (1,499,192) | byDataset policy resolves the ACL chain: user → codenames → priorities |
-| `SELECT DISTINCT o_clerk FROM orders LIMIT 5` | `CLERK-REDACTED` (single distinct value) | Mask applies because caller is not in `bg_rls_demo_high_priority_ops` |
+| `SELECT DISTINCT o_clerk FROM orders LIMIT 5` | `CLERK-REDACTED` (single distinct value) | Mask applies because caller is not in `acme_high_priority_ops` |
 
 All three policies enforce as their Snowflake-side originals would. The migration is behaviorally equivalent within the IR's scope.
 
@@ -143,7 +143,7 @@ Both findings landed as commits during this exercise — the cycle of *exercise 
 This is a worked migration of three policies, not a complete migration tooling story. Several real concerns sit outside scope:
 
 - **Data migration.** The script provisions the ACL data on Databricks; a real migration would extract the data from Snowflake (`CREATE TABLE ... AS SELECT * FROM remote_snowflake_table` via a federation source, or an ETL pipeline). The Tessera IR doesn't model the data migration step; it carries the policy intent and the table references.
-- **Identity migration.** Snowflake roles (`BG_RLS_DEMO_HIGH_PRIORITY_OPS`) and Databricks groups (`bg_rls_demo_high_priority_ops`) are not auto-provisioned. The script assumes the groups already exist on Databricks (they were created in earlier worked exercises). A real migration would inventory Snowflake roles, provision equivalent Databricks groups, and populate the bindings.
+- **Identity migration.** Snowflake roles (`ACME_HIGH_PRIORITY_OPS`) and Databricks groups (`acme_high_priority_ops`) are not auto-provisioned. The script assumes the groups already exist on Databricks (they were created in earlier worked exercises). A real migration would inventory Snowflake roles, provision equivalent Databricks groups, and populate the bindings.
 - **Schema migration.** This exercise reuses TPC-H sample tables on both platforms. A real migration would mirror the source schemas onto the target.
 - **Reconciliation.** The adapter contract includes a `reconcile()` method (still stubbed); a real production cycle would compare deployed state to the IR and flag drift. This exercise applies in one direction without reconciliation.
 - **Cross-platform extraction shapes.** The Snowflake extractor recognizes three body shapes — the ones the project's worked exercises deployed. Production extraction would need a SQL AST parser and broader pattern coverage.
@@ -163,7 +163,7 @@ What this exercise *does* demonstrate is that the **IR pivot works**: a Snowflak
 Prereqs:
 - `pip install` already covers it (`databricks-sdk`, `snowflake-connector-python`, `ruamel.yaml`, the validators).
 - A `~/snowflake_auth.txt` file with the Snowflake password (the file is local-only; never committed).
-- A Databricks SDK profile that resolves to a workspace with `bg_rls_demo` provisioned (or change the constants at the top of the script).
+- A Databricks SDK profile that resolves to a workspace with `acme` provisioned (or change the constants at the top of the script).
 
 The script is idempotent — re-running it drops existing attachments before re-applying the new DDL. Useful for exercising the adapter when emission paths or extraction heuristics change.
 
@@ -180,13 +180,13 @@ The script is idempotent — re-running it drops existing attachments before re-
 
 ## The reverse direction also works
 
-`adapters/tests/live_migration_demo_reverse.py` runs the same cycle with **UC as source, Snowflake as target**. Same eight phases, mirror identifiers (`bg_rls_demo.reverse_demo` on Databricks; `BRICETEST.REVERSE_DEMO` on Snowflake). Three policies deploy on UC via `UnityCatalogAdapter.emit()`, get re-discovered + extracted via UC's `discover()`/`extract()` (landed in 0.5.0), and re-emit onto Snowflake via `SnowflakeAdapter.emit()`. Live-verified 2026-05-20:
+`adapters/tests/live_migration_demo_reverse.py` runs the same cycle with **UC as source, Snowflake as target**. Same eight phases, mirror identifiers (`acme.reverse_demo` on Databricks; `ACME.REVERSE_DEMO` on Snowflake). Three policies deploy on UC via `UnityCatalogAdapter.emit()`, get re-discovered + extracted via UC's `discover()`/`extract()` (landed in 0.5.0), and re-emit onto Snowflake via `SnowflakeAdapter.emit()`. Live-verified 2026-05-20:
 
 | Surface | Result under caller (BGIESBRECHT / ACCOUNTADMIN) |
 |---|---|
-| `BRICETEST.REVERSE_DEMO.demo_orders` | 60,080 rows (priorities 3/4/5) — third branch fires |
-| `BRICETEST.REVERSE_DEMO.demo_orders_rls_acl` | 40,324 rows (1-URGENT + 2-HIGH) — caller's ACL codenames |
-| `BRICETEST.REVERSE_DEMO.demo_orders.o_clerk` | `'CLERK-REDACTED'` — caller isn't in the privileged role |
+| `ACME.REVERSE_DEMO.demo_orders` | 60,080 rows (priorities 3/4/5) — third branch fires |
+| `ACME.REVERSE_DEMO.demo_orders_rls_acl` | 40,324 rows (1-URGENT + 2-HIGH) — caller's ACL codenames |
+| `ACME.REVERSE_DEMO.demo_orders.o_clerk` | `'CLERK-REDACTED'` — caller isn't in the privileged role |
 
 This is the symmetric demonstration the IR pivot exists for. The same three Tessera policies enforce identically on both platforms; the migration tooling has discovery, extraction, emission, and reconcile real on both sides; the cycle works in both directions.
 

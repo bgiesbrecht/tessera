@@ -189,7 +189,7 @@ The morning snapshot above remains accurate as a point-in-time read. The afterno
 1. **Stage 4 spec changes landed.** ADRs 018–021 are now reflected in the actual `spec/v0/` files — ontology.ttl, context.jsonld, schema.json, and technical-design-v0.2.md §3.3 / §3.3a / §4.9 / §4.10 / §5.6 / §5.7. All seven worked-example JSON-LDs validate cleanly against the post-Stage-4 schema.
 2. **SHACL shapes shipped (`spec/v0/shapes.ttl`).** Priority 4 done. Closes the validation pipeline at the semantic layer; covers what JSON Schema cannot (closed vocabularies, IRI/class typing, node-shape composition). The conditional-dependency constraints (baselineGroup↔defaultStrategy, transformation↔effect, etc.) are deliberately deferred to JSON Schema — the pragmatic split is documented in shapes.ttl and CLAUDE.md.
 3. **Adapter contract + both implementations scaffolded simultaneously.** Unity Catalog and Snowflake adapters were built in the same commit, pressure-testing the contract from two platforms at once. ADR-024 records the contract shape (Adapter ABC, `CapabilityProfile`, `Diagnostic`, `AdapterConfig` with `identity_bindings` + `resource_bindings` + `tag_taxonomy`, structured Result types). Adapters never execute; the caller composes execution.
-4. **First live cross-platform exercise ran end-to-end.** Same Tessera IR (`group-row-visibility-policy-a.jsonld`) lowered through both adapters and executed against `bg_rls_demo.tpch.orders` on Databricks (7.5M rows) and `BRICETEST.TESSERA.SNOW_ORDERS` on Snowflake (1.5M rows). Both row filters enforce correctly. Findings recorded in ADR-024's postscript and in the Snowflake adapter's capability profile.
+4. **First live cross-platform exercise ran end-to-end.** Same Tessera IR (`group-row-visibility-policy-a.jsonld`) lowered through both adapters and executed against `acme.tpch.orders` on Databricks (7.5M rows) and `ACME.TESSERA.SNOW_ORDERS` on Snowflake (1.5M rows). Both row filters enforce correctly. Findings recorded in ADR-024's postscript and in the Snowflake adapter's capability profile.
 
 ## Updated worked-exercises table
 
@@ -222,7 +222,7 @@ Exercise 6 artifacts: `adapters/tests/live_databricks.py`, `adapters/tests/live_
 
 ## Design questions resolved since the morning snapshot
 
-1. **`AdapterConfig.resource_bindings`** — the same IR target (`table:bg_rls_demo.tpch.orders`) lowers to two different platform identifiers (`bg_rls_demo.tpch.orders` vs `BRICETEST.TESSERA.SNOW_ORDERS`). Surfaced live during the Snowflake exercise; added as a first-class field alongside `identity_bindings`. ADR-021's "configuration mapping pattern" is now mechanically concrete on both axes (identity + resource).
+1. **`AdapterConfig.resource_bindings`** — the same IR target (`table:acme.tpch.orders`) lowers to two different platform identifiers (`acme.tpch.orders` vs `ACME.TESSERA.SNOW_ORDERS`). Surfaced live during the Snowflake exercise; added as a first-class field alongside `identity_bindings`. ADR-021's "configuration mapping pattern" is now mechanically concrete on both axes (identity + resource).
 
 2. **Snowflake's `DEFAULT_SECONDARY_ROLES = ("ALL")` default is a real operator concern, not just a testing-mode oddity.**
    - The setting is a **user property**, not a session parameter (verified: `SHOW PARAMETERS LIKE '%SECONDARY%' IN SESSION` returns nothing; `DESCRIBE USER` exposes `DEFAULT_SECONDARY_ROLES = ["ALL"]`).

@@ -114,7 +114,7 @@ The framework is recognizing a structure that already exists in practice, not in
 
 ## §3. Scoped policy attachment
 
-Tessera v0 attaches policies to specific resources via `appliesTo`. A policy says "this applies to `bg_rls_demo.tpch.orders`." This is fine for table-specific policies but does not express ABAC's defining behavior.
+Tessera v0 attaches policies to specific resources via `appliesTo`. A policy says "this applies to `acme.tpch.orders`." This is fine for table-specific policies but does not express ABAC's defining behavior.
 
 ABAC's defining behavior: a policy attaches at a *level* in the hierarchy (catalog, schema, or table) and *automatically applies* to anything within that scope matching its conditions. A single policy can protect every PII column in a catalog without enumerating tables.
 

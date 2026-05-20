@@ -15,7 +15,7 @@ Demo. Same posture as the prior exercises: express the demonstrated pattern corr
 
 **0.2 — Target platform**
 
-Snowflake. Account `FBGQMMZ-DCC90967`, database `BRICETEST`, schema `TESSERA`. Compute warehouse `COMPUTE_WH`.
+Snowflake. Account `FBGQMMZ-DCC90967`, database `ACME`, schema `TESSERA`. Compute warehouse `COMPUTE_WH`.
 
 **0.3 — Scope of this exercise**
 
@@ -39,7 +39,7 @@ A single Tessera policy is requested, not two parallel policies. No Mechanism A 
 
 **1.1 — Protected table**
 
-`BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL`. A copy of the existing `BRICETEST.TESSERA.SNOW_ORDERS` table (which itself is the 1.5M-row TPC-H sample). Created fresh for this exercise so unrelated policies do not interact.
+`ACME.TESSERA.SNOW_ORDERS_RLS_ACL`. A copy of the existing `ACME.TESSERA.SNOW_ORDERS` table (which itself is the 1.5M-row TPC-H sample). Created fresh for this exercise so unrelated policies do not interact.
 
 **1.2 — Relevant columns**
 
@@ -65,8 +65,8 @@ None. The Snowflake table is not tagged with object tags.
 
 Two tables, mirroring the Databricks two-table indirection:
 
-- `BRICETEST.TESSERA.RLS_ACL_MAPPING` — maps usernames to codenames.
-- `BRICETEST.TESSERA.RLS_PRIORITY_ACL` — maps codenames to order-priority values.
+- `ACME.TESSERA.RLS_ACL_MAPPING` — maps usernames to codenames.
+- `ACME.TESSERA.RLS_PRIORITY_ACL` — maps codenames to order-priority values.
 
 **2.2 — ACL schema**
 
@@ -222,7 +222,7 @@ Same as the prior exercises: policy name differences, formatting/whitespace, com
 The Tessera-derived row-access policy must:
 
 - Be accepted by Snowflake via `CREATE ROW ACCESS POLICY ...` and `ALTER TABLE ... ADD ROW ACCESS POLICY ...`.
-- Reference the two ACL tables verbatim (`BRICETEST.TESSERA.RLS_ACL_MAPPING`, `BRICETEST.TESSERA.RLS_PRIORITY_ACL`).
+- Reference the two ACL tables verbatim (`ACME.TESSERA.RLS_ACL_MAPPING`, `ACME.TESSERA.RLS_PRIORITY_ACL`).
 - Use `CURRENT_USER()` to match the session principal.
 - Use `EXISTS` semantics (or equivalent — existence of a matching row chain, not counting).
 - Be fail-closed for principals without ACL entries.

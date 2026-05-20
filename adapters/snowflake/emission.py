@@ -562,7 +562,7 @@ def _emit_access_grant(policy: dict[str, Any], config: AdapterConfig) -> Emissio
         elif prefix == "function":
             object_kind = "FUNCTION"
             # If the bound resource already includes a signature (e.g.,
-            # `BRICETEST.SCHEMA.fn(NUMBER)`), use it verbatim. Otherwise resolve
+            # `ACME.SCHEMA.fn(NUMBER)`), use it verbatim. Otherwise resolve
             # via the Snowflake cursor if one is available in extras; failing
             # that, emit a `()` placeholder with a warning.
             if "(" in bound:

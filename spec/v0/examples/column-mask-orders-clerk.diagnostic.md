@@ -26,7 +26,7 @@ No other findings of substance. The behavioral logic is straightforward and maps
 
 | Policy element | Category | Notes |
 |---|---|---|
-| Resource binding (`column:bg_rls_demo.tpch.orders.o_clerk`) | **Fully enforced** | `ALTER TABLE ... ALTER COLUMN ... SET MASK` attaches the masking function to the specific column. |
+| Resource binding (`column:acme.tpch.orders.o_clerk`) | **Fully enforced** | `ALTER TABLE ... ALTER COLUMN ... SET MASK` attaches the masking function to the specific column. |
 | `orders_full_access` pass-through rule | **Fully enforced** | The `CASE WHEN is_account_group_member('orders_full_access') THEN o_clerk` branch returns the unredacted value for members. |
 | Default branch — Redact with literal | **Fully enforced** | The `ELSE 'CLERK-REDACTED'` branch returns the literal redaction value. Matches the Tessera `defaultBranch.transformation: { type: Redact, replacement: 'CLERK-REDACTED' }`. |
 | `defaultStrategy: negated-complement` | **Fully enforced** | The existing SQL is structurally negated-complement (unconditional `ELSE`). The Tessera declaration matches the implementation's intent. |
@@ -128,7 +128,7 @@ The Databricks adapter capability profile (when built) would declare a single ti
 | Requirement | Status |
 |---|---|
 | `CREATE FUNCTION` + `ALTER COLUMN ... SET MASK` accepted by Unity Catalog | ✓ — emission matches the verified mechanism. |
-| Applied to `o_clerk` on `bg_rls_demo.tpch.orders` | ✓. |
+| Applied to `o_clerk` on `acme.tpch.orders` | ✓. |
 | References `orders_full_access` verbatim | ✓. |
 | Uses literal `'CLERK-REDACTED'` | ✓ in both the Tessera `replacement` parameter and the SQL `ELSE` clause. |
 
@@ -148,7 +148,7 @@ The exercise's value is in surfacing finding §4. The schema correction is small
 
 ## Postscript — adapter coverage 2026-05-19
 
-The Unity Catalog adapter now emits this policy. The hand-derived SQL in `column-mask-orders-clerk.databricks.sql` was the empirical target during this exercise; on 2026-05-19 the same IR was lowered through `adapters/unity_catalog/emission.py` and produced byte-equivalent DDL (modulo the explanatory `-- Attach the mask` comment, which is documentation-only). Live-executed against `bg_rls_demo.tpch.orders.o_clerk`: the caller (not a member of `orders_full_access`) saw `'CLERK-REDACTED'` for every distinct value. Capability profile for `Capability.COLUMN_VISIBILITY` updated to record the live verification.
+The Unity Catalog adapter now emits this policy. The hand-derived SQL in `column-mask-orders-clerk.databricks.sql` was the empirical target during this exercise; on 2026-05-19 the same IR was lowered through `adapters/unity_catalog/emission.py` and produced byte-equivalent DDL (modulo the explanatory `-- Attach the mask` comment, which is documentation-only). Live-executed against `acme.tpch.orders.o_clerk`: the caller (not a member of `orders_full_access`) saw `'CLERK-REDACTED'` for every distinct value. Capability profile for `Capability.COLUMN_VISIBILITY` updated to record the live verification.
 
 Coverage scope of this emission path: `byIdentity` column targets; rules with `effect: allow` or `effect: transform`; `defaultBranch` with `effect: transform`; `Redact` transformation. `Mask` and `Hash` transformations have parameter-shape semantics settled in v0 but their SQL templates are queued. ABAC `byScope` column masking (the `abac-column-mask-policy-*` IR shapes) remains a separate emission path, not yet implemented.
 
@@ -159,24 +159,24 @@ The hand-derived SQL file stays in this directory as historical record of the em
 The Snowflake adapter now also emits this policy. The same IR was lowered through `adapters/snowflake/emission.py` to a Snowflake masking-policy DDL block:
 
 ```sql
-CREATE OR REPLACE MASKING POLICY BRICETEST.TESSERA.column_mask_orders_clerk_mask
+CREATE OR REPLACE MASKING POLICY ACME.TESSERA.column_mask_orders_clerk_mask
 AS (O_CLERK VARCHAR) RETURNS VARCHAR ->
   CASE
-    WHEN IS_ROLE_IN_SESSION('BG_RLS_DEMO_HIGH_PRIORITY_OPS') THEN O_CLERK
+    WHEN IS_ROLE_IN_SESSION('ACME_HIGH_PRIORITY_OPS') THEN O_CLERK
     ELSE 'CLERK-REDACTED'
   END;
 
-ALTER TABLE BRICETEST.TESSERA.SNOW_ORDERS
+ALTER TABLE ACME.TESSERA.SNOW_ORDERS
   MODIFY COLUMN O_CLERK
-  SET MASKING POLICY BRICETEST.TESSERA.column_mask_orders_clerk_mask;
+  SET MASKING POLICY ACME.TESSERA.column_mask_orders_clerk_mask;
 ```
 
-Live-executed against `BRICETEST.TESSERA.SNOW_ORDERS.O_CLERK`. With `USE SECONDARY ROLES NONE` and the role bound to `group:orders_full_access` set to `BG_RLS_DEMO_HIGH_PRIORITY_OPS`:
+Live-executed against `ACME.TESSERA.SNOW_ORDERS.O_CLERK`. With `USE SECONDARY ROLES NONE` and the role bound to `group:orders_full_access` set to `ACME_HIGH_PRIORITY_OPS`:
 
 | Active role | O_CLERK values returned |
 |---|---|
-| `BG_RLS_DEMO_HIGH_PRIORITY_OPS` | real `Clerk#000000…` values |
-| `BG_RLS_DEMO_ALL_PRIORITY_OPS` | `CLERK-REDACTED` |
+| `ACME_HIGH_PRIORITY_OPS` | real `Clerk#000000…` values |
+| `ACME_ALL_PRIORITY_OPS` | `CLERK-REDACTED` |
 | `PUBLIC` | `CLERK-REDACTED` |
 | `ACCOUNTADMIN` | `CLERK-REDACTED` |
 

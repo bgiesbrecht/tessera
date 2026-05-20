@@ -4,17 +4,17 @@
   "@id": "policy:table-grants-scenario-a",
   "version": "1.0.0",
   "policyKind": "AccessGrantConstraint",
-  "description": "Marketing analytics team can Read bg_rls_demo.tpch.orders.\nPurely affirmative; principals not in the group fall through to whatever\nother policies or platform defaults apply (defaultStrategy omitted).",
+  "description": "Marketing analytics team can Read acme.tpch.orders.\nPurely affirmative; principals not in the group fall through to whatever\nother policies or platform defaults apply (defaultStrategy omitted).",
   "appliesTo": {
     "selector": "byIdentity",
-    "resource": "table:bg_rls_demo.tpch.orders"
+    "resource": "table:acme.tpch.orders"
   },
   "action": "Read",
   "rules": [
     {
       "principal": {
         "selector": "byIdentity",
-        "resource": "group:bg_rls_demo_marketing_analytics"
+        "resource": "group:acme_marketing_analytics"
       },
       "effect": "allow"
     }

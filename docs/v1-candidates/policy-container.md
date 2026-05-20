@@ -18,29 +18,29 @@
 "@id": policy:group-row-visibility-policy-a
 version: 1.0.0
 description: >
-  Three-branch row visibility on bg_rls_demo.tpch.orders, default grounded
+  Three-branch row visibility on acme.tpch.orders, default grounded
   in explicit membership in `account users`.
 kind: RowVisibility
 
 appliesTo:
   selector: byIdentity
-  resource: table:bg_rls_demo.tpch.orders
+  resource: table:acme.tpch.orders
 
 defaultStrategy: explicit-baseline-group
 baselineGroup: "account users"
 
 rules:
   # Rule 1 — most permissive
-  - principal: { selector: byIdentity, resource: group:bg_rls_demo_all_priority_ops }
+  - principal: { selector: byIdentity, resource: group:acme_all_priority_ops }
     effect: keep-matching-rows
     # No condition: rule matches every row for principals in this group.
 
   # Rule 2 — restrictive
-  - principal: { selector: byIdentity, resource: group:bg_rls_demo_high_priority_ops }
+  - principal: { selector: byIdentity, resource: group:acme_high_priority_ops }
     effect: keep-matching-rows
     condition:
       op: in
-      operands: [column:bg_rls_demo.tpch.orders.o_orderpriority]
+      operands: [column:acme.tpch.orders.o_orderpriority]
       values: ["1-URGENT", "2-HIGH"]
 
   # Rule 3 — baseline (the rule keyed off baselineGroup; framework recognizes
@@ -49,7 +49,7 @@ rules:
     effect: keep-matching-rows
     condition:
       op: in
-      operands: [column:bg_rls_demo.tpch.orders.o_orderpriority]
+      operands: [column:acme.tpch.orders.o_orderpriority]
       values: ["3-MEDIUM", "4-NOT SPECIFIED", "5-LOW"]
 
 provenance:
@@ -137,9 +137,9 @@ When `defaultStrategy: negated-complement`, the IR has no place to carry the def
 "@type": Policy
 defaultStrategy: negated-complement
 rules:
-  - principal: { selector: byIdentity, resource: group:bg_rls_demo_all_priority_ops }
+  - principal: { selector: byIdentity, resource: group:acme_all_priority_ops }
     effect: keep-matching-rows
-  - principal: { selector: byIdentity, resource: group:bg_rls_demo_high_priority_ops }
+  - principal: { selector: byIdentity, resource: group:acme_high_priority_ops }
     condition: { op: in, operands: [column:...], values: ["1-URGENT", "2-HIGH"] }
     effect: keep-matching-rows
 defaultBranch:

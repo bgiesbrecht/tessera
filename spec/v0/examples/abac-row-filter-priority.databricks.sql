@@ -8,7 +8,7 @@
 -- The Databricks Tessera adapter is not yet built; this file represents
 -- what the adapter would emit given this policy and the configured
 -- tag-taxonomy mapping (ADR-021) that translates
---   bg:rowDiscriminator: orderpriority ↔ has_tag_value('abac_column', 'orderpriority')
+--   acme:rowDiscriminator: orderpriority ↔ has_tag_value('abac_column', 'orderpriority')
 --
 -- Companion artifacts:
 --   ../examples/abac-row-filter-priority.tessera.yaml / .jsonld
@@ -30,16 +30,16 @@
 -- indicating row visibility. Ordering of the CASE branches encodes
 -- Tessera's first-match rule order from the IR: most-permissive first.
 
-CREATE OR REPLACE FUNCTION bg_rls_demo.tpch.tessera__abac_row_filter_priority__filter(priority STRING)
+CREATE OR REPLACE FUNCTION acme.tpch.tessera__abac_row_filter_priority__filter(priority STRING)
 RETURNS BOOLEAN
 RETURN
   CASE
-    WHEN is_account_group_member('bg_rls_demo_all_priority_ops')  THEN TRUE
-    WHEN is_account_group_member('bg_rls_demo_high_priority_ops') THEN priority IN ('1-URGENT', '2-HIGH')
+    WHEN is_account_group_member('acme_all_priority_ops')  THEN TRUE
+    WHEN is_account_group_member('acme_high_priority_ops') THEN priority IN ('1-URGENT', '2-HIGH')
     ELSE                                                               priority IN ('3-MEDIUM', '4-NOT SPECIFIED', '5-LOW')
   END;
 
-GRANT EXECUTE ON FUNCTION bg_rls_demo.tpch.tessera__abac_row_filter_priority__filter TO `account users`;
+GRANT EXECUTE ON FUNCTION acme.tpch.tessera__abac_row_filter_priority__filter TO `account users`;
 
 -- ─── The ABAC policy ─────────────────────────────────────────────────────
 -- Attaches at catalog scope. MATCH COLUMNS selects the row-discriminator
@@ -49,9 +49,9 @@ GRANT EXECUTE ON FUNCTION bg_rls_demo.tpch.tessera__abac_row_filter_priority__fi
 -- internally (Mechanism B).
 
 CREATE OR REPLACE POLICY tessera__abac_row_filter_priority
-  ON CATALOG bg_rls_demo
+  ON CATALOG acme
   COMMENT 'Tessera ABAC row filter — policy:abac-row-filter-priority'
-  ROW FILTER bg_rls_demo.tpch.tessera__abac_row_filter_priority__filter
+  ROW FILTER acme.tpch.tessera__abac_row_filter_priority__filter
     TO `account users`
     FOR TABLES
     MATCH COLUMNS has_tag_value('abac_column', 'orderpriority') AS priority_col
@@ -78,7 +78,7 @@ CREATE OR REPLACE POLICY tessera__abac_row_filter_priority
 --   `priority`.
 --
 -- * Currently the only column in the catalog tagged `abac_column=orderpriority`
---   is `bg_rls_demo.tpch.orders_abac.o_orderpriority`, so the policy
+--   is `acme.tpch.orders_abac.o_orderpriority`, so the policy
 --   effectively applies just to that one table. Tagging additional
 --   columns the same way would extend the policy to those tables
 --   automatically — the catalog-scope attachment is the value
