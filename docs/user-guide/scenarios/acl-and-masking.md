@@ -191,7 +191,7 @@ policy:
 
 ### Why `byDataset` here
 
-You could try to express this with `byIdentity` against groups, but every change to which CSRs can see which priorities would require platform-side group membership updates. Putting the mapping in a table means it can change without re-granting permissions. This is also Snowflake's documented best-practice pattern for non-trivial row-access policies — the platform-native equivalent gates on `CURRENT_USER()` against the mapping table, which sidesteps a Snowflake quirk around secondary roles (more on that in [operating.md](../operating.md) if you go to Snowflake production).
+You could try to express this with `byIdentity` against groups, but every change to which CSRs can see which priorities would require platform-side group membership updates. Putting the mapping in a table means it can change without re-granting permissions. This is the [data-driven entitlement pattern Snowflake documents for mapping tables](https://docs.snowflake.com/en/user-guide/security-row-using): the platform-native equivalent gates on `CURRENT_USER()` against the mapping table. (For role-discrimination scenarios, Snowflake recommends `IS_ROLE_IN_SESSION` instead — Tessera's `byIdentity`. See [authoring.md § Snowflake authoring guidance](../authoring.md#snowflake-authoring-guidance) for the selector-fit decision.)
 
 ---
 
@@ -350,7 +350,7 @@ For Policy 1 (the byDataset row visibility) you'll see something like:
 
 **Databricks** — a row-filter UDF that joins the ACL tables and an `ALTER TABLE ... SET ROW FILTER ON (o_orderpriority)`.
 
-**Snowflake** — a `CREATE ROW ACCESS POLICY ... -> EXISTS (... CURRENT_USER() ...)` and an `ALTER TABLE ... ADD ROW ACCESS POLICY ... ON (O_ORDERPRIORITY)`. Note the policy gates on `CURRENT_USER()` against your mapping table; this is the pattern Snowflake's docs recommend for non-trivial row-access policies, and the immediate reason `byDataset` is a better authoring choice than `byIdentity` for Snowflake-target policies.
+**Snowflake** — a `CREATE ROW ACCESS POLICY ... -> EXISTS (... CURRENT_USER() ...)` and an `ALTER TABLE ... ADD ROW ACCESS POLICY ... ON (O_ORDERPRIORITY)`. Note the policy gates on `CURRENT_USER()` against your mapping table; this is the data-driven entitlement pattern Snowflake documents for mapping tables, and it's a structural fit because your policy decision is "which codenames does this user have" rather than "does this user have role X."
 
 For Policy 2 (the column mask):
 
@@ -417,7 +417,7 @@ for stmt in mask_sf_result.statements:   # Policy 2
     cur.execute(stmt)
 ```
 
-**Snowflake operator note.** For non-trivial Snowflake row-access policies, Snowflake's default behavior gives every user all roles they've been granted at session start (`DEFAULT_SECONDARY_ROLES = ('ALL')` since 2024). For *role-discriminating* policies this matters; for the `byDataset` pattern in Policy 1 it doesn't — the policy gates on `CURRENT_USER()`, which is unaffected. This is part of why Tessera nudges you toward `byDataset` for non-trivial Snowflake row-access policies. Full discussion in [operating.md](../operating.md).
+**Snowflake operator note.** This scenario's Policy 1 uses `byDataset` because the underlying decision is data-driven entitlement (which codenames does this CSR have access to). The Snowflake emission gates on `CURRENT_USER()` against your mapping table, which is orthogonal to role activation — so `DEFAULT_SECONDARY_ROLES = ('ALL')` (Snowflake's default since 2024) doesn't affect this policy either way. The role-activation question only arises for `IS_ROLE_IN_SESSION`-based (i.e., `byIdentity`) policies; full discussion in [operating.md](../operating.md). For when `byIdentity` is the right choice instead, see [authoring.md § Snowflake authoring guidance](../authoring.md#snowflake-authoring-guidance).
 
 ---
 

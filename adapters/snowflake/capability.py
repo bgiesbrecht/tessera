@@ -26,8 +26,10 @@ SNOWFLAKE_PROFILE = CapabilityProfile(
             "for role-based gating: `CURRENT_ROLE()` (primary role only) and "
             "`IS_ROLE_IN_SESSION(X)` (any active role, primary OR secondary). The adapter "
             "currently emits `IS_ROLE_IN_SESSION(X)` for byIdentity principal selectors, "
-            "matching Snowflake's documented recommendation for non-trivial policies "
-            "('If role activation and role hierarchy are important...'). This carries "
+            "matching Snowflake's recommendation for role-discrimination scenarios: 'If role "
+            "activation and role hierarchy are important, Snowflake recommends that the policy "
+            "conditions use the IS_ROLE_IN_SESSION function for account roles...' "
+            "(docs.snowflake.com/en/user-guide/security-row-using). This carries "
             "permission-scope semantics: any user granted role X sees the data. Policies "
             "needing strict primary-role discrimination would require a different adapter "
             "emission, currently a deferred design question pending an exercise that drives "
@@ -65,11 +67,17 @@ SNOWFLAKE_PROFILE = CapabilityProfile(
             "PrincipalSetFromTable lowers to a correlated EXISTS subquery inside the row-access policy body, "
             "joining the IR's mapping table to the IR's resource-ACL table on the shared codename column. "
             "Live-verified on 2026-05-19 against BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL — all four scenarios "
-            "(seed, additive grant, removal, secondary-roles immunity) pass. This is Snowflake's documented "
-            "best-practice for non-trivial row-access policies: gating on CURRENT_USER() against a mapping "
-            "table sidesteps the BCR-1692 DEFAULT_SECONDARY_ROLES=('ALL') gotcha that affects "
-            "IS_ROLE_IN_SESSION-based policies. SUPPORTED for RowVisibilityConstraint; PARTIAL overall "
-            "because ColumnVisibilityConstraint and ABAC-scoped byDataset are not yet implemented.",
+            "(seed, additive grant, removal, secondary-roles immunity) pass. This is the pattern Snowflake "
+            "documents for data-driven entitlement (membership is a relation, not a role): see "
+            "docs.snowflake.com/en/user-guide/security-row-using — 'A row access policy condition can reference "
+            "a mapping table to filter the query result set... use a mapping table to determine the revenue "
+            "values a sales manager can see in a specified sales region.' Gating on CURRENT_USER() makes the "
+            "policy orthogonal to role activation, including the DEFAULT_SECONDARY_ROLES=('ALL') default. "
+            "This is the right pattern for ACL-driven entitlements; NOT a substitute for byIdentity in "
+            "role-discrimination scenarios, where Snowflake recommends IS_ROLE_IN_SESSION (see ROW_VISIBILITY "
+            "entry). Snowflake's performance caveat applies: mapping-table lookups are slower than simple "
+            "predicate-only policies. SUPPORTED for RowVisibilityConstraint; PARTIAL overall because "
+            "ColumnVisibilityConstraint and ABAC-scoped byDataset are not yet implemented.",
         ),
         Capability.DATASET_DRIVEN_RESOURCES: (
             CapabilitySupport.PARTIAL,

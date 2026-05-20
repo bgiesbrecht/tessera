@@ -253,7 +253,7 @@ ALTER USER analyst_x SET DEFAULT_SECONDARY_ROLES = ('PUBLIC');
 USE SECONDARY ROLES NONE;
 ```
 
-**The Tessera-preferred alternative:** for non-trivial Snowflake policies, author with `byDataset` rather than `byIdentity`. `byDataset` lowers to a mapping-table-based policy gating on `CURRENT_USER()`, which is orthogonal to role activation entirely — the role-discrimination question doesn't arise. See [`authoring.md`](./authoring.md) § Snowflake authoring guidance for the structural reason this aligns with Snowflake's own best-practice recommendation.
+**When `byDataset` fits better:** if the policy is actually deciding data-driven entitlement (ACL-table-driven, not role-driven), author with `byDataset` rather than `byIdentity`. `byDataset` lowers to a mapping-table-based policy gating on `CURRENT_USER()`, which is orthogonal to role activation entirely — the role-discrimination question doesn't arise. This is the pattern Snowflake [documents for data-driven entitlement](https://docs.snowflake.com/en/user-guide/security-row-using), not a blanket Snowflake-recommended alternative to `byIdentity` for "complex" policies. See [`authoring.md`](./authoring.md) § Snowflake authoring guidance for selector-fit guidance.
 
 ADR-024's postscript records the live-verification finding under refined framing (initially misframed as a "gotcha"; corrected after design discussion). Issue [#14](https://github.com/bgiesbrecht/tessera/issues/14) tracks the open question of whether the IR should grow to express Intent A vs Intent B explicitly.
 
@@ -323,7 +323,7 @@ Not yet a first-class adapter mode. The current pattern: emit DDL, print/log, do
 - [ ] `identity_bindings` use uppercase role names (or whatever your environment uses).
 - [ ] `resource_bindings` populated.
 - [ ] Existing row-access policy on the target column inspected; drop step scripted if applicable.
-- [ ] For non-trivial policies: prefer `byDataset` authoring over `byIdentity`.
+- [ ] Selector matches the decision the policy actually makes (role-discrimination → `byIdentity`; ACL-driven entitlement → `byDataset`; see `authoring.md` § Snowflake authoring guidance).
 - [ ] Schema + SHACL validation pass before the connector call.
 - [ ] Diagnostic output captured to audit log.
 

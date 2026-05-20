@@ -64,7 +64,7 @@ The v0 immutability bar is suspended (ADR-017) until external dependency exists,
 **Tooling is incomplete:**
 - YAML → JSON-LD converter exists (v1, 2026-05-20). Reverse direction (JSON-LD → YAML) is deferred. Comment preservation in YAML round-trips is also deferred; the converter uses `ruamel.yaml` from the start so the feature can land cleanly later.
 - No CLI. Library-shaped Python only.
-- No formal `verify` mode for deployment-time configuration checks (e.g., "this user has `DEFAULT_SECONDARY_ROLES = ('ALL')`, which will defeat this policy's discrimination").
+- No formal `verify` mode for deployment-time configuration checks (e.g., "this principal binding maps to a role that doesn't exist on the target," "the target column type doesn't match the policy's expected type").
 
 **The customer engagement backing v0 is one real ACL-pattern shop.** ADR-003's reference customer — a Snowflake shop with hundreds of ACL-table-based policies — drove the design discipline (adapter-first, `byDataset` first-class, capability profiles as artifacts). Other customer corpora may strain the design in ways v0 hasn't yet absorbed.
 

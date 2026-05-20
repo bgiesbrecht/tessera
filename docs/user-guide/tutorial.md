@@ -254,7 +254,7 @@ Same IR; platform-divergent DDL. Note the differences:
 - `SET ROW FILTER` → `ADD ROW ACCESS POLICY` — different DDL primitives for the same concept.
 - Table identifier resolved through `resource_bindings` to a Snowflake-qualified name.
 
-**The Snowflake authoring caveat** that this policy hits: `IS_ROLE_IN_SESSION` respects Snowflake's secondary-role activation. With `DEFAULT_SECONDARY_ROLES = ('ALL')` (Snowflake's default since 2024, per BCR-1692), every role granted to the user is session-active, so `IS_ROLE_IN_SESSION` returns true for all granted roles regardless of which one is primary via `USE ROLE`. This is a real operator concern; the [`operating.md`](./operating.md) Snowflake section covers configuration and the recommended `byDataset` authoring alternative.
+**The Snowflake authoring intent question** that this policy hits: `IS_ROLE_IN_SESSION` is what [Snowflake recommends](https://docs.snowflake.com/en/user-guide/security-row-using) for role-discrimination policies — "If role activation and role hierarchy are important, Snowflake recommends that the policy conditions use the IS_ROLE_IN_SESSION function..." With `DEFAULT_SECONDARY_ROLES = ('ALL')` (Snowflake's default since 2024 per BCR-1692), every granted role is session-active, so the predicate sees them all. This is consistent with `IS_ROLE_IN_SESSION`'s permission-scope semantics, not a defeat of them. If your policy is actually doing data-driven entitlement rather than role discrimination, see § 8 below for the `byDataset` pattern. [`operating.md`](./operating.md) covers the operator-side configuration question in detail.
 
 **Deployment on Snowflake via the connector:**
 
@@ -273,9 +273,9 @@ for stmt in result.statements:
 
 ---
 
-## 8. The recommended Snowflake authoring pattern — `byDataset`
+## 8. Data-driven entitlement on Snowflake — `byDataset`
 
-For non-trivial Snowflake row-access policies, prefer `byDataset` over `byIdentity`. The structural reason: Snowflake's own documentation recommends a mapping-table pattern for non-trivial policies, gating on `CURRENT_USER()` against an authorization table rather than on role activation. This sidesteps the secondary-roles issue entirely because `CURRENT_USER()` is unaffected by role activation.
+When the policy decision is "which rows is *this user* assigned to" rather than "does this user have role X," the right Tessera selector is `byDataset` (Snowflake side) and `PrincipalSetFromTable` (the principal set is computed from a join, not enumerated as role names). [Snowflake documents this as the mapping-table pattern](https://docs.snowflake.com/en/user-guide/security-row-using): the policy body gates on `CURRENT_USER()` against an authorization table, which is orthogonal to role activation. (Note Snowflake's performance caveat in the same doc: "using mapping tables may result in decreased performance compared to the more simple example.")
 
 Tessera's `byDataset` selector with `PrincipalSetFromTable` IS that pattern. The IR is identical to the custom-ACL pattern from the `acl-row-visibility` exercise:
 

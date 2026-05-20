@@ -87,7 +87,7 @@ principal:
     resourceColumn: code_name
 ```
 
-The principal set is computed at query time by joining a mapping table. Used for ACL-table patterns (the Databricks `acl-row-visibility-*` and Snowflake `snowflake-byDataset-row-visibility-*` exercises). Also the **recommended Snowflake authoring pattern** for non-trivial row-access policies — see § Snowflake authoring guidance below.
+The principal set is computed at query time by joining a mapping table. Used for ACL-table patterns (the Databricks `acl-row-visibility-*` and Snowflake `snowflake-byDataset-row-visibility-*` exercises). On Snowflake, this is the pattern documented for data-driven entitlement — see § Snowflake authoring guidance below for when it fits and when `byIdentity` fits instead.
 
 ### `byScope` — ABAC scoped attachment
 
@@ -215,23 +215,50 @@ Use attribute axes in:
 
 ## Snowflake authoring guidance
 
-For non-trivial Snowflake row-access policies, **prefer `byDataset` over `byIdentity`** for the principal selector. This recommendation has two parts: a Snowflake-side reason and a Tessera-side reason that align.
+Pick the selector that matches what the policy actually decides — **not** policy complexity. Snowflake's [Use row access policies](https://docs.snowflake.com/en/user-guide/security-row-using) documents three patterns and recommends different ones for different scenarios. Earlier versions of this guide framed `byDataset` as Snowflake's blanket preferred pattern for "non-trivial" policies; that framing was wrong and is corrected here.
 
-### Snowflake reason
+### Role-discrimination → `byIdentity`
 
-Snowflake's documentation recommends a mapping-table pattern for non-trivial row-access policies (Snowflake docs, *Use row access policies — Mapping table placement*). The reason is operational: gating the policy body on `CURRENT_USER()` against an authorization table is unaffected by the `DEFAULT_SECONDARY_ROLES` setting, whereas gating on `IS_ROLE_IN_SESSION` is subject to it.
+When the policy decision is *"does this user have role X?"*, Snowflake explicitly recommends `IS_ROLE_IN_SESSION`:
 
-Since 2024 (BCR-1692), Snowflake's default for new users is `DEFAULT_SECONDARY_ROLES = ('ALL')`. With ALL active, `IS_ROLE_IN_SESSION(X)` returns true for every role granted to the user, regardless of which role is primary via `USE ROLE`. Policies that rely on `IS_ROLE_IN_SESSION` to discriminate between roles silently fail to discriminate. The mapping-table pattern sidesteps this entirely.
+> "If role activation and role hierarchy are important, Snowflake recommends that the policy conditions use the IS_ROLE_IN_SESSION function for account roles and the IS_DATABASE_ROLE_IN_SESSION function for database roles."
+> — [Use row access policies](https://docs.snowflake.com/en/user-guide/security-row-using)
 
-### Tessera reason
+Tessera's `byIdentity` lowers to `IS_ROLE_IN_SESSION` on Snowflake, matching that recommendation. Snowflake's `DEFAULT_SECONDARY_ROLES = ('ALL')` default (BCR-1692, rolled out 2024) is **consistent with** this emission rather than a defeat condition: secondary roles activate, `IS_ROLE_IN_SESSION` sees them, permission-scope semantics hold. The platform default and the adapter's emission align. (ADR-024's postscript and [`operating.md`](./operating.md) § Role-discrimination semantics record this correction.)
 
-Tessera's `byDataset` selector with `PrincipalSetFromTable` lowers structurally to exactly that mapping-table pattern. The IR shape is the same as the Databricks ACL exercise — the platform divergence is purely in adapter emission. By authoring with `byDataset`, you get:
+If your policy author intends *primary-role-only* semantics — "only when explicitly acting as role X" — that is a different intent the IR does not currently express. Tracked as issue [#14](https://github.com/bgiesbrecht/tessera/issues/14).
 
-- Snowflake-secondary-roles immunity by construction.
-- Role-taxonomy changes update the ACL table, not the policy DDL.
-- The same IR runs on Databricks (where the adapter joins the ACL table in a row-filter UDF body) and on Snowflake (where the adapter joins the ACL table in a row-access policy body).
+### Data-driven entitlement → `byDataset`
 
-### Recommended Snowflake `byDataset` shape
+When the policy decision is *"does this ACL/mapping table assign this user to these rows?"*, Snowflake documents the mapping-table pattern as the canonical fit:
+
+> "A row access policy condition can reference a mapping table to filter the query result set... For example, use a mapping table to determine the revenue values a sales manager can see in a specified sales region."
+> — [Use row access policies](https://docs.snowflake.com/en/user-guide/security-row-using)
+
+This is the real Tessera customer engagement (ADR-003): hundreds of policies expressed as ACL rows. Tessera's `byDataset` selector with `PrincipalSetFromTable` lowers to this pattern. The policy body gates on `CURRENT_USER()` against the ACL, which is orthogonal to role activation — so `DEFAULT_SECONDARY_ROLES` is not part of the design question. Same IR runs on both platforms; only the adapter emission differs.
+
+Snowflake's performance caveat:
+
+> "using mapping tables may result in decreased performance compared to the more simple example."
+> — [Use row access policies](https://docs.snowflake.com/en/user-guide/security-row-using)
+
+The documented optimization for high-volume protected tables is wrapping the lookup in a memoizable function:
+
+> "To increase query performance on the policy-protected table, replace the mapping table lookup subquery in the EXISTS clause with a memoizable function."
+> — [Use row access policies](https://docs.snowflake.com/en/user-guide/security-row-using)
+
+Tessera's emit path currently produces the plain EXISTS form; memoization is a queued optimization, not a v0 requirement.
+
+### Simple cases → simple patterns
+
+For straightforward decisions, Snowflake favors simple patterns over mapping tables on performance grounds:
+
+> "The advantage of simple policies like this is that there is a negligible performance cost for Snowflake to evaluate these policies to return query results compared to using row access policies with mapping tables."
+> — [Use row access policies](https://docs.snowflake.com/en/user-guide/security-row-using)
+
+A single-rule Tessera `byIdentity` policy lowers to one of these simple patterns. Complexity by itself is not a reason to reach for `byDataset`.
+
+### `byDataset` shape on Snowflake
 
 ```yaml
 policy:
@@ -260,18 +287,13 @@ policy:
 
 **Caveat — `resourceColumn` is currently conflated** (v1 candidate; see `spec/v0/examples/snowflake-byDataset-row-visibility.diagnostic.md` §3). For the policy to emit cleanly on Snowflake, the `resourceColumn` of the `ResourceSetFromTable` must match the column name on the protected table that the row-access policy binds to. v1 may split this into separate `aclColumn` + `boundColumn` fields. For now, name the columns to match.
 
-When `byIdentity` is acceptable for Snowflake:
-- The policy is single-rule and gates on `PUBLIC` only (no role discrimination needed).
-- Your environment has `DEFAULT_SECONDARY_ROLES` explicitly set per user.
-- The policy is for a controlled context where the secondary-roles-immunity property isn't load-bearing.
-
 ## When to use which selector
 
 | Want to express | Selector |
 |---|---|
 | "this specific table / specific group" | `byIdentity` |
 | "anything tagged PII / Confidential" | `byClassification` |
-| "membership determined by a join against an ACL table" | `byDataset` (Snowflake-preferred; see above) |
+| "membership determined by a join against an ACL table" | `byDataset` (data-driven entitlement; see § Snowflake authoring guidance) |
 | "everything in catalog X, except sandbox schema" with optional attribute matching | `byScope` |
 | "PII AND in CRM domain, NOT in test schema" | `byComposition` |
 
@@ -286,7 +308,7 @@ When `byIdentity` is acceptable for Snowflake:
 | `column-mask-orders-clerk-*` | Single `TransformationInstance` (Redact) |
 | `abac-column-mask-*` | ABAC scoping via `byScope` + tag-driven masking |
 | `abac-row-filter-priority-*` | ABAC scoping with multi-branch row filter |
-| `snowflake-byDataset-row-visibility-*` | The recommended Snowflake pattern, end to end |
+| `snowflake-byDataset-row-visibility-*` | The Snowflake mapping-table pattern for data-driven entitlement, end to end |
 
 Each carries a `.diagnostic.md` that records findings, gaps, and platform-specific behaviors.
 
