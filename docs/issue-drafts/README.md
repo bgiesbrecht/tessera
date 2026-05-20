@@ -40,6 +40,12 @@ Staging area for issues queued to be filed against `bgiesbrecht/tessera`. Keepin
 | 2026-05-19 | [#23](https://github.com/bgiesbrecht/tessera/issues/23) | Cross-border data transfer controls — covered but unexercised | open (governance-gap survey; underexercised) |
 | 2026-05-19 | [#24](https://github.com/bgiesbrecht/tessera/issues/24) | Consent management — partially covered, integration with consent records undefined | open (governance-gap survey; integration question) |
 | 2026-05-19 | [#25](https://github.com/bgiesbrecht/tessera/issues/25) | AI governance — training-eligibility and ADM-restriction attribute axes | open (governance-gap survey; in-scope gap; v0-candidate; scoping-needed) |
+| 2026-05-20 | [#26](https://github.com/bgiesbrecht/tessera/issues/26) | adapter-reconcile-stub — `Adapter.reconcile()` still stubbed on both adapters | open (v0-candidate; gap surfaced by 0.4.0 migration cycle) |
+| 2026-05-20 | [#27](https://github.com/bgiesbrecht/tessera/issues/27) | uc-adapter-discover-extract — UC adapter discover() and extract() not implemented | open (v0-candidate; gap surfaced by 0.4.0 migration cycle) |
+| 2026-05-20 | [#28](https://github.com/bgiesbrecht/tessera/issues/28) | udf-parameter-name-collision-convention — document the row-filter/column-mask UDF parameter naming rule | open (v0-doc-correction; bug fixed in three emission paths, convention now needs documenting) |
+| 2026-05-20 | [#29](https://github.com/bgiesbrecht/tessera/issues/29) | extracted-ir-identifier-provenance — should extracted IR carry source-platform identifier case? | open (v0-doc-correction; case-insensitive binding lookup mitigates operationally) |
+| 2026-05-20 | [#30](https://github.com/bgiesbrecht/tessera/issues/30) | uc-abac-byscope-column-mask — UC adapter byScope column-mask emission not implemented | open (v0-candidate; ABAC coverage gap) |
+| 2026-05-20 | [#31](https://github.com/bgiesbrecht/tessera/issues/31) | snowflake-abac-byscope — Snowflake adapter byScope ABAC emission not implemented (row + column) | open (v0-candidate; Snowflake mechanism is genuinely different from Databricks) |
 
 ## Queued
 
