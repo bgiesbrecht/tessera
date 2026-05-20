@@ -51,10 +51,10 @@ Expect breaking changes in everything until a v0.1 milestone is cut. After v0.1,
 ## Architecture in brief
 
 ```
-              ┌─────────────────────────────────┐
-              │     Authoring form (YAML)       │
-              │ *.tessera.yaml, comments preserved│
-              └─────────────────┬───────────────┘
+              ┌────────────────────────────────────┐
+              │     Authoring form (YAML)          │
+              │ *.tessera.yaml, comments preserved │
+              └─────────────────┬──────────────────┘
                                 │  convert
                                 ▼
               ┌─────────────────────────────────┐
