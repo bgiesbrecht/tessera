@@ -39,14 +39,20 @@ If you run a single platform and that platform's governance meets your needs, Te
 
 ## Status
 
-Tessera is in early design. The specification is being drafted; reference adapters do not yet exist. The current focus is:
+Current version: **0.6.0** (see `VERSION`, `CHANGELOG.md`).
 
-1. Stabilizing the vocabulary and intermediate representation.
-2. Publishing the JSON-LD context as a stable, versioned reference.
-3. Building the first end-to-end adapter (Unity Catalog) followed by the second (Snowflake-native).
-4. Working through a real customer's custom enforcement pattern as the proving ground for adapter extensibility.
+Both reference adapters are real and exercise the full ADR-024 cycle — `emit` / `discover` / `extract` / `reconcile` — on Databricks Unity Catalog and on Snowflake. Three policy shapes are implemented across both platforms: `RowVisibilityConstraint` (`byIdentity`, `byScope`, `byDataset`), `ColumnVisibilityConstraint` (`Redact`), and `AccessGrantConstraint` (table, function, schema-fan-out). Bidirectional migration between the two platforms is demonstrated end-to-end in `adapters/tests/live_migration_demo.py` and its reverse-direction sibling, with verification queries confirming the same policy intent enforces the same way on both sides.
 
-Expect breaking changes in everything until a v0.1 milestone is cut. After v0.1, the JSON-LD context is immutable per version; the YAML authoring form, the adapter contract, and the reference implementations follow normal semantic-versioning practice.
+The IR — JSON-LD context, OWL ontology, JSON Schema, SHACL shapes — lives in `spec/v0/`. Per ADR-017, the v0 immutability bar is **suspended** until external dependency exists (a third-party adapter, a customer corpus, downstream tooling): additions continue to land in v0, each captured as an ADR. The published GitHub Pages URLs under `bgiesbrecht.github.io/tessera/spec/v0/` will not change once external consumers exist.
+
+For a demo-ready tour of what's working today, read [`docs/showcase.md`](docs/showcase.md). For per-version detail, read `CHANGELOG.md`. Twenty-one of thirty-one tracked issues remain open; the breakdown is in `docs/issue-drafts/README.md`.
+
+Known limitations at 0.6.0:
+
+- UC ABAC `byScope` column-mask emission is queued ([#30](https://github.com/bgiesbrecht/tessera/issues/30)).
+- Snowflake ABAC `byScope` is queued ([#31](https://github.com/bgiesbrecht/tessera/issues/31)) — different platform mechanism.
+- YAML comment preservation in round-trips is deferred to converter v2.
+- Schema-pattern resource bindings are not yet implemented.
 
 ## Architecture in brief
 
@@ -83,57 +89,86 @@ Three forms exist:
 .
 ├── README.md                              ← this file
 ├── LICENSE                                ← Apache 2.0
-├── DECISIONS.md                           ← decision log (ADRs)
+├── DECISIONS.md                           ← 26 numbered ADRs
+├── CHANGELOG.md                           ← per-version detail
+├── VERSION                                ← current: 0.6.0
 ├── docs/
-│   ├── executive-summary.md               ← one-page brief
+│   ├── showcase.md                        ← demo-anchored tour of 0.6.0
+│   ├── executive-summary.md               ← one-page leadership brief
 │   ├── problem-and-recommendation.md      ← stakeholder framing
 │   ├── technical-design-v0.2.md           ← current technical spec
-│   └── stakeholder-meeting-agenda.md      ← decision-meeting template
+│   ├── w3c-overview.md                    ← semantic-web stack tour
+│   ├── worked-example-exercise.md         ← worked-example methodology
+│   ├── stakeholder-meeting-agenda.md      ← decision-meeting template
+│   ├── user-guide/                        ← practitioner documentation
+│   │   ├── tutorial.md                    ← first policy, end to end
+│   │   ├── authoring.md                   ← writing .tessera.yaml
+│   │   ├── operating.md                   ← deploying and reconciling
+│   │   ├── contributing.md                ← repo conventions
+│   │   ├── evaluating.md                  ← adopt / don't-adopt framework
+│   │   └── scenarios/                     ← scenario tutorials
+│   ├── exercises/                         ← per-example input briefs
+│   ├── handoffs/                          ← dated context handoffs
+│   ├── issue-drafts/                      ← issue scoping documents
+│   └── v1-candidates/                     ← deferred-to-v1 design notes
 ├── spec/
 │   └── v0/
-│       ├── context.jsonld                 ← JSON-LD context (v0, immutable)
-│       ├── ontology.ttl                   ← OWL/Turtle ontology (v0, immutable)
-│       ├── schema.json                    ← JSON Schema (planned)
-│       └── shapes.ttl                     ← SHACL shapes (planned)
+│       ├── context.jsonld                 ← JSON-LD context
+│       ├── ontology.ttl                   ← OWL/Turtle ontology
+│       ├── schema.json                    ← JSON Schema 2020-12
+│       ├── shapes.ttl                     ← SHACL shapes
+│       └── examples/                      ← worked-example artifacts
 ├── adapters/
-│   ├── unity-catalog/                     ← planned
-│   ├── snowflake/                         ← planned
-│   └── custom-acl/                        ← planned, first customer engagement
+│   ├── contract/                          ← Adapter ABC, Capability, AdapterConfig, reconcile
+│   ├── unity_catalog/                     ← Databricks adapter (full cycle)
+│   ├── snowflake/                         ← Snowflake adapter (full cycle)
+│   └── tests/                             ← parity tests + live demo scripts
 └── tools/
-    ├── converter/                         ← YAML ↔ JSON-LD (planned)
-    └── linter/                            ← validation pipeline (planned)
+    ├── converter/                         ← YAML → JSON-LD
+    └── cli/                               ← unified `tessera` CLI
 ```
 
-Directories marked *planned* do not exist yet. The current artifact set is the documents under `docs/` and the context document under `spec/context/`.
+Per ADR-017, the contents of `spec/v0/` are not yet frozen — additions land in v0 (each captured as an ADR) until external dependency exists. See `CHANGELOG.md` for what changed at each version.
 
 ## How to read the documents
 
-In order, for a new contributor:
+Routing by goal:
 
-1. **`DECISIONS.md`** — read first, always. Every decision that shapes the project lives here as a numbered ADR. All other documents are consistent with these decisions; when they conflict, the ADRs win and the document gets fixed.
-2. **`docs/executive-summary.md`** — the one-page version of what the project is and why.
-3. **`docs/problem-and-recommendation.md`** — the stakeholder-facing framing of the problem and the proposed approach, written without code or technical specifics.
-4. **`docs/technical-design-v0.2.md`** — the current technical specification. References the ADRs for foundational decisions; describes the architecture, vocabulary, IR, adapter contract, and reference implementation scope.
-5. **`spec/v0/context.jsonld`** — the JSON-LD context document. The concrete vocabulary the rest of the spec builds on. Companion: `spec/v0/ontology.ttl`, the formal ontology in Turtle/OWL.
+- **"What does Tessera actually do today?"** — `docs/showcase.md`. The 5–10 minute demo-anchored tour. Start here if you're new.
+- **"Should we adopt this?"** — `docs/user-guide/evaluating.md`, then `docs/executive-summary.md` and `docs/problem-and-recommendation.md`.
+- **"How do I write a policy?"** — `docs/user-guide/tutorial.md`, then `docs/user-guide/authoring.md`, then the scenarios under `docs/user-guide/scenarios/`.
+- **"How do I deploy and reconcile?"** — `docs/user-guide/operating.md`.
+- **"How does the IR work? Why is it shaped this way?"** — `docs/technical-design-v0.2.md` (the current technical specification), then the relevant ADRs in `DECISIONS.md`.
+- **"Why does Tessera use RDF/OWL/SHACL?"** — `docs/w3c-overview.md`.
+- **"How do I build an adapter or extend the framework?"** — `docs/user-guide/contributing.md`, the adapter contract in `adapters/contract/`, ADR-024.
+- **"Show me something runnable."** — `adapters/tests/live_migration_demo.py` (Snowflake → Databricks, end to end); the reverse-direction sibling; the worked-example artifacts in `spec/v0/examples/`.
 
-If you're trying to evaluate whether Tessera fits a specific environment, read 2 and 3 and stop. If you're trying to contribute to the spec or build an adapter, read all five.
+`DECISIONS.md` is the authoritative record: every decision that shapes the project lives there as a numbered ADR. When other documents conflict with an ADR, the ADR wins and the document gets fixed.
 
 ## Foundational decisions
 
-The project is grounded in twelve recorded decisions (see `DECISIONS.md` for the full text and rationale):
+The project is grounded in **26 recorded ADRs** (see `DECISIONS.md` for the complete record and rationale). The decisions that most shape how a reader should understand the project:
 
-- **ADR-001** Tessera's value proposition is semantic interoperability across platforms, not migration. Migration is a derived benefit.
-- **ADR-002** Tessera is a skunkworks customer-enablement initiative. Unity Catalog remains the source of truth inside Databricks; Tessera operates between governance estates.
+**Posture and framing**
+- **ADR-001** Value proposition is semantic interoperability across platforms, not migration. Migration is a derived benefit.
+- **ADR-002** Skunkworks customer-enablement initiative. Unity Catalog is the source of truth *inside* Databricks; Tessera operates *between* governance estates.
+- **ADR-017** v0 immutability is **conditional**: it engages when external dependency exists (third-party adapter, customer corpus, downstream tooling), not on a date.
+
+**Architecture**
 - **ADR-003** Adapters are the unifying abstraction. Native and custom enforcement patterns are peers, not core-and-extension.
-- **ADR-004** JSON-LD is the canonical form of the intermediate representation; YAML is the primary authoring form.
-- **ADR-005** The vocabulary reuses existing standards (W3C ODRL, W3C DPV, Cedar, XACML) where they fit, rather than reinventing them.
-- **ADR-006** A custom DSL is deferred until the IR has stabilized through real corpus exposure and at least two adapter implementations. YAML is the authoring surface in the interim.
-- **ADR-007** Several technical questions remain open and are tracked explicitly rather than resolved by default.
-- **ADR-008** Project name is **Tessera**; the vocabulary prefix is `tessera:` and the YAML authoring extension is `.tessera.yaml`.
-- **ADR-009** License is **Apache 2.0** for both specification and code.
-- **ADR-010** The repository is hosted at **`github.com/bgiesbrecht/tessera`** under an individual account, consistent with the skunkworks posture.
-- **ADR-011** The canonical namespace, context, and ontology URLs are served from **GitHub Pages** at `bgiesbrecht.github.io/tessera/spec/v0/`.
-- **ADR-012** The repository is **public**, because the published namespace URLs must resolve anonymously for downstream tooling.
+- **ADR-004** JSON-LD is the canonical form of the IR; YAML is the primary authoring form.
+- **ADR-005** Vocabulary reuses existing standards (W3C ODRL, W3C DPV) where they fit; alignment is declared via SKOS.
+- **ADR-024** Adapter contract: every adapter implements `emit` / `discover` / `extract` / `reconcile`, plus a declared `CapabilityProfile`.
+
+**IR shape**
+- **ADR-013 / ADR-014 / ADR-015** Policy container as canonical multi-rule shape, with explicit `defaultStrategy` / `baselineGroup` / `defaultBranch` fields and ordered first-match combining.
+- **ADR-016 / ADR-022** Transformations are parameterized objects (`{type: Redact, replacement: ...}`), tied to effect rather than policy-kind.
+- **ADR-018 through ADR-021** ABAC additions: `AttributeAxis`, `byScope`, composable matching, adapter-configuration mapping for the platform-specific tag mechanism.
+- **ADR-023** Cross-policy combination algebra (γ-with-refinement).
+- **ADR-026** `AccessGrantConstraint` as a first-class policyKind alongside row and column visibility.
+
+**Project mechanics**
+- **ADR-008 / ADR-009 / ADR-010 / ADR-011 / ADR-012** Name (`tessera`), license (Apache 2.0), repository (`github.com/bgiesbrecht/tessera`, public), canonical URLs (GitHub Pages under `bgiesbrecht.github.io/tessera/spec/v0/`).
 
 ## Posture toward the platforms
 
