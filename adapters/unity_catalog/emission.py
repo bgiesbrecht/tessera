@@ -70,6 +70,14 @@ def _emit_row_visibility(policy: dict[str, Any], config: AdapterConfig) -> Emiss
     target_table = config.bind_resource(raw_resource) or _strip_iri(raw_resource)
     rules = policy.get("rules") or []
 
+    # byDataset principals — the ACL-mapping-table pattern. Dispatch to a
+    # separate helper that emits a row-filter UDF with an EXISTS body joining
+    # the IR's mapping tables on current_user().
+    if rules and all(
+        (rule.get("principal") or {}).get("selector") == "byDataset" for rule in rules
+    ):
+        return _emit_row_visibility_by_dataset(policy, config, target_table)
+
     if selector != "byIdentity":
         diagnostics.append(Diagnostic(
             severity=DiagnosticSeverity.WARNING,
@@ -110,6 +118,135 @@ def _emit_row_visibility(policy: dict[str, Any], config: AdapterConfig) -> Emiss
         f"RETURN\n"
         f"        {body};",
         f"ALTER TABLE {target_table} SET ROW FILTER {function_name} ON ({column_arg.split()[0] if column_arg else ''});",
+    ]
+
+    return EmissionResult(
+        policy_id=policy_id,
+        target_artifacts=[target_table],
+        statements=statements,
+        diagnostics=diagnostics,
+    )
+
+
+def _emit_row_visibility_by_dataset(
+    policy: dict[str, Any], config: AdapterConfig, target_table: str,
+) -> EmissionResult:
+    """Lower a byDataset RowVisibilityConstraint to a Databricks row-filter UDF.
+
+    Emission target (matches the hand-derived
+    spec/v0/examples/acl-row-visibility.databricks.sql):
+
+        CREATE OR REPLACE FUNCTION <fn>(<col> STRING) RETURNS BOOLEAN
+        RETURN EXISTS (
+          SELECT 1
+          FROM <mapping_table> m
+          JOIN <resource_acl_table> p
+            ON m.<m_resource_col> = p.<p_principal_col>
+          WHERE m.<m_principal_col> = current_user()
+            AND p.<p_resource_col> = <col>
+        );
+
+        ALTER TABLE <target_table> SET ROW FILTER <fn> ON (<col>);
+
+    Single-rule, single-branch. defaultStrategy: none ⇒ no fallback clause.
+    The Databricks counterpart of the Snowflake byDataset emission; the parameter
+    name *is* the column name (positional bind), so no collision-avoidance trick
+    is needed here.
+    """
+    diagnostics: list[Diagnostic] = []
+    policy_id = policy.get("@id")
+    rules = policy.get("rules") or []
+    if len(rules) != 1:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="MULTI_RULE_BYDATASET_NOT_SUPPORTED",
+            message=(
+                f"UC byDataset emission expects exactly one rule; got {len(rules)}. "
+                "Emitting the first only."
+            ),
+        ))
+    rule = rules[0]
+
+    principal = rule.get("principal") or {}
+    dataset = principal.get("dataset") or {}
+    if dataset.get("@type") != "PrincipalSetFromTable":
+        return EmissionResult(
+            policy_id=policy_id, target_artifacts=[target_table], statements=[],
+            diagnostics=[Diagnostic(
+                severity=DiagnosticSeverity.ERROR,
+                code="UNSUPPORTED_DATASET_TYPE",
+                message=(
+                    f"byDataset principal requires dataset @type PrincipalSetFromTable; "
+                    f"got {dataset.get('@type')!r}."
+                ),
+                location="rules[0].principal.dataset.@type",
+            )],
+        )
+    mapping_table = dataset.get("table") or ""
+    mapping_principal_col = dataset.get("principalColumn") or "username"
+    mapping_resource_col = dataset.get("resourceColumn") or "code_name"
+
+    condition = rule.get("condition") or {}
+    if condition.get("op") != "exists-in-dataset":
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="UNSUPPORTED_CONDITION_FOR_BYDATASET",
+            message=(
+                "byDataset row visibility expects condition.op = exists-in-dataset; "
+                f"got {condition.get('op')!r}."
+            ),
+        ))
+        return EmissionResult(
+            policy_id=policy_id, target_artifacts=[target_table], statements=[],
+            diagnostics=diagnostics,
+        )
+
+    operands = condition.get("operands") or []
+    if not operands or not isinstance(operands[0], dict):
+        return EmissionResult(
+            policy_id=policy_id, target_artifacts=[target_table], statements=[],
+            diagnostics=[Diagnostic(
+                severity=DiagnosticSeverity.ERROR,
+                code="MISSING_RESOURCE_DATASET",
+                message="exists-in-dataset condition must carry a ResourceSetFromTable operand.",
+                location="rules[0].condition.operands[0]",
+            )],
+        )
+    resource_ds = operands[0]
+    if resource_ds.get("@type") != "ResourceSetFromTable":
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="UNSUPPORTED_OPERAND_TYPE",
+            message=(
+                f"exists-in-dataset operand expected to be ResourceSetFromTable; "
+                f"got {resource_ds.get('@type')!r}."
+            ),
+        ))
+    resource_table = resource_ds.get("table") or ""
+    resource_principal_col = resource_ds.get("principalColumn") or "code_name"
+    resource_resource_col = resource_ds.get("resourceColumn") or "value"
+
+    slug = (policy_id or "policy").split(":")[-1].replace("-", "_")
+    schema_qualified = target_table.rsplit(".", 1)[0] if target_table.count(".") >= 1 else target_table
+    function_name = f"{schema_qualified}.tessera__{slug}__row_filter"
+    column_name = resource_resource_col
+
+    body = (
+        "EXISTS (\n"
+        "  SELECT 1\n"
+        f"  FROM {mapping_table} m\n"
+        f"  JOIN {resource_table} p\n"
+        f"    ON m.{mapping_resource_col} = p.{resource_principal_col}\n"
+        f"  WHERE m.{mapping_principal_col} = current_user()\n"
+        f"    AND p.{resource_resource_col} = {column_name}\n"
+        ")"
+    )
+
+    statements = [
+        f"CREATE OR REPLACE FUNCTION {function_name}({column_name} STRING)\n"
+        f"RETURNS BOOLEAN\n"
+        f"RETURN {body};",
+        f"ALTER TABLE {target_table} SET ROW FILTER {function_name} ON ({column_name});",
     ]
 
     return EmissionResult(
