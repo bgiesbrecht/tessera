@@ -2,7 +2,7 @@
 
 This page is the authoring reference. It assumes you've worked through [`tutorial.md`](./tutorial.md). Where the tutorial walked one policy end to end, this page covers the vocabulary you'll reach for when writing policies of your own.
 
-The canonical form is JSON-LD (ADR-004), but you author in YAML (`.tessera.yaml` files). The YAML maps mechanically to JSON-LD via the JSON-LD context at `spec/v0/context.jsonld`. A converter tool that handles this round-trip with comment preservation is queued; for now, the two forms are maintained side by side.
+The canonical form is JSON-LD (ADR-004), but you author in YAML (`.tessera.yaml` files). The YAML maps mechanically to JSON-LD via the JSON-LD context at `spec/v0/context.jsonld`. A v1 converter is available — run `python -m tools.converter <file.tessera.yaml> --out <file.jsonld>` or call `from tools.converter import yaml_to_jsonld` from Python. The converter handles envelope-form YAML (the practitioner shape `policy: { id, kind, ... }`) and JSON-LD-shaped YAML alike. Comment preservation in YAML round-trips and the reverse direction (JSON-LD → YAML) are deferred to v2.
 
 ## Top-level structure — the Policy container
 

@@ -5,7 +5,7 @@ This tutorial walks through a single policy from authoring to deployment on both
 **What you'll do, in order:**
 1. Understand the policy intent in plain English.
 2. Write the policy in `.tessera.yaml`.
-3. Convert to the canonical JSON-LD form (mental model — the converter tool is queued).
+3. Convert to the canonical JSON-LD form via the converter (`python -m tools.converter ...`).
 4. Validate against the JSON Schema and SHACL shapes.
 5. Configure an adapter (identity bindings, resource bindings).
 6. Emit DDL through the adapter.
@@ -84,7 +84,7 @@ For the full authoring vocabulary, see [`authoring.md`](./authoring.md).
 
 ## 3. Mental model — JSON-LD canonical form
 
-YAML is what you write; JSON-LD is what the system reasons over. The conversion is mechanical (mapping keys, expanding short names to IRIs via the spec's `context.jsonld`). A converter tool that performs this conversion losslessly with comment preservation is queued — see Priority 5 in `CLAUDE.md`.
+YAML is what you write; JSON-LD is what the system reasons over. The conversion is mechanical (mapping keys, expanding short names to IRIs via the spec's `context.jsonld`). A v1 converter handles this — `python -m tools.converter <file.tessera.yaml> --out <file.jsonld>` or the library function `tools.converter.yaml_to_jsonld()`. Comment preservation in YAML round-trips and JSON-LD → YAML are deferred to v2.
 
 For now, the JSON-LD is hand-maintained alongside the YAML. Look at `spec/v0/examples/group-row-visibility-policy-a.jsonld` for the canonical form of the policy above. The shape is similar; the IRIs are explicit and the `@context` line at the top declares the vocabulary namespace.
 

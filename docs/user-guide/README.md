@@ -8,18 +8,22 @@ Tessera is a portable representation of data governance policy. It expresses *wh
 
 | Who you are | Read first | Then |
 |---|---|---|
+| **Practitioner with an ACL table + masking situation** — you have YAML skills and a real governance problem; you don't need the semantic-web theory | [Scenario: ACL & masking](./scenarios/acl-and-masking.md) | [Authoring](./authoring.md) for vocabulary, [Operating](./operating.md) for deployment |
 | **Policy author** — you write `.tessera.yaml` files describing what governance the organization needs | [Tutorial](./tutorial.md) → [Authoring](./authoring.md) | The capability profiles linked from `operating.md` to know what your target platforms can and can't express |
 | **Operator / adopter** — you wire Tessera into a deployment pipeline (CI, configuration management, audit) | [Tutorial](./tutorial.md) → [Operating](./operating.md) | [Authoring](./authoring.md) for the vocabulary you'll be lowering |
-| **Evaluator** — you're deciding whether Tessera fits | [Evaluating](./evaluating.md) | [Tutorial](./tutorial.md) for a concrete end-to-end |
+| **Evaluator** — you're deciding whether Tessera fits | [Evaluating](./evaluating.md) | [Scenario: ACL & masking](./scenarios/acl-and-masking.md) for a concrete end-to-end |
 | **Future contributor** — you're extending Tessera (new adapter, new IR concept) | [Contributing](./contributing.md) | `DECISIONS.md` (ADRs) and [Operating](./operating.md) |
 
 ## Pages
 
-- [**Tutorial**](./tutorial.md) — write a policy, validate it, emit DDL through both adapters, deploy on Databricks and Snowflake, verify. Single narrative; ~30 minutes end to end.
+- [**Scenario: ACL & masking**](./scenarios/acl-and-masking.md) — practitioner-shaped tutorial for the common "ACL-table row visibility plus column masking" situation. Assumes YAML literacy; no semantic-web background required.
+- [**Tutorial**](./tutorial.md) — write a policy, validate it, emit DDL through both adapters, deploy on Databricks and Snowflake, verify. More concept-focused; ~30 minutes end to end.
 - [**Authoring**](./authoring.md) — the policy vocabulary. Selectors, conditions, transformations, the Policy container, the recommended Snowflake authoring pattern.
 - [**Operating**](./operating.md) — adapter configuration, identity / resource / tag bindings, capability profiles, deployment patterns per platform, the Snowflake `DEFAULT_SECONDARY_ROLES` caveat.
 - [**Evaluating**](./evaluating.md) — scope, non-goals, honest limitations, posture.
 - [**Contributing**](./contributing.md) — how to extend Tessera. Adapter contract, ADR discipline, validation pipeline.
+
+Scenarios live under `scenarios/`. More can be added as additional customer shapes emerge.
 
 ## Conventions used in this guide
 

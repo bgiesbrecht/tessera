@@ -62,7 +62,7 @@ The v0 immutability bar is suspended (ADR-017) until external dependency exists,
 - Discovery, extraction, reconciliation are stubbed across both adapters. The contract defines them; the implementations don't yet exist.
 
 **Tooling is incomplete:**
-- No converter (YAML ↔ JSON-LD round-trip). The two forms are currently maintained side by side.
+- YAML → JSON-LD converter exists (v1, 2026-05-20). Reverse direction (JSON-LD → YAML) is deferred. Comment preservation in YAML round-trips is also deferred; the converter uses `ruamel.yaml` from the start so the feature can land cleanly later.
 - No CLI. Library-shaped Python only.
 - No formal `verify` mode for deployment-time configuration checks (e.g., "this user has `DEFAULT_SECONDARY_ROLES = ('ALL')`, which will defeat this policy's discrimination").
 

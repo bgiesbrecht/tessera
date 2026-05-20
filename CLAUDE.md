@@ -164,11 +164,22 @@ Validated against the worked-example artifacts and the technical-design §4.5 AC
 
 `spec/v0/shapes.ttl` exists and validates all seven worked-example JSON-LD policies. The shape coverage is intentionally scoped to the semantic checks JSON Schema cannot perform: closed vocabularies (policyKind, action, effect, defaultStrategy, condition operator, selector kind), IRI/class typing of axis references (AttributeAxis), and node shapes invoked via `sh:node` (the JSON-LD `@type` is not asserted on blank nodes, so `sh:targetClass` is unreliable). Conditional dependencies (baselineGroup↔defaultStrategy, defaultBranch↔defaultStrategy, transformation↔effect, selector-kind→required-fields, transformation-type→required-params) are deliberately deferred to the JSON Schema layer; SHACL would express them as verbose `sh:or`/`sh:not` biconditionals with no additional safety beyond what the schema already provides. The shapes file also surfaced one semantic clarification worth recording: `defaultBranch` carries no `principal` (it applies to whichever principals match no preceding rule), so the rule-shape requirement of `principal` does not extend to it. This is implicit in ADR-014 and now also visible in shapes.ttl's comment.
 
-### Priority 5 — The converter tool
+### Priority 5 — The converter tool (v1 complete, 2026-05-20)
 
-`tools/converter/` — a small Python (or Go, user's preference) tool that converts between `.tessera.yaml` and JSON-LD in both directions. Comment preservation per ADR-004: comments preserved positionally for YAML round trips; mapped to `rdfs:comment` on YAML → JSON-LD where attached to a node; JSON-LD → YAML does not synthesize comments.
+`tools/converter/` — Python YAML → JSON-LD converter. v1 scope:
+- **Envelope-form** YAML (the practitioner shape: `policy: { id, kind, ... }`) and **flat-form** YAML (JSON-LD-shaped YAML used in earlier worked examples) both accepted.
+- Mechanical mapping: envelope unwrap, `id → @id` with `policy:` prefix injection, `kind → policyKind`, context-aware `type → @type` (datasets and operands convert; transformation `type` stays — the schema explicitly requires lowercase).
+- Canonical `@context` URL injected at root.
+- Trailing-whitespace normalization on string values (handles YAML block-scalar artifacts).
+- CLI entry: `python -m tools.converter <file.tessera.yaml> [--out path]`.
+- Library entry: `yaml_to_jsonld(path)`, `yaml_to_jsonld_str(text)`, `convert_file(in, out)`.
+- Regression test: all 11 worked-example YAMLs convert structurally-equivalent to the committed JSON-LDs.
+- `ruamel.yaml` used from the start (sets up comment-preservation as a future v2 increment, not a refactor).
 
-Use `ruamel.yaml` if Python (because PyYAML drops comments). Use `yaml.v3` if Go and handle comments carefully.
+v1 deferred:
+- **Comment preservation** per ADR-004 (positional YAML round-trips; `rdfs:comment` mapping on YAML → JSON-LD). Architecture is comment-preservation-ready (round-trip ruamel parser); the feature is a follow-up.
+- **JSON-LD → YAML direction.** Single-direction (YAML as source of truth) covers the practitioner path. Reverse direction belongs with the adapter extraction story (migration use case).
+- **Descriptive-field drift in the existing corpus** — 5 of 11 examples have prose differences between their YAML and committed JSON-LD (the regression test surfaces these as informational findings). A follow-up regeneration commit would zero this out by re-running the converter against every YAML and committing the new JSON-LDs as the canonical form.
 
 ### Priority 6 — Adapter scaffolds (complete, 2026-05-19)
 
