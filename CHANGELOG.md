@@ -4,6 +4,66 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.4.0] — 2026-05-20
+
+Five-commit increment focused on closing the migration cycle: `discover` and `extract` on Snowflake are no longer stubs, `byDataset` row visibility is implemented on both adapters, and the full Snowflake → Unity Catalog migration runs end-to-end on fresh schemas with adapter-applied bindings carrying the platform translation. ADR-026 adds `AccessGrantConstraint` as the fifth v0 policyKind, closing the table-grants exercise's open question.
+
+### Added
+
+**Spec.**
+- **ADR-026** — `AccessGrantConstraint` policyKind added to v0 across `ontology.ttl`, `context.jsonld`, `schema.json`, and `shapes.ttl`. Affirmative-grant policies (`effect: allow` on rules) now have an honest policyKind rather than squeezing into `RowVisibilityConstraint`. Three table-grants exercise YAMLs migrated to the new shape; JSON-LDs regenerated via the v1 converter; all 11 worked-example policies still validate clean. Closes [#15](https://github.com/bgiesbrecht/tessera/issues/15).
+
+**Adapter responsibilities (no longer stubs).**
+- **`SnowflakeAdapter.discover(database, schema)`** inventories row-access policies, masking policies, and their attachments on a target schema. Walks `SHOW {ROW ACCESS,MASKING} POLICIES`, `DESCRIBE` for bodies, `INFORMATION_SCHEMA.POLICY_REFERENCES` for attachments.
+- **`SnowflakeAdapter.extract(artifact)`** lifts a discovered Snowflake policy into Tessera IR. Pattern-driven over the policy body text; recognizes three shapes the worked exercises have deployed: byDataset / EXISTS-with-mapping-table row-access policies, byIdentity / IS_ROLE_IN_SESSION-branched row-access policies, byIdentity / CASE-WHEN-IS_ROLE_IN_SESSION masking policies. Extracted IR validates against schema + SHACL with confidence ≥ 0.9.
+
+**Adapter emission coverage.**
+- **UC byDataset row-visibility emission** — `_emit_row_visibility_by_dataset` produces the row-filter UDF body matching the hand-derived `spec/v0/examples/acl-row-visibility.databricks.sql`. `CREATE FUNCTION ... RETURN EXISTS (SELECT 1 FROM map JOIN acl ... WHERE m.user = current_user() AND p.col = <param>)` + `ALTER TABLE ... SET ROW FILTER`. Uses a fixed parameter alias (`policy_input_value`) to avoid the case-insensitive-identifier collision that would otherwise degenerate the predicate to `col = col` (always TRUE — the bug the second deploy uncovered).
+
+**Tooling.**
+- **`adapters/tests/live_snowflake_to_uc_migration.py`** — the first round-trip migration runner. Discovers the policies already deployed on `BRICETEST.TESSERA`, extracts to IR, emits UC DDL, deploys on `bg_rls_demo.tpch`, verifies behavior under the calling user.
+- **`adapters/tests/live_migration_demo.py`** — the repeatable, clean-schemas-both-sides migration demo. Eight phases from fresh-Snowflake-schema provisioning through Databricks verification, plus `--cleanup` to teardown. Idempotent; safe to re-run. The runnable answer to the "could we migrate Snowflake → UC by end of day" aspiration.
+
+**Documentation.**
+- **`docs/user-guide/scenarios/migrating-snowflake-to-uc.md`** — practitioner-shaped walkthrough of the five-phase migration cycle, with the empirical results from both runs and the two findings the exercise produced as adapter improvements (resource_bindings for data tables; parameter-naming collision in the row-filter UDF).
+
+### Changed
+
+- **`AdapterConfig.bind_principal` / `bind_resource`** are now case-insensitive on the identifier portion after the IRI prefix. Snowflake stores identifiers uppercase; extracted IRs come back uppercase; bindings authored mixed-case would otherwise miss. IRI prefix (`table:`, `column:`, `group:`) stays case-sensitive — the semantic discriminator must not collide.
+- **Snowflake byDataset row-visibility emission** now consults `bind_resource()` for the data-table references inside the policy body (mapping table, ACL table). Parallel to the UC fix from earlier in the day. Without this the emitted Snowflake DDL would carry the IR's literal table names (Databricks-shaped) and fail on Snowflake.
+- **UC adapter dispatch on the `rules[].principal.selector` axis**: when all rules use `byDataset`, the row-visibility emission routes to `_emit_row_visibility_by_dataset` instead of the byIdentity path.
+- **Three `table-grants-scenario-*` artifacts** migrated from `RowVisibilityConstraint + effect: allow` to `AccessGrantConstraint`. JSON-LDs regenerated via the converter.
+- **`table-grants.diagnostic.md` §3.4** marked RESOLVED by ADR-026.
+
+### Fixed
+
+- **Row-filter parameter-name collision in UC byDataset emission.** The function parameter `O_ORDERPRIORITY` collided with the bare `o_orderpriority` column reference inside the `EXISTS` subquery; SQL is case-insensitive on identifiers, so Databricks resolved the bare identifier to the column reference, the predicate degenerated to `col = col` (always TRUE), and the filter passed everything. First deployment surfaced 7.5M visible rows; the second deployment with the fix correctly returned only the caller-permitted priorities. Same gotcha the Snowflake adapter solved in 0.2.0; same fix.
+
+### Empirical verification (end of day)
+
+The repeatable migration demo (`adapters/tests/live_migration_demo.py`) runs the full 8-phase cycle on fresh schemas. Under the calling user (`brice.giesbrecht@databricks.com`, in `account users` only):
+
+| Policy | Target object | Visible result |
+|---|---|---|
+| Group row visibility | `bg_rls_demo.migration_demo.demo_orders` | 59,998 rows (priorities 3-MEDIUM / 4-NOT SPECIFIED / 5-LOW — third branch fires) |
+| byDataset row visibility | `bg_rls_demo.migration_demo.demo_orders_rls_acl` | 40,002 rows (priorities 1-URGENT + 2-HIGH — caller's ACL codenames) |
+| Column mask | `bg_rls_demo.migration_demo.demo_orders.o_clerk` | `'CLERK-REDACTED'` for all distinct values |
+
+### Issue tracker activity
+
+- **Closed**: [#15](https://github.com/bgiesbrecht/tessera/issues/15) (access-grant-constraint-policykind) by ADR-026.
+- **Open at version close**: #3, #4, #5, #7, #8, #9, #11, #12, #13, #14, #16, #17, #18, #19, #20, #21, #22, #23, #24, #25.
+- 25 total issues; 5 closed; 20 open.
+
+### What this version does not include
+
+- **`adapters/reconcile()`** still stubbed on both adapters. The full discover/extract/emit/reconcile cycle is three-of-four real now.
+- **UC ABAC byScope column-mask emission** still queued. The byScope row-filter path landed in 0.3.0; the column-mask sibling remains the matching coverage gap.
+- **Snowflake ABAC byScope** (row + column) — different platform mechanism (object tags + tag-based policy attachment). Out of scope for this version.
+- **Tessera CLI thin wrapper** — converter's `python -m tools.converter` is the only command-line surface today; a unified CLI is a deferred convenience.
+- **Phase 2 scoping documents for #19/#21/#25** — queued for claude.ai to draft.
+- **Reverse-direction extraction shapes** beyond the three the project's worked exercises have deployed. Production extraction would need a SQL AST parser; the regex-driven extractor handles known shapes and reports diagnostics on the rest.
+
 ## [0.3.0] — 2026-05-20
 
 Five-commit increment on top of 0.2.0. New tool (YAML → JSON-LD converter), three new adapter emission paths (UC column visibility, UC ABAC byScope row visibility, Snowflake column visibility), new practitioner-shaped tutorial, new W3C-savvy overview, 10 new tracked issues from the governance-gap survey, and the worked-example corpus regenerated with YAML as canonical source.
