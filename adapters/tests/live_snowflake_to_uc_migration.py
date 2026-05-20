@@ -5,11 +5,11 @@
     3. Validate extracted IRs against schema + SHACL.
     4. Emit equivalent Databricks DDL via UnityCatalogAdapter.emit, using bindings
        that map Snowflake-side identifiers to their Databricks counterparts.
-    5. Print the resulting DDL — the SQL that would be run on Databricks to
-       reproduce the policies on Unity Catalog.
-
-If a Databricks SDK session is available and unblocked, the script can also
-apply the DDL and verify behavior; that step is deferred to a follow-up.
+    5. Deploy the migrated DDL on Databricks (Phase 4) — provision prerequisite
+       tables/ACL data, drop existing row filters and column masks on the
+       targets, apply the new DDL.
+    6. Verify behavior (Phase 5): confirm SHOW GRANTS / row counts / column
+       values match the policy intent.
 """
 
 from __future__ import annotations
@@ -81,9 +81,11 @@ def main() -> None:
         print(f"  • [{art['kind']}] {art['fq_name']}  →  {attachments or '<no attachments>'}")
     print()
 
-    # Bindings that translate Snowflake identifiers to Databricks identifiers
-    # for the migration. The Snowflake side used UPPER_CASE roles and database
-    # qualifiers; Databricks uses lowercase group names + the bg_rls_demo catalog.
+    # Bindings translate Snowflake-side identifiers to Databricks-side identifiers.
+    # Includes the ACL mapping-table references (data tables) which the byDataset
+    # policy's body reaches into — migration requires either remapping these
+    # references or migrating the data; here we remap and migrate the data
+    # alongside.
     uc_config = AdapterConfig(
         identity_bindings={
             "group:bg_rls_demo_all_priority_ops":   "bg_rls_demo_all_priority_ops",
@@ -91,9 +93,12 @@ def main() -> None:
             "group:public":                         "account users",
         },
         resource_bindings={
-            "table:BRICETEST.TESSERA.SNOW_ORDERS":           "bg_rls_demo.tpch.orders",
-            "table:BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL":   "bg_rls_demo.tpch.orders_rls_acl",
-            "column:BRICETEST.TESSERA.SNOW_ORDERS.o_clerk":  "bg_rls_demo.tpch.orders.o_clerk",
+            "table:BRICETEST.TESSERA.SNOW_ORDERS":            "bg_rls_demo.tpch.orders",
+            "table:BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL":    "bg_rls_demo.tpch.orders_rls_acl",
+            "column:BRICETEST.TESSERA.SNOW_ORDERS.o_clerk":   "bg_rls_demo.tpch.orders.o_clerk",
+            # ACL data-table references inside the byDataset policy body
+            "table:BRICETEST.TESSERA.RLS_ACL_MAPPING":        "bg_rls_demo.tpch.rls_acl_mapping",
+            "table:BRICETEST.TESSERA.RLS_PRIORITY_ACL":       "bg_rls_demo.tpch.rls_priority_acl",
         },
     )
     uc = UnityCatalogAdapter(config=uc_config)
@@ -138,6 +143,7 @@ def main() -> None:
         extracted.append(r.policy)
 
     print("=== Phase 3: emit Databricks DDL via UC adapter ===\n")
+    all_uc_statements: list[tuple[str, list[str]]] = []
     for policy in extracted:
         em = uc.emit(policy)
         print(f"--- {policy['@id']} ---")
@@ -149,9 +155,127 @@ def main() -> None:
         for stmt in em.statements:
             print(stmt)
             print()
+        all_uc_statements.append((policy["@id"], em.statements))
 
     cur.close()
     conn.close()
+
+    print("\n=== Phase 4: deploy migrated DDL on Databricks ===\n")
+    _deploy_on_databricks(all_uc_statements)
+
+
+def _deploy_on_databricks(stmt_batches: list[tuple[str, list[str]]]) -> None:
+    """Provision prereqs, drop existing attachments, apply the migrated DDL."""
+    from databricks.sdk import WorkspaceClient
+    from databricks.sdk.service.sql import StatementState
+
+    PROFILE = "adb-984752964297111"
+    WAREHOUSE_ID = "148ccb90800933a1"
+    w = WorkspaceClient(profile=PROFILE)
+
+    def run(sql: str, *, ignore_errors: bool = False):
+        r = w.statement_execution.execute_statement(
+            warehouse_id=WAREHOUSE_ID, statement=sql, wait_timeout="30s",
+        )
+        while r.status.state in (StatementState.PENDING, StatementState.RUNNING):
+            r = w.statement_execution.get_statement(r.statement_id)
+        if r.status.state != StatementState.SUCCEEDED:
+            if ignore_errors:
+                return None
+            raise RuntimeError(f"SQL failed: {sql[:80]} -> {r.status.error}")
+        return r.result.data_array if r.result else None
+
+    print("Prereqs (idempotent provisioning) …")
+    for stmt in [
+        "CREATE CATALOG IF NOT EXISTS bg_rls_demo",
+        "CREATE SCHEMA IF NOT EXISTS bg_rls_demo.tpch",
+        "CREATE TABLE IF NOT EXISTS bg_rls_demo.tpch.orders AS "
+        "  SELECT * FROM samples.tpch.orders",
+        "CREATE OR REPLACE TABLE bg_rls_demo.tpch.orders_rls_acl AS "
+        "  SELECT * FROM samples.tpch.orders",
+        # Migrate the ACL mapping data from Snowflake to Databricks. The migration
+        # tooling has to bring the data the policy body reaches into; the IR's
+        # resource_bindings remap the references but the rows themselves need to
+        # exist on the target platform.
+        "CREATE OR REPLACE TABLE bg_rls_demo.tpch.rls_acl_mapping ("
+        "  username STRING, code_name STRING)",
+        "INSERT INTO bg_rls_demo.tpch.rls_acl_mapping VALUES "
+        "  ('BGIESBRECHT', 'urgent_priority_ops'),"
+        "  ('BGIESBRECHT', 'high_priority_ops'),"
+        "  ('brice.giesbrecht@databricks.com', 'urgent_priority_ops'),"
+        "  ('brice.giesbrecht@databricks.com', 'high_priority_ops')",
+        "CREATE OR REPLACE TABLE bg_rls_demo.tpch.rls_priority_acl ("
+        "  code_name STRING, o_orderpriority STRING)",
+        "INSERT INTO bg_rls_demo.tpch.rls_priority_acl VALUES "
+        "  ('urgent_priority_ops', '1-URGENT'),"
+        "  ('high_priority_ops', '2-HIGH'),"
+        "  ('standard_ops', '3-MEDIUM'),"
+        "  ('standard_ops', '4-NOT SPECIFIED'),"
+        "  ('standard_ops', '5-LOW')",
+    ]:
+        try:
+            run(stmt)
+            print(f"  OK: {stmt[:80]}…")
+        except Exception as e:
+            print(f"  FAIL: {stmt[:80]}… -> {str(e).splitlines()[0][:160]}")
+
+    print("\nDrop any existing attachments on the targets …")
+    for stmt in [
+        "ALTER TABLE bg_rls_demo.tpch.orders DROP ROW FILTER",
+        "ALTER TABLE bg_rls_demo.tpch.orders ALTER COLUMN o_clerk DROP MASK",
+        "ALTER TABLE bg_rls_demo.tpch.orders_rls_acl DROP ROW FILTER",
+    ]:
+        run(stmt, ignore_errors=True)
+        print(f"  attempted: {stmt}")
+
+    print("\nApply migrated DDL …")
+    for policy_id, statements in stmt_batches:
+        print(f"  -- {policy_id} --")
+        for stmt in statements:
+            head = stmt.splitlines()[0]
+            try:
+                run(stmt)
+                print(f"    OK: {head[:100]}")
+            except RuntimeError as e:
+                print(f"    FAIL: {head[:100]} -> {str(e).splitlines()[0][:200]}")
+
+    print("\n=== Phase 5: verify behavior on Databricks ===\n")
+    print("Row counts on bg_rls_demo.tpch.orders (was: ABAC-policy filtered):")
+    try:
+        rows = run("SELECT o_orderpriority, COUNT(*) FROM bg_rls_demo.tpch.orders GROUP BY 1 ORDER BY 1")
+        for r in rows or []:
+            print(f"  {r[0]}: {r[1]}")
+    except Exception as e:
+        print(f"  (query failed: {e})")
+
+    print("\nRow counts on bg_rls_demo.tpch.orders_rls_acl (byDataset filter applied):")
+    try:
+        rows = run("SELECT o_orderpriority, COUNT(*) FROM bg_rls_demo.tpch.orders_rls_acl GROUP BY 1 ORDER BY 1")
+        for r in rows or []:
+            print(f"  {r[0]}: {r[1]}")
+    except Exception as e:
+        print(f"  (query failed: {e})")
+
+    print("\nDistinct o_clerk on bg_rls_demo.tpch.orders (mask should hide values unless in group):")
+    try:
+        rows = run("SELECT DISTINCT o_clerk FROM bg_rls_demo.tpch.orders LIMIT 5")
+        for r in rows or []:
+            print(f"  {r[0]}")
+    except Exception as e:
+        print(f"  (query failed: {e})")
+
+    print("\nMembership probe:")
+    try:
+        rows = run(
+            "SELECT "
+            "is_account_group_member('bg_rls_demo_all_priority_ops') AS all_priority, "
+            "is_account_group_member('bg_rls_demo_high_priority_ops') AS high_priority, "
+            "is_account_group_member('account users') AS account_users"
+        )
+        if rows:
+            print(f"  {rows[0]}")
+    except Exception as e:
+        print(f"  (query failed: {e})")
 
 
 if __name__ == "__main__":

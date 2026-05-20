@@ -182,7 +182,13 @@ def _emit_row_visibility_by_dataset(
                 location="rules[0].principal.dataset.@type",
             )],
         )
-    mapping_table = dataset.get("table") or ""
+    mapping_table_raw = dataset.get("table") or ""
+    # Apply resource_bindings to the data-table reference too. The IR carries
+    # the source platform's table name; production migration usually needs to
+    # remap that to a target-platform table name (or migrate the data and use
+    # the new identifier). We look up `table:<raw>` to support this without
+    # changing the IR shape.
+    mapping_table = config.bind_resource(f"table:{mapping_table_raw}") or mapping_table_raw
     mapping_principal_col = dataset.get("principalColumn") or "username"
     mapping_resource_col = dataset.get("resourceColumn") or "code_name"
 
@@ -222,14 +228,23 @@ def _emit_row_visibility_by_dataset(
                 f"got {resource_ds.get('@type')!r}."
             ),
         ))
-    resource_table = resource_ds.get("table") or ""
+    resource_table_raw = resource_ds.get("table") or ""
+    resource_table = config.bind_resource(f"table:{resource_table_raw}") or resource_table_raw
     resource_principal_col = resource_ds.get("principalColumn") or "code_name"
     resource_resource_col = resource_ds.get("resourceColumn") or "value"
 
     slug = (policy_id or "policy").split(":")[-1].replace("-", "_")
     schema_qualified = target_table.rsplit(".", 1)[0] if target_table.count(".") >= 1 else target_table
     function_name = f"{schema_qualified}.tessera__{slug}__row_filter"
-    column_name = resource_resource_col
+    # The function parameter MUST NOT collide with any column name referenced
+    # inside the EXISTS subquery. SQL is case-insensitive on identifiers, so
+    # naming the parameter after the column makes `p.<col> = <col>` ambiguous:
+    # Databricks resolves the bare identifier to the column ref, the predicate
+    # degenerates to `col = col` (always TRUE), and the filter passes all rows.
+    # Pin a fixed alias instead; the column-to-parameter bind happens at
+    # ALTER TABLE ... SET ROW FILTER ... ON (col) by position.
+    param_name = "policy_input_value"
+    bound_column = resource_resource_col
 
     body = (
         "EXISTS (\n"
@@ -238,15 +253,15 @@ def _emit_row_visibility_by_dataset(
         f"  JOIN {resource_table} p\n"
         f"    ON m.{mapping_resource_col} = p.{resource_principal_col}\n"
         f"  WHERE m.{mapping_principal_col} = current_user()\n"
-        f"    AND p.{resource_resource_col} = {column_name}\n"
+        f"    AND p.{resource_resource_col} = {param_name}\n"
         ")"
     )
 
     statements = [
-        f"CREATE OR REPLACE FUNCTION {function_name}({column_name} STRING)\n"
+        f"CREATE OR REPLACE FUNCTION {function_name}({param_name} STRING)\n"
         f"RETURNS BOOLEAN\n"
         f"RETURN {body};",
-        f"ALTER TABLE {target_table} SET ROW FILTER {function_name} ON ({column_name});",
+        f"ALTER TABLE {target_table} SET ROW FILTER {function_name} ON ({bound_column});",
     ]
 
     return EmissionResult(
