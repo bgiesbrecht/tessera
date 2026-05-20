@@ -77,8 +77,94 @@ def discover_schema(run_sql, catalog: str, schema: str) -> DiscoveryResult:
             continue
         for art in _parse_described_table(described, fq_table, run_sql, diagnostics):
             artifacts.append(art)
+        # Walk SHOW GRANTS on the table.
+        for art in _discover_grants(run_sql, "TABLE", fq_table, diagnostics):
+            artifacts.append(art)
+
+    # Walk SHOW GRANTS on the schema itself.
+    for art in _discover_grants(run_sql, "SCHEMA", f"{catalog}.{schema}", diagnostics):
+        artifacts.append(art)
+
+    # Walk functions via INFORMATION_SCHEMA.ROUTINES + SHOW GRANTS on each.
+    # SHOW USER FUNCTIONS doesn't accept a fully-qualified IN clause without
+    # the current catalog being set; the API doesn't carry session state, so
+    # information_schema is the reliable surface.
+    try:
+        functions = run_sql(
+            f"SELECT routine_name FROM {catalog}.information_schema.routines "
+            f"WHERE routine_schema = '{schema}'"
+        ) or []
+        for frow in functions:
+            fn = frow[0] if frow else None
+            if not fn:
+                continue
+            fq_fn = f"{catalog}.{schema}.{fn}"
+            for art in _discover_grants(run_sql, "FUNCTION", fq_fn, diagnostics):
+                artifacts.append(art)
+    except Exception as e:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="LIST_FUNCTIONS_FAILED",
+            message=f"could not enumerate functions in {catalog}.{schema}: {str(e).splitlines()[0][:200]}",
+        ))
 
     return DiscoveryResult(artifacts=artifacts, diagnostics=diagnostics)
+
+
+# Privileges to skip during grant discovery — platform-mechanism / ownership /
+# implicit grants that aren't policy intent.
+_GRANT_PRIVILEGES_SKIP = {"OWN", "ALL PRIVILEGES", "ALL_PRIVILEGES", "MANAGE", "APPLY_TAG"}
+# Pseudo-principals that are platform built-ins (kept for visibility but
+# extraction marks them so the operator can decide).
+_GRANT_PSEUDO_PRINCIPALS = {"account users", "users"}
+
+
+def _discover_grants(
+    run_sql, object_kind: str, fq_object: str,
+    diagnostics: list[Diagnostic],
+) -> list[dict[str, Any]]:
+    """Walk SHOW GRANTS ON <kind> <name>; produce one artifact per explicit grant."""
+    out: list[dict[str, Any]] = []
+    try:
+        rows = run_sql(f"SHOW GRANTS ON {object_kind} {fq_object}") or []
+    except Exception as e:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.INFO,
+            code="SHOW_GRANTS_FAILED",
+            message=f"could not SHOW GRANTS ON {object_kind} {fq_object}: {str(e).splitlines()[0][:160]}",
+        ))
+        return out
+    # Databricks SHOW GRANTS returns rows like [principal, privilege, object_type, object].
+    # Sometimes the object_type/object are inherited-source values (e.g., row's object_type =
+    # 'SCHEMA' on a table grant means the grant was inherited from the parent schema). We
+    # surface those but mark them in the artifact so the extractor can decide.
+    for row in rows:
+        if not row or len(row) < 4:
+            continue
+        principal = (row[0] or "").strip()
+        privilege = (row[1] or "").strip().upper()
+        source_kind = (row[2] or "").strip().upper()
+        source_object = (row[3] or "").strip()
+        if not (principal and privilege):
+            continue
+        if privilege in _GRANT_PRIVILEGES_SKIP:
+            continue
+        out.append({
+            "kind": "access_grant",
+            "fq_name": f"{object_kind.lower()}:{fq_object}::{privilege}::{principal}",
+            "name": f"{principal} {privilege} {object_kind} {fq_object}",
+            "principal": principal,
+            "privilege": privilege,
+            "object_kind": object_kind,
+            "object_name": fq_object,
+            "source_kind": source_kind,
+            "source_object": source_object,
+            "attachments": [{
+                "REF_ENTITY_NAME": fq_object,
+                "REF_OBJECT_KIND": object_kind,
+            }],
+        })
+    return out
 
 
 def _parse_described_table(
@@ -176,6 +262,8 @@ def extract_artifact(artifact: dict[str, Any]) -> ExtractionResult:
         return _extract_row_filter(artifact)
     if kind == "column_mask":
         return _extract_column_mask(artifact)
+    if kind == "access_grant":
+        return _extract_access_grant(artifact)
     return ExtractionResult(
         policy=None, confidence=0.0,
         diagnostics=[Diagnostic(
@@ -184,6 +272,130 @@ def extract_artifact(artifact: dict[str, Any]) -> ExtractionResult:
             message=f"Unrecognized artifact kind: {kind!r}.",
         )],
     )
+
+
+# Inverse of the emission mapping. Some Databricks privileges fan out to more
+# than one IR action; the extractor picks the canonical Tessera action and
+# records the original via provenance.
+_DATABRICKS_PRIVILEGE_TO_ACTION = {
+    "SELECT": "Read",
+    "MODIFY": "Write",
+    "EXECUTE": "Execute",
+    "INSERT": "Write",
+    "UPDATE": "Write",
+    "DELETE": "Delete",
+    "USE SCHEMA": None,    # Adapter scaffolding; not a policy-intent action.
+    "USE CATALOG": None,
+    "USAGE": None,
+    "CREATE": "Write",
+    "CREATE TABLE": "Write",
+    "CREATE FUNCTION": "Write",
+}
+
+
+def _extract_access_grant(artifact: dict[str, Any]) -> ExtractionResult:
+    """Lift a single SHOW GRANTS row into a Tessera AccessGrantConstraint policy.
+
+    Filters:
+        * USE SCHEMA / USE CATALOG / USAGE → skipped (scaffolding, not policy intent).
+        * inherited grants (source_kind != object_kind) → skipped; the parent's
+          grant is its own discovered artifact and will produce its own IR.
+        * pseudo-principals 'users' / 'account users' → lifted with a note.
+    """
+    diagnostics: list[Diagnostic] = []
+    principal = artifact["principal"]
+    privilege = artifact["privilege"]
+    object_kind = artifact["object_kind"]
+    object_name = artifact["object_name"]
+    source_kind = artifact.get("source_kind") or object_kind
+    source_object = artifact.get("source_object") or object_name
+
+    # Skip inherited grants — the source object's grant will produce its own
+    # IR. This avoids N copies of the same logical schema-level grant showing
+    # up once per child table.
+    if source_kind and source_kind.upper() != object_kind.upper():
+        return ExtractionResult(policy=None, confidence=0.0, diagnostics=[
+            Diagnostic(
+                severity=DiagnosticSeverity.INFO,
+                code="INHERITED_GRANT_SKIPPED",
+                message=(f"Grant {principal!r} {privilege!r} on {object_kind} {object_name!r} "
+                         f"is inherited from {source_kind} {source_object!r}; skipping "
+                         "(the inherited-from object produces its own IR)."),
+            )
+        ])
+
+    action = _DATABRICKS_PRIVILEGE_TO_ACTION.get(privilege)
+    if action is None:
+        if privilege in ("USE SCHEMA", "USE CATALOG", "USAGE"):
+            return ExtractionResult(policy=None, confidence=0.0, diagnostics=[
+                Diagnostic(
+                    severity=DiagnosticSeverity.INFO,
+                    code="SCAFFOLDING_GRANT_SKIPPED",
+                    message=(f"{privilege} grant on {object_kind} {object_name!r} treated as "
+                             "adapter scaffolding (not policy intent); skipped."),
+                )
+            ])
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="UNMAPPED_PRIVILEGE",
+            message=(f"Databricks privilege {privilege!r} has no Tessera action mapping; "
+                     "lifting under verbatim action name."),
+        ))
+        action = privilege.title()
+
+    if principal.lower() in _GRANT_PSEUDO_PRINCIPALS:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.INFO,
+            code="PSEUDO_PRINCIPAL",
+            message=(f"Grantee {principal!r} is a Databricks pseudo-principal "
+                     "(workspace-wide). Lifted; operator decides whether to "
+                     "preserve in the corpus."),
+        ))
+
+    # Resource IRI shape depends on object kind.
+    kind_to_prefix = {
+        "TABLE": ("byIdentity", "resource", "table"),
+        "VIEW":  ("byIdentity", "resource", "table"),
+        "FUNCTION": ("byIdentity", "resource", "function"),
+        "SCHEMA": ("byScope", "scope", "schema"),
+        "CATALOG": ("byScope", "scope", "catalog"),
+    }
+    selector_info = kind_to_prefix.get(object_kind)
+    if selector_info is None:
+        return ExtractionResult(
+            policy=None, confidence=0.0,
+            diagnostics=[Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_OBJECT_KIND",
+                message=f"Cannot map object kind {object_kind!r} to a Tessera selector.",
+            )],
+        )
+    selector, key, prefix = selector_info
+    applies_to = {"selector": selector, key: f"{prefix}:{object_name}"}
+
+    slug = (f"{object_kind.lower()}_{object_name.replace('.', '_').replace(' ', '_')}_"
+            f"{principal.replace(' ', '_').replace('@', '_at_').lower()}_"
+            f"{action.lower()}")
+    policy = {
+        "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
+        "@type": "Policy",
+        "@id": f"policy:extracted-grant-{slug}",
+        "version": "1.0.0",
+        "policyKind": "AccessGrantConstraint",
+        "description": (f"Extracted from Databricks grant: {principal} {privilege} on "
+                        f"{object_kind} {object_name}."),
+        "appliesTo": applies_to,
+        "action": action,
+        "rules": [{
+            "principal": {"selector": "byIdentity", "resource": f"group:{principal}"},
+            "effect": "allow",
+        }],
+        "provenance": {
+            "extractedFrom": f"unity-catalog:grant:{object_kind}:{object_name}",
+            "notes": f"Extracted by UnityCatalogAdapter discover()/extract(). Raw privilege: {privilege}.",
+        },
+    }
+    return ExtractionResult(policy=policy, confidence=0.95, diagnostics=diagnostics)
 
 
 def _extract_row_filter(artifact: dict[str, Any]) -> ExtractionResult:

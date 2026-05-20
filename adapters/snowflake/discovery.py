@@ -47,12 +47,13 @@ from adapters.contract.types import (
 
 
 def discover_schema(cursor, database: str, schema: str) -> DiscoveryResult:
-    """Inventory row-access policies and masking policies on a Snowflake schema.
+    """Inventory row-access policies, masking policies, and explicit grants
+    on a Snowflake schema.
 
     Caller passes an open Snowflake connector cursor and the fully-qualified
     schema (database + schema name). Returns a DiscoveryResult whose
-    `artifacts` list carries one entry per policy, each enriched with its
-    body and attachments.
+    `artifacts` list carries one entry per policy or grant, each enriched with
+    its body / attachments / metadata.
     """
     diagnostics: list[Diagnostic] = []
     artifacts: list[dict[str, Any]] = []
@@ -72,7 +73,109 @@ def discover_schema(cursor, database: str, schema: str) -> DiscoveryResult:
         diagnostics=diagnostics,
     ))
 
+    # Schema-level grants.
+    artifacts.extend(_discover_snowflake_grants(
+        cursor, "SCHEMA", f"{database}.{schema}", diagnostics,
+    ))
+
+    # Per-table grants.
+    try:
+        cursor.execute(f"SHOW TABLES IN SCHEMA {database}.{schema}")
+        rows = cursor.fetchall()
+        desc = [d.name for d in cursor.description]
+        for row in rows:
+            meta = dict(zip(desc, row))
+            tname = meta.get("name")
+            if tname:
+                fq = f"{database}.{schema}.{tname}"
+                artifacts.extend(_discover_snowflake_grants(
+                    cursor, "TABLE", fq, diagnostics,
+                ))
+    except Exception as e:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="SHOW_TABLES_FAILED",
+            message=f"could not enumerate tables in {database}.{schema}: {str(e).splitlines()[0][:200]}",
+        ))
+
+    # Per-function grants.
+    try:
+        cursor.execute(f"SHOW USER FUNCTIONS IN SCHEMA {database}.{schema}")
+        rows = cursor.fetchall()
+        desc = [d.name for d in cursor.description]
+        for row in rows:
+            meta = dict(zip(desc, row))
+            fname = meta.get("name")
+            args = meta.get("arguments") or ""
+            # arguments is typically "(NAME ARG_TYPE, ...) RETURN RET_TYPE";
+            # the signature portion before " RETURN " is what GRANT needs.
+            sig = args.split(" RETURN")[0] if " RETURN" in args else args
+            if fname:
+                fq = f"{database}.{schema}.{fname}{sig}" if sig.startswith("(") else f"{database}.{schema}.{fname}"
+                artifacts.extend(_discover_snowflake_grants(
+                    cursor, "FUNCTION", fq, diagnostics,
+                ))
+    except Exception as e:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.INFO,
+            code="SHOW_FUNCTIONS_FAILED",
+            message=f"could not enumerate functions in {database}.{schema}: {str(e).splitlines()[0][:200]}",
+        ))
+
     return DiscoveryResult(artifacts=artifacts, diagnostics=diagnostics)
+
+
+# Snowflake-side filtering parallel to UC: skip ownership and implicit grants.
+_SNOWFLAKE_PRIVILEGES_SKIP = {"OWNERSHIP", "ALL", "ALL PRIVILEGES"}
+
+
+def _discover_snowflake_grants(
+    cursor, object_kind: str, fq_object: str,
+    diagnostics: list[Diagnostic],
+) -> list[dict[str, Any]]:
+    """Walk SHOW GRANTS ON <kind> <object>; produce one artifact per explicit grant."""
+    out: list[dict[str, Any]] = []
+    try:
+        cursor.execute(f"SHOW GRANTS ON {object_kind} {fq_object}")
+        rows = cursor.fetchall()
+        desc = [d.name for d in cursor.description]
+    except Exception as e:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.INFO,
+            code="SHOW_GRANTS_FAILED",
+            message=f"could not SHOW GRANTS ON {object_kind} {fq_object}: {str(e).splitlines()[0][:160]}",
+        ))
+        return out
+
+    # Snowflake SHOW GRANTS columns include: created_on, privilege, granted_on,
+    # name (the object), granted_to, grantee_name, grant_option, granted_by.
+    for row in rows:
+        meta = dict(zip(desc, row))
+        privilege = (meta.get("privilege") or "").strip().upper()
+        granted_on = (meta.get("granted_on") or "").strip().upper()
+        granted_to = (meta.get("granted_to") or "").strip().upper()
+        grantee = (meta.get("grantee_name") or "").strip()
+        if not (privilege and grantee):
+            continue
+        if privilege in _SNOWFLAKE_PRIVILEGES_SKIP:
+            continue
+        out.append({
+            "kind": "access_grant",
+            "fq_name": f"{object_kind.lower()}:{fq_object}::{privilege}::{grantee}",
+            "name": f"{grantee} {privilege} {object_kind} {fq_object}",
+            "principal": grantee,
+            "grantee_type": granted_to,    # ROLE / USER / etc.
+            "privilege": privilege,
+            "object_kind": object_kind,
+            "object_name": fq_object,
+            "source_kind": granted_on,
+            "source_object": meta.get("name", ""),
+            "attachments": [{
+                "REF_ENTITY_NAME": fq_object,
+                "REF_OBJECT_KIND": object_kind,
+            }],
+        })
+    return out
 
 
 def _inventory_policies(
@@ -136,7 +239,7 @@ def _inventory_policies(
 
 
 def extract_artifact(artifact: dict[str, Any]) -> ExtractionResult:
-    """Lift a discovered Snowflake policy into Tessera IR.
+    """Lift a discovered Snowflake artifact into Tessera IR.
 
     Recognized shapes (see module docstring). Returns ExtractionResult with the
     parsed IR dict + a confidence score (1.0 = full shape recognized; <1.0 =
@@ -147,6 +250,8 @@ def extract_artifact(artifact: dict[str, Any]) -> ExtractionResult:
         return _extract_row_access_policy(artifact)
     if kind == "masking_policy":
         return _extract_masking_policy(artifact)
+    if kind == "access_grant":
+        return _extract_snowflake_access_grant(artifact)
     return ExtractionResult(
         policy=None, confidence=0.0,
         diagnostics=[Diagnostic(
@@ -155,6 +260,100 @@ def extract_artifact(artifact: dict[str, Any]) -> ExtractionResult:
             message=f"Unrecognized artifact kind: {kind!r}.",
         )],
     )
+
+
+_SNOWFLAKE_PRIVILEGE_TO_ACTION = {
+    "SELECT": "Read",
+    "INSERT": "Write",
+    "UPDATE": "Write",
+    "DELETE": "Delete",
+    "TRUNCATE": "Delete",
+    "USAGE": None,    # context-dependent: scaffolding for schema/db; Execute for function
+    "REFERENCES": "Read",
+}
+
+
+def _extract_snowflake_access_grant(artifact: dict[str, Any]) -> ExtractionResult:
+    """Lift a Snowflake SHOW GRANTS row into a Tessera AccessGrantConstraint policy."""
+    diagnostics: list[Diagnostic] = []
+    principal = artifact["principal"]
+    privilege = artifact["privilege"]
+    object_kind = artifact["object_kind"]
+    object_name = artifact["object_name"]
+
+    # USAGE on a function = invoke (Execute); USAGE on schema/database = scaffolding.
+    if privilege == "USAGE":
+        if object_kind == "FUNCTION":
+            action = "Execute"
+        else:
+            return ExtractionResult(policy=None, confidence=0.0, diagnostics=[
+                Diagnostic(
+                    severity=DiagnosticSeverity.INFO,
+                    code="SCAFFOLDING_GRANT_SKIPPED",
+                    message=(f"USAGE on {object_kind} {object_name!r} treated as adapter "
+                             "scaffolding (not policy intent); skipped."),
+                )
+            ])
+    else:
+        action = _SNOWFLAKE_PRIVILEGE_TO_ACTION.get(privilege)
+
+    if action is None:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="UNMAPPED_PRIVILEGE",
+            message=(f"Snowflake privilege {privilege!r} has no Tessera action mapping; "
+                     "lifting under verbatim action name."),
+        ))
+        action = privilege.title()
+
+    kind_to_prefix = {
+        "TABLE": ("byIdentity", "resource", "table"),
+        "VIEW":  ("byIdentity", "resource", "table"),
+        "FUNCTION": ("byIdentity", "resource", "function"),
+        "SCHEMA": ("byScope", "scope", "schema"),
+        "DATABASE": ("byScope", "scope", "catalog"),
+    }
+    selector_info = kind_to_prefix.get(object_kind)
+    if selector_info is None:
+        return ExtractionResult(
+            policy=None, confidence=0.0,
+            diagnostics=[Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_OBJECT_KIND",
+                message=f"Cannot map Snowflake object kind {object_kind!r} to a Tessera selector.",
+            )],
+        )
+    selector, key, prefix = selector_info
+
+    # Strip Snowflake function signature when constructing the IR resource ref —
+    # the IR carries the function name; the signature is a Snowflake artifact.
+    bare_object = object_name.split("(", 1)[0] if object_kind == "FUNCTION" else object_name
+
+    applies_to = {"selector": selector, key: f"{prefix}:{bare_object}"}
+
+    slug = (f"{object_kind.lower()}_{bare_object.replace('.', '_').replace(' ', '_')}_"
+            f"{principal.replace(' ', '_').replace('@', '_at_').lower()}_"
+            f"{action.lower()}")
+    policy = {
+        "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
+        "@type": "Policy",
+        "@id": f"policy:extracted-grant-{slug}",
+        "version": "1.0.0",
+        "policyKind": "AccessGrantConstraint",
+        "description": (f"Extracted from Snowflake grant: {principal} {privilege} on "
+                        f"{object_kind} {object_name}."),
+        "appliesTo": applies_to,
+        "action": action,
+        "rules": [{
+            "principal": {"selector": "byIdentity", "resource": f"group:{principal}"},
+            "effect": "allow",
+        }],
+        "provenance": {
+            "extractedFrom": f"snowflake:grant:{object_kind}:{object_name}",
+            "notes": f"Extracted by SnowflakeAdapter discover()/extract(). Raw privilege: {privilege}.",
+        },
+    }
+    return ExtractionResult(policy=policy, confidence=0.95, diagnostics=diagnostics)
 
 
 def _extract_row_access_policy(artifact: dict[str, Any]) -> ExtractionResult:

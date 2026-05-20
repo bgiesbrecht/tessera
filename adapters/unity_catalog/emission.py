@@ -37,6 +37,8 @@ def emit_policy(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult
         return _emit_row_visibility(policy, config)
     if policy_kind == "ColumnVisibilityConstraint":
         return _emit_column_visibility(policy, config)
+    if policy_kind == "AccessGrantConstraint":
+        return _emit_access_grant(policy, config)
 
     diagnostics.append(Diagnostic(
         severity=DiagnosticSeverity.WARNING,
@@ -781,6 +783,180 @@ def _render_condition(
     column = _column_only(_strip_iri(operands[0]))
     rendered_values = ", ".join(f"'{str(v)}'" for v in values)
     return f"{column} IN ({rendered_values})"
+
+
+def _emit_access_grant(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult:
+    """Lower an AccessGrantConstraint to Databricks GRANT statements.
+
+    The IR carries:
+        appliesTo.selector: byIdentity | byScope
+        appliesTo.resource: table:... | column:... | function:...  (byIdentity)
+        appliesTo.scope:    schema:... | catalog:...                (byScope)
+        action:             Read | Write | Execute | Delete | Share | …
+        rules[*].principal: byIdentity with resource: group:...
+        rules[*].effect:    allow | deny
+
+    Action map (Databricks):
+        Read    → SELECT
+        Write   → MODIFY        (Databricks aggregates INSERT/UPDATE/DELETE under MODIFY for tables)
+        Delete  → MODIFY
+        Execute → EXECUTE       (functions only)
+        Share   → SELECT        (best-effort; Databricks sharing is a separate mechanism)
+        Sample  → SELECT
+        Aggregate → SELECT
+
+    For byScope schema-/catalog-level grants, USE SCHEMA / USE CATALOG is
+    emitted as adapter scaffolding so the grantee can resolve the namespace
+    (per the table-grants exercise's diagnostic on `USE SCHEMA`).
+    """
+    diagnostics: list[Diagnostic] = []
+    policy_id = policy.get("@id")
+    applies_to = policy.get("appliesTo") or {}
+    selector = applies_to.get("selector")
+    action_ir = (policy.get("action") or "Read")
+    rules = policy.get("rules") or []
+
+    # Resolve the target object — kind + qualified name — and apply resource_bindings.
+    object_kind: str | None = None
+    target_name: str | None = None
+    needs_usage_scaffold: str | None = None    # what level of USE-* to emit
+
+    if selector == "byIdentity":
+        raw_resource = applies_to.get("resource") or ""
+        bound = config.bind_resource(raw_resource) or _strip_iri(raw_resource)
+        prefix, _ = (raw_resource.split(":", 1) + [""])[:2]
+        prefix = prefix.lower()
+        if prefix == "table":
+            object_kind = "TABLE"; target_name = bound
+        elif prefix == "column":
+            # Column-level grants aren't a thing in UC; coerce to TABLE on the parent.
+            object_kind = "TABLE"
+            target_name = bound.rsplit(".", 1)[0]
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.INFO,
+                code="COLUMN_GRANT_COERCED_TO_TABLE",
+                message=("column-level grants are not a UC primitive; "
+                         f"grant emitted on parent TABLE {target_name!r}."),
+            ))
+        elif prefix == "function":
+            object_kind = "FUNCTION"; target_name = bound
+        else:
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_RESOURCE_PREFIX",
+                message=f"Unknown byIdentity resource prefix {prefix!r}; cannot emit grant.",
+            ))
+    elif selector == "byScope":
+        raw_scope = applies_to.get("scope") or ""
+        bound = config.bind_resource(f"scope:{_strip_iri(raw_scope)}") or _strip_iri(raw_scope)
+        prefix, _ = (raw_scope.split(":", 1) + [""])[:2]
+        prefix = prefix.lower()
+        if prefix == "schema":
+            object_kind = "SCHEMA"; target_name = bound; needs_usage_scaffold = "SCHEMA"
+        elif prefix == "catalog":
+            object_kind = "CATALOG"; target_name = bound; needs_usage_scaffold = "CATALOG"
+        else:
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_SCOPE_PREFIX",
+                message=f"Unknown byScope prefix {prefix!r}; cannot emit grant.",
+            ))
+    else:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="UNSUPPORTED_SELECTOR_FOR_ACCESS_GRANT",
+            message=(f"AccessGrantConstraint scaffold supports byIdentity / byScope selectors; "
+                     f"got {selector!r}."),
+        ))
+
+    if not object_kind or not target_name:
+        return EmissionResult(
+            policy_id=policy_id, target_artifacts=[], statements=[],
+            diagnostics=diagnostics,
+        )
+
+    db_action = _map_action_to_databricks(action_ir, object_kind, diagnostics)
+
+    statements: list[str] = []
+    for idx, rule in enumerate(rules):
+        principal = rule.get("principal") or {}
+        if principal.get("selector") != "byIdentity":
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_PRINCIPAL_SELECTOR_FOR_GRANT",
+                message=(f"rule {idx}: AccessGrantConstraint scaffold supports byIdentity principals; "
+                         f"got {principal.get('selector')!r}."),
+                location=f"rules[{idx}].principal.selector",
+            ))
+            continue
+        principal_ref = principal.get("resource") or ""
+        bound_principal = config.bind_principal(principal_ref) or _strip_iri(principal_ref)
+
+        keyword = "GRANT" if rule.get("effect") == "allow" else (
+            "DENY" if rule.get("effect") == "deny" else None
+        )
+        if keyword is None:
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_EFFECT_FOR_GRANT",
+                message=(f"rule {idx}: AccessGrantConstraint supports effect=allow or "
+                         f"effect=deny; got {rule.get('effect')!r}."),
+                location=f"rules[{idx}].effect",
+            ))
+            continue
+
+        if needs_usage_scaffold == "SCHEMA":
+            statements.append(
+                f"GRANT USE SCHEMA ON SCHEMA {target_name} TO `{bound_principal}`;"
+            )
+        elif needs_usage_scaffold == "CATALOG":
+            statements.append(
+                f"GRANT USE CATALOG ON CATALOG {target_name} TO `{bound_principal}`;"
+            )
+
+        statements.append(
+            f"{keyword} {db_action} ON {object_kind} {target_name} "
+            f"{'TO' if keyword == 'GRANT' else 'FROM'} `{bound_principal}`;"
+        )
+
+    return EmissionResult(
+        policy_id=policy_id,
+        target_artifacts=[f"{object_kind.lower()}:{target_name}"],
+        statements=statements,
+        diagnostics=diagnostics,
+    )
+
+
+def _map_action_to_databricks(
+    action_ir: str, object_kind: str, diagnostics: list[Diagnostic],
+) -> str:
+    """Translate a Tessera action to a Databricks privilege keyword."""
+    action_ir = action_ir.removeprefix("tessera:")
+    mapping = {
+        "Read":      "SELECT",
+        "Sample":    "SELECT",
+        "Aggregate": "SELECT",
+        "Share":     "SELECT",
+        "Write":     "MODIFY",
+        "Delete":    "MODIFY",
+        "Execute":   "EXECUTE",
+    }
+    privilege = mapping.get(action_ir)
+    if privilege is None:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="ACTION_TO_PRIVILEGE_FALLBACK",
+            message=f"No mapping for Tessera action {action_ir!r}; emitting verbatim.",
+        ))
+        privilege = action_ir.upper()
+    if object_kind == "FUNCTION" and privilege == "SELECT":
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="READ_ON_FUNCTION",
+            message=("Action 'Read' on a function maps to SELECT on a TABLE in Databricks. "
+                     "For function invocation, the Tessera action should be 'Execute'."),
+        ))
+    return privilege
 
 
 def _strip_iri(value: str) -> str:

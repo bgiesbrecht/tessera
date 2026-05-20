@@ -34,6 +34,8 @@ def emit_policy(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult
         return _emit_row_visibility(policy, config)
     if policy_kind == "ColumnVisibilityConstraint":
         return _emit_column_visibility(policy, config)
+    if policy_kind == "AccessGrantConstraint":
+        return _emit_access_grant(policy, config)
 
     return EmissionResult(
         policy_id=policy_id,
@@ -512,6 +514,184 @@ def _render_condition(condition: dict[str, Any], idx: int, diagnostics: list[Dia
     column = _column_only(_strip_iri(operands[0]))
     rendered_values = ", ".join(f"'{str(v)}'" for v in values)
     return f"{column} IN ({rendered_values})"
+
+
+def _emit_access_grant(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult:
+    """Lower an AccessGrantConstraint to Snowflake GRANT statements.
+
+    Action map (Snowflake):
+        Read    → SELECT
+        Write   → INSERT, UPDATE, DELETE  (best-effort; Snowflake fans out)
+        Delete  → DELETE
+        Execute → USAGE  (Snowflake uses USAGE for function/procedure invocation)
+        Share   → SELECT
+        Sample  → SELECT
+        Aggregate → SELECT
+
+    Snowflake function grants require a signature (`(args)`). The IR doesn't
+    carry the signature; emission uses `()` as a placeholder and emits a
+    warning. Production migration tooling would resolve the signature from
+    the deployed function metadata.
+    """
+    diagnostics: list[Diagnostic] = []
+    policy_id = policy.get("@id")
+    applies_to = policy.get("appliesTo") or {}
+    selector = applies_to.get("selector")
+    action_ir = (policy.get("action") or "Read")
+    rules = policy.get("rules") or []
+
+    object_kind: str | None = None
+    target_name: str | None = None
+
+    if selector == "byIdentity":
+        raw_resource = applies_to.get("resource") or ""
+        bound = config.bind_resource(raw_resource) or _strip_iri(raw_resource)
+        prefix, _ = (raw_resource.split(":", 1) + [""])[:2]
+        prefix = prefix.lower()
+        if prefix == "table":
+            object_kind = "TABLE"; target_name = bound
+        elif prefix == "column":
+            object_kind = "TABLE"
+            target_name = bound.rsplit(".", 1)[0]
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.INFO,
+                code="COLUMN_GRANT_COERCED_TO_TABLE",
+                message=(f"column-level grants aren't a Snowflake primitive; "
+                         f"grant emitted on parent TABLE {target_name!r}."),
+            ))
+        elif prefix == "function":
+            object_kind = "FUNCTION"; target_name = f"{bound}()"
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="FUNCTION_SIGNATURE_PLACEHOLDER",
+                message=("Snowflake function grants require a signature; emitting `()` "
+                         "as placeholder. Update the emitted DDL with the actual signature "
+                         "before applying."),
+            ))
+        else:
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_RESOURCE_PREFIX",
+                message=f"Unknown byIdentity resource prefix {prefix!r}; cannot emit grant.",
+            ))
+    elif selector == "byScope":
+        raw_scope = applies_to.get("scope") or ""
+        bound = config.bind_resource(f"scope:{_strip_iri(raw_scope)}") or _strip_iri(raw_scope)
+        prefix, _ = (raw_scope.split(":", 1) + [""])[:2]
+        prefix = prefix.lower()
+        if prefix == "schema":
+            object_kind = "SCHEMA"; target_name = bound
+        elif prefix == "catalog":
+            # Snowflake's catalog analog is DATABASE.
+            object_kind = "DATABASE"; target_name = bound
+        else:
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_SCOPE_PREFIX",
+                message=f"Unknown byScope prefix {prefix!r}; cannot emit grant.",
+            ))
+    else:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="UNSUPPORTED_SELECTOR_FOR_ACCESS_GRANT",
+            message=(f"AccessGrantConstraint scaffold supports byIdentity / byScope selectors; "
+                     f"got {selector!r}."),
+        ))
+
+    if not object_kind or not target_name:
+        return EmissionResult(
+            policy_id=policy_id, target_artifacts=[], statements=[],
+            diagnostics=diagnostics,
+        )
+
+    privileges = _map_action_to_snowflake(action_ir, object_kind, diagnostics)
+
+    statements: list[str] = []
+    for idx, rule in enumerate(rules):
+        principal = rule.get("principal") or {}
+        if principal.get("selector") != "byIdentity":
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_PRINCIPAL_SELECTOR_FOR_GRANT",
+                message=(f"rule {idx}: AccessGrantConstraint scaffold supports byIdentity principals; "
+                         f"got {principal.get('selector')!r}."),
+                location=f"rules[{idx}].principal.selector",
+            ))
+            continue
+        principal_ref = principal.get("resource") or ""
+        bound_principal = (config.bind_principal(principal_ref)
+                           or _strip_iri(principal_ref).upper())
+
+        keyword = "GRANT" if rule.get("effect") == "allow" else None
+        if keyword is None:
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_EFFECT_FOR_GRANT",
+                message=(f"rule {idx}: Snowflake emission supports effect=allow only; "
+                         f"got {rule.get('effect')!r}. (Snowflake has no DENY equivalent.)"),
+                location=f"rules[{idx}].effect",
+            ))
+            continue
+
+        # Schema/database grants need USAGE first so the role can resolve the namespace.
+        if object_kind == "SCHEMA":
+            statements.append(
+                f"GRANT USAGE ON SCHEMA {target_name} TO ROLE {bound_principal};"
+            )
+        elif object_kind == "DATABASE":
+            statements.append(
+                f"GRANT USAGE ON DATABASE {target_name} TO ROLE {bound_principal};"
+            )
+
+        for priv in privileges:
+            statements.append(
+                f"{keyword} {priv} ON {object_kind} {target_name} TO ROLE {bound_principal};"
+            )
+
+    return EmissionResult(
+        policy_id=policy_id,
+        target_artifacts=[f"{object_kind.lower()}:{target_name}"],
+        statements=statements,
+        diagnostics=diagnostics,
+    )
+
+
+def _map_action_to_snowflake(
+    action_ir: str, object_kind: str, diagnostics: list[Diagnostic],
+) -> list[str]:
+    """Translate a Tessera action to Snowflake privilege keyword(s).
+
+    Returns a list because some actions fan out to multiple Snowflake privileges
+    (e.g., Write → INSERT + UPDATE + DELETE on tables).
+    """
+    action_ir = action_ir.removeprefix("tessera:")
+    if object_kind == "FUNCTION":
+        # Snowflake function/procedure invocation = USAGE privilege.
+        if action_ir in ("Execute",):
+            return ["USAGE"]
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="ACTION_NOT_APPLICABLE_TO_FUNCTION",
+            message=(f"Action {action_ir!r} doesn't apply to Snowflake functions; "
+                     "emitting USAGE as a best-effort fallback."),
+        ))
+        return ["USAGE"]
+    if action_ir == "Read":
+        return ["SELECT"]
+    if action_ir == "Write":
+        return ["INSERT", "UPDATE", "DELETE"]
+    if action_ir == "Delete":
+        return ["DELETE"]
+    if action_ir in ("Share", "Sample", "Aggregate"):
+        return ["SELECT"]
+    if action_ir == "Execute":
+        return ["USAGE"]
+    diagnostics.append(Diagnostic(
+        severity=DiagnosticSeverity.WARNING,
+        code="ACTION_TO_PRIVILEGE_FALLBACK",
+        message=f"No Snowflake privilege mapping for action {action_ir!r}; emitting verbatim.",
+    ))
+    return [action_ir.upper()]
 
 
 def _strip_iri(value: str) -> str:
