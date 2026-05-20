@@ -442,6 +442,14 @@ The "unrecognized" category exists because honest reporting of unknown is part o
 
 Adapters are versioned independently of the spec. An adapter declares the spec version it implements, the vocabulary version it understands, and its own version. The compatibility matrix is published.
 
+### 5.5a Emission readability — `defaultStrategy: negated-complement` and the `ELSE` clause
+
+When emitting a `Policy` whose `defaultStrategy: negated-complement` carries a `defaultBranch`, the adapter SHOULD render the default branch as the platform's natural default-clause construct — the `ELSE` of a `CASE` expression on Databricks, the `ELSE` of a Snowflake masking-policy `CASE`, etc. — rather than as an additional explicit `WHEN` branch with negated principal predicates.
+
+Both forms are behaviorally equivalent; the `ELSE` form is the readable one and is the IR's structural intent (the `defaultBranch` field exists precisely to communicate "this is the catch-all").
+
+For pre-ADR-014 IR shapes (non-container, multi-rule with a `byComposition`/`match: not` final rule), the same expectation holds: an adapter SHOULD recognize the negated-complement pattern and render it as `ELSE`. This is a quality-of-output expectation; the naive rule-by-rule emission is correct but harder to read in audit. Issue [#5](https://github.com/bgiesbrecht/tessera/issues/5) tracked this; ADR-014's Policy container made it largely automatic by giving `defaultBranch` first-class structure, and the existing adapters take that path.
+
 ### 5.6 Adapter configuration mappings (the general pattern)
 
 Adapters need to translate between platform-specific identifiers and Tessera's semantic vocabulary. The translation is per-environment because adopters use different naming conventions, different tag taxonomies, different principal identity systems. **Configuration lives in adapter-side files, not in the policy IR.** A policy that says `sensitivity: PII` should mean the same thing on every platform; the policy author should not need to know that the Databricks adapter expects this to emit as `has_tag_value('classification', 'pii')` while the Snowflake adapter expects a different tag name.

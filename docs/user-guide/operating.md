@@ -54,6 +54,27 @@ config = AdapterConfig(
 
 Per ADR-021, the IR carries semantic intent (`sensitivity: PII`) and the adapter carries the per-environment translation (`classification = 'pii'`). Authors don't put platform-specific tag values in policies; operators don't author policies to introduce a new platform.
 
+### Identifier case in extracted IR
+
+When an adapter `extract()`s a deployed policy back into Tessera IR, the IR carries the source platform's identifier case **verbatim**. Snowflake folds to uppercase, so a Snowflake-extracted IR has `table:BRICETEST.TESSERA.SNOW_ORDERS`. Databricks is mixed-case, so a UC-extracted IR has `table:bg_rls_demo.tpch.orders`. The IR is lossless about what the source actually stored.
+
+`AdapterConfig.bind_principal` and `bind_resource` are **case-insensitive on the identifier portion** after the IRI prefix to bridge the gap. The prefix (`table:`, `column:`, `group:`) is the semantic discriminator and stays case-sensitive; the identifier after the colon is matched case-folded. This means you can author bindings in whatever case is natural for the target platform — Databricks-mixed for UC targets, uppercase for Snowflake targets, lowercase for normalized records — and the lookup will find it regardless of the case the IR carries.
+
+```python
+config = AdapterConfig(
+    resource_bindings={
+        # Authored in target-platform case; matches IR identifiers regardless of source case.
+        "table:bg_rls_demo.migration_demo.demo_orders":
+            "bg_rls_demo.migration_demo.demo_orders",
+    },
+)
+# Both lookups succeed:
+config.bind_resource("table:bg_rls_demo.migration_demo.demo_orders")             # exact
+config.bind_resource("table:BG_RLS_DEMO.MIGRATION_DEMO.DEMO_ORDERS")              # case-folded
+```
+
+The convention going forward: **carry source case in the IR; rely on the binding-layer case-insensitivity for cross-platform lookups.** Don't pre-normalize identifiers during extraction (the source case is provenance information worth preserving). Issue [#29](https://github.com/bgiesbrecht/tessera/issues/29) tracks the design discussion that produced this convention.
+
 ## Capability profiles
 
 Every adapter declares a `CapabilityProfile`:
