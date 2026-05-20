@@ -5,7 +5,6 @@
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
   "description": "Three-branch row visibility on tables in bg_rls_demo whose o_orderpriority column is tagged for ABAC row filtering. Members of bg_rls_demo_all_priority_ops see all rows; members of bg_rls_demo_high_priority_ops see priority 1-URGENT and 2-HIGH only; everyone else sees priority 3-MEDIUM, 4-NOT SPECIFIED, 5-LOW.",
-
   "appliesTo": {
     "selector": "byScope",
     "scope": "catalog:bg_rls_demo",
@@ -15,11 +14,8 @@
       }
     }
   },
-
   "action": "Read",
-
   "defaultStrategy": "negated-complement",
-
   "rules": [
     {
       "principal": {
@@ -36,29 +32,37 @@
       "effect": "keep-matching-rows",
       "condition": {
         "op": "in",
-        "operands": ["column:$matched"],
-        "values": ["1-URGENT", "2-HIGH"]
+        "operands": [
+          "column:$matched"
+        ],
+        "values": [
+          "1-URGENT",
+          "2-HIGH"
+        ]
       }
     }
   ],
-
   "defaultBranch": {
     "effect": "keep-matching-rows",
     "condition": {
       "op": "in",
-      "operands": ["column:$matched"],
-      "values": ["3-MEDIUM", "4-NOT SPECIFIED", "5-LOW"]
+      "operands": [
+        "column:$matched"
+      ],
+      "values": [
+        "3-MEDIUM",
+        "4-NOT SPECIFIED",
+        "5-LOW"
+      ]
     }
   },
-
   "capabilityRequirements": [
     "scoped-policy-attachment",
     "attribute-axis-matching",
     "tag-taxonomy-mapping",
     "matched-column-reference"
   ],
-
   "provenance": {
-    "notes": "Hand-authored for the ABAC RLS exercise. Blind derivation from docs/exercises/abac-row-filter-priority-inputs.md; Brice's existing implementation has not been shared. Phase 3 comparison happens after Phase 2 commits."
+    "notes": "Hand-authored for the ABAC RLS exercise. Blind derivation from\ndocs/exercises/abac-row-filter-priority-inputs.md; Brice's existing\nimplementation has not been shared. Phase 3 comparison happens\nafter Phase 2 commits."
   }
 }

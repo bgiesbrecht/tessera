@@ -5,16 +5,12 @@
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
   "description": "A principal sees rows of bg_rls_demo.tpch.orders_rls_acl whose o_orderpriority is granted to them via the two-table ACL join (rls_acl_mapping ⋈ rls_priority_acl on code_name). Principals not in the ACL mapping see no rows (fail-closed; defaultStrategy: none).",
-
   "appliesTo": {
     "selector": "byIdentity",
     "resource": "table:bg_rls_demo.tpch.orders_rls_acl"
   },
-
   "action": "Read",
-
   "defaultStrategy": "none",
-
   "rules": [
     {
       "principal": {
@@ -40,15 +36,13 @@
       "effect": "keep-matching-rows"
     }
   ],
-
   "capabilityRequirements": [
     "data-driven-selectors",
     "two-table-join-via-codename",
     "case-insensitive-principal-match",
     "fail-closed-on-acl-absence"
   ],
-
   "provenance": {
-    "notes": "Hand-authored for the ACL-table worked example. The principal selector and condition are the closest v0 representation of a two-table join pattern. The actual SQL emission compiles the full join; the IR carries only the structural shape v0 can express. See diagnostic §4 for the gaps this exercise surfaces."
+    "notes": "Hand-authored for the ACL-table worked example.\nThe principal selector and condition are the closest v0 representation\nof a two-table join pattern. The actual SQL emission compiles the full\njoin; the IR carries only the structural shape v0 can express. See\ndiagnostic §4 for the gaps this exercise surfaces."
   }
 }

@@ -5,17 +5,13 @@
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
   "description": "Three-branch row visibility on bg_rls_demo.tpch.orders driven by group memberships. Default visibility (priorities 3-5) grounded in explicit membership in the Databricks universal group `account users`.",
-
   "appliesTo": {
     "selector": "byIdentity",
     "resource": "table:bg_rls_demo.tpch.orders"
   },
-
   "action": "Read",
-
   "defaultStrategy": "explicit-baseline-group",
   "baselineGroup": "account users",
-
   "rules": [
     {
       "principal": {
@@ -32,8 +28,13 @@
       "effect": "keep-matching-rows",
       "condition": {
         "op": "in",
-        "operands": ["column:bg_rls_demo.tpch.orders.o_orderpriority"],
-        "values": ["1-URGENT", "2-HIGH"]
+        "operands": [
+          "column:bg_rls_demo.tpch.orders.o_orderpriority"
+        ],
+        "values": [
+          "1-URGENT",
+          "2-HIGH"
+        ]
       }
     },
     {
@@ -44,13 +45,18 @@
       "effect": "keep-matching-rows",
       "condition": {
         "op": "in",
-        "operands": ["column:bg_rls_demo.tpch.orders.o_orderpriority"],
-        "values": ["3-MEDIUM", "4-NOT SPECIFIED", "5-LOW"]
+        "operands": [
+          "column:bg_rls_demo.tpch.orders.o_orderpriority"
+        ],
+        "values": [
+          "3-MEDIUM",
+          "4-NOT SPECIFIED",
+          "5-LOW"
+        ]
       }
     }
   ],
-
   "provenance": {
-    "notes": "Hand-authored for the first worked example. Rewritten to the Policy container shape after ADR-014 backported the container into v0."
+    "notes": "Hand-authored for the first worked example.\nRewritten to the Policy container shape after ADR-014 backported the\ncontainer into v0."
   }
 }

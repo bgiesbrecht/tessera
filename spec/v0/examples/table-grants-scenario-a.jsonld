@@ -4,15 +4,12 @@
   "@id": "policy:table-grants-scenario-a",
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
-  "description": "Marketing analytics team can Read bg_rls_demo.tpch.orders. Purely affirmative; principals not in the group fall through to other policies or platform defaults.",
-
+  "description": "Marketing analytics team can Read bg_rls_demo.tpch.orders.\nPurely affirmative; principals not in the group fall through to whatever\nother policies or platform defaults apply (defaultStrategy omitted).",
   "appliesTo": {
     "selector": "byIdentity",
     "resource": "table:bg_rls_demo.tpch.orders"
   },
-
   "action": "Read",
-
   "rules": [
     {
       "principal": {
@@ -21,9 +18,5 @@
       },
       "effect": "allow"
     }
-  ],
-
-  "provenance": {
-    "notes": "Scenario A of the table-grants exercise. Lowered as RowVisibilityConstraint+effect:allow; diagnostic records the AccessGrantConstraint alternative as an open design question."
-  }
+  ]
 }

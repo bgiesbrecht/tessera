@@ -4,15 +4,12 @@
   "@id": "policy:table-grants-scenario-b",
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
-  "description": "Data engineering team can Read every table in bg_rls_demo.tpch_staging, including future tables added to the schema. byScope at schema level produces the downward-propagation semantics per ADR-019.",
-
+  "description": "Data engineering team can Read every table in bg_rls_demo.tpch_staging,\nincluding tables added after the policy is applied. No explicit\nenumeration; byScope at schema level propagates downward.",
   "appliesTo": {
     "selector": "byScope",
     "scope": "schema:bg_rls_demo.tpch_staging"
   },
-
   "action": "Read",
-
   "rules": [
     {
       "principal": {
@@ -21,9 +18,5 @@
       },
       "effect": "allow"
     }
-  ],
-
-  "provenance": {
-    "notes": "Scenario B of the table-grants exercise. First exercise to use byScope without a matching block (the 'match all in scope' case). Phase 3 propagation test verifies that tables created after policy application inherit the grant."
-  }
+  ]
 }

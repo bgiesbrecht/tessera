@@ -5,7 +5,6 @@
   "version": "1.0.0",
   "policyKind": "ColumnVisibilityConstraint",
   "description": "ABAC column-mask policy attached at catalog scope. Matches columns whose sensitivity attribute is PIIClerk; redacts to the literal 'CLERK-REDACTED' for principals outside bg_rls_demo_all_priority_ops.",
-
   "appliesTo": {
     "selector": "byScope",
     "scope": "catalog:bg_rls_demo",
@@ -15,11 +14,8 @@
       }
     }
   },
-
   "action": "Read",
-
   "defaultStrategy": "negated-complement",
-
   "rules": [
     {
       "principal": {
@@ -29,7 +25,6 @@
       "effect": "allow"
     }
   ],
-
   "defaultBranch": {
     "effect": "transform",
     "transformation": {
@@ -37,14 +32,12 @@
       "replacement": "CLERK-REDACTED"
     }
   },
-
   "capabilityRequirements": [
     "scoped-policy-attachment",
     "attribute-axis-matching",
     "tag-taxonomy-mapping"
   ],
-
   "provenance": {
-    "notes": "Hand-authored for the ABAC Stage 3 exercise. Brice deliberately preserved the blind-derivation property; Phase 2 is independent of the existing implementation. Phase 3 will compare."
+    "notes": "Hand-authored for the ABAC Stage 3 exercise. Brice deliberately\npreserved the blind-derivation property; Phase 2 is independent of\nthe existing implementation. Phase 3 will compare."
   }
 }

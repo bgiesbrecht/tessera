@@ -4,17 +4,13 @@
   "@id": "policy:snowflake-byDataset-row-visibility",
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
-  "description": "A principal sees rows of BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL whose O_ORDERPRIORITY is granted to them via the two-table ACL join (RLS_ACL_MAPPING ⋈ RLS_PRIORITY_ACL on CODE_NAME). Principals not in the ACL mapping see no rows (fail-closed; defaultStrategy: none). Snowflake counterpart to policy:acl-row-visibility; the IR shape is identical except for platform-bound table identifiers.",
-
+  "description": "A principal sees rows of BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL whose\nO_ORDERPRIORITY is granted to them via the two-table ACL join\n(RLS_ACL_MAPPING ⋈ RLS_PRIORITY_ACL on CODE_NAME). Principals not in the\nACL mapping see no rows (fail-closed; defaultStrategy: none).",
   "appliesTo": {
     "selector": "byIdentity",
     "resource": "table:BRICETEST.TESSERA.SNOW_ORDERS_RLS_ACL"
   },
-
   "action": "Read",
-
   "defaultStrategy": "none",
-
   "rules": [
     {
       "principal": {
@@ -40,14 +36,12 @@
       "effect": "keep-matching-rows"
     }
   ],
-
   "capabilityRequirements": [
     "data-driven-selectors",
     "two-table-join-via-codename",
     "fail-closed-on-acl-absence"
   ],
-
   "provenance": {
-    "notes": "Snowflake counterpart to policy:acl-row-visibility. The IR is structurally identical to the Databricks ACL IR. Platform divergence lives entirely in the adapter's emission: Snowflake produces CREATE ROW ACCESS POLICY ... -> EXISTS(...) where Databricks produced CREATE FUNCTION ... AS FILTER ... EXISTS(...). The lack of a case-insensitive-principal-match capability requirement (present in the Databricks counterpart) reflects Snowflake's identifier folding handling the case-normalization case structurally."
+    "notes": "Snowflake counterpart to acl-row-visibility-policy. IR structurally\nidentical to the Databricks ACL IR. Platform divergence lives in the\nadapter emission: Snowflake produces CREATE ROW ACCESS POLICY -> EXISTS,\nDatabricks produces CREATE FUNCTION ... AS FILTER ... EXISTS.\n\nDiagnostic surfaces one v0 IR finding: the resourceColumn field of\nResourceSetFromTable is conflated as both the ACL table's column name\nand the protected table's column name. The exercise aligned the two\n(both O_ORDERPRIORITY) to make the adapter emission well-formed, but\nv1 should split them."
   }
 }

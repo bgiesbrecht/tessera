@@ -4,15 +4,12 @@
   "@id": "policy:table-grants-scenario-c",
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
-  "description": "Marketing analytics team can Execute the compute_customer_ltv function. Semantic-policy use of EXECUTE; platform-mechanism uses (UDFs as policy-enforcement vehicles) are adapter scaffolding, not modeled in the IR.",
-
+  "description": "Marketing analytics team can Execute the compute_customer_ltv function.\nGates who may invoke the business-logic function. Scoped to policy intent;\nplatform-mechanism uses of EXECUTE (UDFs as policy-enforcement vehicles)\nremain adapter scaffolding, not modeled here.",
   "appliesTo": {
     "selector": "byIdentity",
     "resource": "function:bg_rls_demo.tpch.compute_customer_ltv"
   },
-
   "action": "Execute",
-
   "rules": [
     {
       "principal": {
@@ -21,9 +18,5 @@
       },
       "effect": "allow"
     }
-  ],
-
-  "provenance": {
-    "notes": "Scenario C of the table-grants exercise. First use of Execute action (added to v0 with semantic-only scope). First use of function: IRI prefix (new informal convention)."
-  }
+  ]
 }
