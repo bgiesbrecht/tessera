@@ -4,6 +4,60 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.3.0] — 2026-05-20
+
+Five-commit increment on top of 0.2.0. New tool (YAML → JSON-LD converter), three new adapter emission paths (UC column visibility, UC ABAC byScope row visibility, Snowflake column visibility), new practitioner-shaped tutorial, new W3C-savvy overview, 10 new tracked issues from the governance-gap survey, and the worked-example corpus regenerated with YAML as canonical source.
+
+### Added
+
+**Tools.**
+- `tools/converter/` — Python YAML → JSON-LD converter. v1 accepts both envelope-form (`policy: { id, kind, … }`) and flat-form YAML. Mechanical mapping (envelope unwrap, `id → @id` with `policy:` prefix, `kind → policyKind`, context-aware `type → @type`, canonical `@context` injection, trailing-whitespace normalization). CLI: `python -m tools.converter <file> [--out path]`. Library: `tools.converter.yaml_to_jsonld(path)` / `yaml_to_jsonld_str(text)` / `convert_file(in, out)`. Uses `ruamel.yaml` from the start so comment preservation (deferred to v2) is a one-step addition. Regression test covers all 11 worked-example YAMLs.
+
+**Adapter coverage.**
+- UC `ColumnVisibilityConstraint` emission — `CREATE OR REPLACE FUNCTION` returning the masked value, `GRANT EXECUTE` adapter scaffolding (per ADR-025 boundary), `ALTER TABLE … ALTER COLUMN … SET MASK`. Live-verified against `bg_rls_demo.tpch.orders.o_clerk`. Covers byIdentity column targets; Redact transformation; Mask/Hash emit `NULL` placeholders pending future scaffold passes.
+- UC ABAC byScope `RowVisibilityConstraint` emission — three-piece DDL: `CREATE FUNCTION` with Mechanism B CASE body, `GRANT EXECUTE`, `CREATE POLICY … ON CATALOG/SCHEMA/TABLE … ROW FILTER … FOR TABLES MATCH COLUMNS has_tag_value(<tag_key>, <tag_value>) AS alias USING COLUMNS (alias)`. Exercises `AdapterConfig.tag_taxonomy` (ADR-021). Live-verified against `bg_rls_demo.tpch.orders_abac`.
+- Snowflake `ColumnVisibilityConstraint` emission — `CREATE OR REPLACE MASKING POLICY … AS (col VARCHAR) RETURNS VARCHAR -> CASE … END` plus `ALTER TABLE … MODIFY COLUMN … SET MASKING POLICY`. Live-verified against `BRICETEST.TESSERA.SNOW_ORDERS.O_CLERK` with `USE SECONDARY ROLES NONE`; role-discrimination is Intent B (IS_ROLE_IN_SESSION) per Snowflake's recommendation and issue #14.
+
+**Documentation.**
+- `docs/w3c-overview.md` — semantic-web-savvy overview of how the project uses OWL, JSON-LD 1.1, SHACL, SKOS, and the W3C stack. Shows the architecture honestly without overclaiming (no SPARQL in eval, no OWL DL reasoning, no formal vocabulary imports, no standards-body submission).
+- `docs/user-guide/scenarios/acl-and-masking.md` — practitioner-shaped tutorial for the "ACL-table row visibility + column masking with a group exception" situation. Assumes YAML literacy; no semantic-web background required. Walks through two policies end to end including converter invocation and per-platform deployment.
+- User-guide README routes practitioners to the scenario tutorial first.
+
+**Issue tracker.**
+- 10 governance-gap issues filed (#16–#25) from claude.ai's top-10 governance-need survey. Three flagged as in-scope gaps with scoping docs queued for Phase 2 (#19 audit logging, #21 retention — most urgent, #25 AI governance); the remaining seven captured coverage-confirmed, out-of-scope, underexercised, or integration-question dispositions for tracking visibility.
+- 8 new labels created on the repo: `governance-need`, `coverage-confirmed`, `in-scope-gap`, `out-of-scope`, `underexercised`, `integration-question`, `scoping-needed`, `v0-candidate`.
+
+**Tests.**
+- `adapters/tests/test_parity.py::test_column_visibility_parity_emits_clean_on_both_adapters` — same IR, both adapters, each emits its native column-mask primitive, output meaningfully different.
+
+### Changed
+
+- **All 11 worked-example JSON-LDs regenerated from their YAML sources via the converter.** The corpus is canonical-YAML-driven going forward. Eliminates the descriptive-field drift the converter's regression test surfaced (5 of 11 files had prose differences between hand-maintained YAML and JSON-LD). Net diff: 60 insertions / 98 deletions across 11 files; no semantic content lost. The converter's deterministic compact output replaces hand-formatted spacing.
+- `adapters/snowflake/capability.py` ROW_VISIBILITY rationale rewritten to record the role-discrimination-semantics distinction (Intent A vs B per issue #14), correcting an earlier "DEFAULT_SECONDARY_ROLES is a gotcha" framing.
+- `adapters/unity_catalog/capability.py` ATTRIBUTE_BASED_SCOPING rationale records that ABAC row visibility is now implemented and live-verified; ABAC column masking via byScope remains the queued stub on this axis.
+- `adapters/snowflake/capability.py` COLUMN_VISIBILITY rationale records live verification with per-role row counts.
+- `adapters/unity_catalog/capability.py` COLUMN_VISIBILITY rationale records live verification.
+- `DECISIONS.md` ADR-024 postscript refined per claude.ai's design review: Snowflake secondary-roles finding is an adapter emission choice (Intent A vs Intent B), not a platform misfeature.
+- `docs/user-guide/{authoring,tutorial,evaluating}.md` updated to reflect converter v1 landing (was "queued" in three places).
+- `CLAUDE.md` Priority 5 section marked complete with deferred items called out; eight-exercise list grew to include the table-grants Phase 3 plus the cross-platform live runs.
+
+### Issue tracker activity
+
+- Filed: [#16](https://github.com/bgiesbrecht/tessera/issues/16)–[#25](https://github.com/bgiesbrecht/tessera/issues/25) (governance-gap survey).
+- Open at version close: #3, #4, #5, #7, #8, #9, #11, #12, #13, #14, #15, #16, #17, #18, #19, #20, #21, #22, #23, #24, #25.
+- Closed prior to this version: #1, #2, #6, #10.
+- 25 total issues; 4 closed; 21 open.
+
+### What this version does not include
+
+- **ABAC byScope column-mask emission on UC** — IR shapes exist (`abac-column-mask-policy-*`) but adapter still warns `UNIMPLEMENTED_SELECTOR_FOR_COLUMN_VISIBILITY` for byScope. Queued.
+- **Snowflake ABAC byScope** (row or column) — different platform mechanism (object tags + masking-policy-attached-to-tag); deferred to a future scoping pass.
+- **Adapter discover / extract / reconcile implementations** — all stubs; blocks the migration story until they're real.
+- **Tessera CLI thin wrapper** — none yet; deployment remains library-shaped Python. The converter's CLI entry (`python -m tools.converter`) is the only command-line surface.
+- **Phase 2 scoping documents for #19/#21/#25** — queued for claude.ai to draft.
+- **JSON-LD → YAML converter direction** — deferred to v2; v1 covers the practitioner authoring direction only.
+- **Comment preservation in YAML round-trips** — deferred to v2 per ADR-004; v1's `ruamel.yaml` foundation makes this a one-step addition rather than a refactor.
+
 ## [0.2.0] — 2026-05-19
 
 Substantial inflection: spec v0 reaches feature-complete-for-the-current-evidence-corpus, first adapter scaffolds land for two platforms simultaneously, first cross-platform live exercises run end to end, full user documentation lands. The morning's `e8a1422` "Checkpoint" commit was the previous state; everything below is what was added on top.
