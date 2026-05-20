@@ -177,3 +177,23 @@ The script is idempotent — re-running it drops existing attachments before re-
 - **Adapter contract**: ADR-024 in `DECISIONS.md`.
 - **Adapter configuration mapping pattern**: ADR-021 — including `identity_bindings` and `resource_bindings`.
 - **The companion practitioner tutorial**: `docs/user-guide/scenarios/acl-and-masking.md` covers authoring the same shapes from scratch, rather than migrating them.
+
+## The reverse direction also works
+
+`adapters/tests/live_migration_demo_reverse.py` runs the same cycle with **UC as source, Snowflake as target**. Same eight phases, mirror identifiers (`bg_rls_demo.reverse_demo` on Databricks; `BRICETEST.REVERSE_DEMO` on Snowflake). Three policies deploy on UC via `UnityCatalogAdapter.emit()`, get re-discovered + extracted via UC's `discover()`/`extract()` (landed in 0.5.0), and re-emit onto Snowflake via `SnowflakeAdapter.emit()`. Live-verified 2026-05-20:
+
+| Surface | Result under caller (BGIESBRECHT / ACCOUNTADMIN) |
+|---|---|
+| `BRICETEST.REVERSE_DEMO.demo_orders` | 60,080 rows (priorities 3/4/5) — third branch fires |
+| `BRICETEST.REVERSE_DEMO.demo_orders_rls_acl` | 40,324 rows (1-URGENT + 2-HIGH) — caller's ACL codenames |
+| `BRICETEST.REVERSE_DEMO.demo_orders.o_clerk` | `'CLERK-REDACTED'` — caller isn't in the privileged role |
+
+This is the symmetric demonstration the IR pivot exists for. The same three Tessera policies enforce identically on both platforms; the migration tooling has discovery, extraction, emission, and reconcile real on both sides; the cycle works in both directions.
+
+Run it with:
+
+```bash
+.venv/bin/python -m adapters.tests.live_migration_demo_reverse
+# Teardown:
+.venv/bin/python -m adapters.tests.live_migration_demo_reverse --cleanup
+```
