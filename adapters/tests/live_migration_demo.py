@@ -82,6 +82,10 @@ SOURCE_POLICIES = [
     EXAMPLES / "group-row-visibility-policy-a.tessera.yaml",
     EXAMPLES / "acl-row-visibility-policy.tessera.yaml",
     EXAMPLES / "column-mask-orders-clerk-policy.tessera.yaml",
+    # RBAC additions (0.5.0+ migration cycle covers AccessGrantConstraint too).
+    EXAMPLES / "table-grants-scenario-a.tessera.yaml",  # table grant
+    EXAMPLES / "table-grants-scenario-b.tessera.yaml",  # schema grant
+    EXAMPLES / "table-grants-scenario-c.tessera.yaml",  # function grant
 ]
 
 
@@ -176,6 +180,17 @@ def provision_snowflake_source(cur) -> None:
         cur.execute(stmt)
         print(f"  OK: {stmt[:80]}…")
 
+    step("Create RBAC demo objects (function + staging schema)")
+    for stmt in [
+        f"CREATE OR REPLACE FUNCTION {fq_sf_table('compute_customer_ltv')}(customer_key NUMBER) "
+        f"  RETURNS NUMBER AS $$ 0 $$",
+        f"CREATE SCHEMA IF NOT EXISTS {SNOWFLAKE_DATABASE}.{SOURCE_SCHEMA}_STAGING",
+        f"CREATE TABLE IF NOT EXISTS {SNOWFLAKE_DATABASE}.{SOURCE_SCHEMA}_STAGING.staged_orders AS "
+        f"  SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS SAMPLE (1000 ROWS)",
+    ]:
+        cur.execute(stmt)
+        print(f"  OK: {stmt[:80]}…")
+
     step("Grant access to demo roles")
     for role in (ROLE_HIGH_PRIORITY, ROLE_ALL_PRIORITY, "PUBLIC"):
         for stmt in [
@@ -202,6 +217,9 @@ def deploy_source_policies(cur) -> None:
             f"group:{GROUP_ACCOUNT_USERS}": "PUBLIC",
             "group:account-users":          "PUBLIC",
             "group:orders_full_access":     ROLE_HIGH_PRIORITY,  # same role used as the privileged group
+            # RBAC demo principals — substitute existing demo roles.
+            "group:bg_rls_demo_marketing_analytics": ROLE_HIGH_PRIORITY,
+            "group:bg_rls_demo_data_engineering":    ROLE_ALL_PRIORITY,
         },
         resource_bindings={
             "table:bg_rls_demo.tpch.orders":               fq_sf_table("demo_orders"),
@@ -209,8 +227,16 @@ def deploy_source_policies(cur) -> None:
             "table:bg_rls_demo.tpch.rls_acl_mapping":      fq_sf_table("demo_rls_acl_mapping"),
             "table:bg_rls_demo.tpch.rls_priority_acl":     fq_sf_table("demo_rls_priority_acl"),
             "column:bg_rls_demo.tpch.orders.o_clerk":      f"{fq_sf_table('demo_orders')}.o_clerk",
+            # RBAC additions — function and schema targets.
+            "function:bg_rls_demo.tpch.compute_customer_ltv":
+                f"{fq_sf_table('compute_customer_ltv')}",
+            "scope:schema:bg_rls_demo.tpch_staging":
+                f"{SNOWFLAKE_DATABASE}.{SOURCE_SCHEMA}_STAGING",
         },
     )
+    # Provide the cursor to Snowflake emit too, so function signatures resolve
+    # automatically from INFORMATION_SCHEMA.FUNCTIONS.
+    sf_config.extras["snowflake_cursor"] = cur
     sf = SnowflakeAdapter(config=sf_config)
 
     from tools.converter import yaml_to_jsonld
@@ -241,11 +267,20 @@ def discover_and_extract(cur) -> list[dict]:
     section("Phase 3 — Discover policies on fresh Snowflake source")
 
     sf = SnowflakeAdapter(config=AdapterConfig(extras={
-        "discover_database": SNOWFLAKE_DATABASE,
-        "discover_schema":   SOURCE_SCHEMA,
         "snowflake_cursor":  cur,
     }))
-    disc = sf.discover()
+    # Walk both schemas — MIGRATION_DEMO and MIGRATION_DEMO_STAGING — so the
+    # schema-level grant scenario B deployed on MIGRATION_DEMO_STAGING is found.
+    class _MergedDisc:
+        artifacts: list = []
+        diagnostics: list = []
+    disc = _MergedDisc()
+    disc.artifacts = []
+    disc.diagnostics = []
+    for sc in (SOURCE_SCHEMA, f"{SOURCE_SCHEMA}_STAGING"):
+        d = sf.discover(database=SNOWFLAKE_DATABASE, schema=sc)
+        disc.artifacts.extend(d.artifacts)
+        disc.diagnostics.extend(d.diagnostics)
     for d in disc.diagnostics:
         print(f"  [{d.severity.value}] {d.code}: {d.message[:140]}")
     for art in disc.artifacts:
@@ -338,6 +373,17 @@ def provision_uc_target_and_deploy(extracted: list[dict]) -> list[tuple[str, lis
         run(stmt)
         print(f"  OK: {stmt[:80]}…")
 
+    step("Create RBAC demo objects (function + staging schema)")
+    for stmt in [
+        f"CREATE OR REPLACE FUNCTION {fq_uc_table('compute_customer_ltv')}(customer_key BIGINT) "
+        f"  RETURNS DOUBLE RETURN 0.0",
+        f"CREATE SCHEMA IF NOT EXISTS {TARGET_CATALOG}.{TARGET_SCHEMA}_staging",
+        f"CREATE TABLE IF NOT EXISTS {TARGET_CATALOG}.{TARGET_SCHEMA}_staging.staged_orders AS "
+        f"  SELECT * FROM samples.tpch.orders LIMIT 1000",
+    ]:
+        run(stmt)
+        print(f"  OK: {stmt[:80]}…")
+
     section("Phase 6 — Emit UC DDL from extracted Tessera IR")
 
     # Bindings map the Snowflake-side identifiers (as carried by the extracted IR)
@@ -354,6 +400,17 @@ def provision_uc_target_and_deploy(extracted: list[dict]) -> list[tuple[str, lis
             f"table:{fq_sf_table('demo_rls_acl_mapping')}": fq_uc_table("demo_rls_acl_mapping"),
             f"table:{fq_sf_table('demo_rls_priority_acl')}":fq_uc_table("demo_rls_priority_acl"),
             f"column:{fq_sf_table('demo_orders')}.o_clerk": f"{fq_uc_table('demo_orders')}.o_clerk",
+            # RBAC additions — function + staging schema + per-table within
+            # the staging schema. (The Phase 1 "GRANT SELECT ON ALL TABLES IN
+            # SCHEMA staging" materializes as a per-table grant on
+            # STAGED_ORDERS, which discovery surfaces independently; the IR
+            # needs the per-table binding to translate.)
+            f"function:{fq_sf_table('compute_customer_ltv')}":
+                fq_uc_table("compute_customer_ltv"),
+            f"scope:schema:{SNOWFLAKE_DATABASE}.{SOURCE_SCHEMA}_STAGING":
+                f"{TARGET_CATALOG}.{TARGET_SCHEMA}_staging",
+            f"table:{SNOWFLAKE_DATABASE}.{SOURCE_SCHEMA}_STAGING.staged_orders":
+                f"{TARGET_CATALOG}.{TARGET_SCHEMA}_staging.staged_orders",
         },
     )
     uc = UnityCatalogAdapter(config=uc_config)
@@ -419,6 +476,29 @@ def verify_on_databricks() -> None:
         f"       is_account_group_member('{GROUP_ACCOUNT_USERS}') AS account_users"
     )
     if rows: print(f"  {rows[0]}")
+
+    step("RBAC: SHOW GRANTS on migrated objects")
+    # Includes the per-table grants the Snowflake "SELECT ON ALL TABLES IN SCHEMA"
+    # expansion produces in the staging schema (which discovery surfaces as
+    # individual table grants).
+    for obj_kind, obj_fq in [
+        ("TABLE",    fq_uc_table('demo_orders')),
+        ("TABLE",    f"{TARGET_CATALOG}.{TARGET_SCHEMA}_staging.staged_orders"),
+        ("FUNCTION", fq_uc_table('compute_customer_ltv')),
+    ]:
+        print(f"  SHOW GRANTS ON {obj_kind} {obj_fq}:")
+        try:
+            rows = run(f"SHOW GRANTS ON {obj_kind} {obj_fq}")
+            seen = False
+            for r in rows or []:
+                if (r[1] or "").upper() in ("ALL PRIVILEGES", "MANAGE", "ALL_PRIVILEGES"):
+                    continue
+                seen = True
+                print(f"    {r[0]} {r[1]} on {r[2]} {r[3]}")
+            if not seen:
+                print("    (no explicit grants — migrated DDL may have substituted into existing role bindings)")
+        except Exception as e:
+            print(f"    (query failed: {str(e).splitlines()[0]})")
 
 
 # ---------------------------------------------------------------------------

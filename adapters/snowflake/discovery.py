@@ -107,11 +107,15 @@ def discover_schema(cursor, database: str, schema: str) -> DiscoveryResult:
             meta = dict(zip(desc, row))
             fname = meta.get("name")
             args = meta.get("arguments") or ""
-            # arguments is typically "(NAME ARG_TYPE, ...) RETURN RET_TYPE";
-            # the signature portion before " RETURN " is what GRANT needs.
-            sig = args.split(" RETURN")[0] if " RETURN" in args else args
+            # arguments is typically "NAME(SIG) RETURN RET_TYPE" — extract the
+            # (SIG) portion (between the first '(' and its matching ')').
+            sig = ""
+            paren_open = args.find("(")
+            paren_close = args.find(")")
+            if paren_open != -1 and paren_close > paren_open:
+                sig = args[paren_open:paren_close + 1]
             if fname:
-                fq = f"{database}.{schema}.{fname}{sig}" if sig.startswith("(") else f"{database}.{schema}.{fname}"
+                fq = f"{database}.{schema}.{fname}{sig}"
                 artifacts.extend(_discover_snowflake_grants(
                     cursor, "FUNCTION", fq, diagnostics,
                 ))

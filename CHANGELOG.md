@@ -4,6 +4,62 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.6.0] — 2026-05-20
+
+RBAC support landed in the adapter cycle. The full ADR-024 four-responsibility set — emit, discover, extract, reconcile — now covers `AccessGrantConstraint` policies alongside the row/column-visibility shapes. The migration demo grew from three policies to six, with the table-grants exercise's RBAC patterns flowing through the same Snowflake → IR → UC pipeline as everything else.
+
+### Added
+
+**UC adapter `_emit_access_grant`** in `adapters/unity_catalog/emission.py`. Dispatches on `byIdentity` (table/function targets) vs `byScope` (schema/catalog targets). Action mapping: `Read → SELECT`, `Write → MODIFY`, `Execute → EXECUTE`. Schema/catalog grants emit `USE SCHEMA` / `USE CATALOG` scaffolding alongside the substantive privilege. Output matches the hand-derived `spec/v0/examples/table-grants.databricks.sql`.
+
+**UC grant discovery** in `adapters/unity_catalog/discovery.py`. Walks `SHOW GRANTS ON TABLE` for each table in the schema, `SHOW GRANTS ON SCHEMA`, `SHOW GRANTS ON FUNCTION` for functions enumerated via `INFORMATION_SCHEMA.ROUTINES` (the `SHOW USER FUNCTIONS IN <schema>` surface requires session-level `USE CATALOG` which the statement-execution API doesn't carry). Filters: `OWN`/`ALL PRIVILEGES`/`MANAGE` skipped as ownership noise; `USE SCHEMA`/`USE CATALOG` skipped as scaffolding; inherited grants (source object ≠ attached object) skipped (the source produces its own IR independently). Pseudo-principals (`account users`/`users`) lifted with an INFO diagnostic.
+
+**Snowflake `_emit_access_grant`** in `adapters/snowflake/emission.py`. Parallel to UC. Snowflake-specific:
+
+- **Schema/database read grants** expand to `GRANT USAGE` + `GRANT SELECT ON ALL TABLES IN SCHEMA` + `GRANT SELECT ON FUTURE TABLES IN SCHEMA`. Snowflake doesn't accept `SELECT` directly on a schema; this expansion is the canonical idiom and matches Tessera's byScope downward-propagation semantics (ADR-019).
+- **Function grants** require a Snowflake call signature. If the binding doesn't supply one and `config.extras["snowflake_cursor"]` is available, `_resolve_function_signature` queries `INFORMATION_SCHEMA.FUNCTIONS` to look it up. Falls back to `()` placeholder with a warning.
+- **Action mapping** fans out where Snowflake splits: `Write → INSERT + UPDATE + DELETE`. `Execute` on a function → `USAGE` (Snowflake's invoke privilege).
+
+**Snowflake grant discovery** extends `adapters/snowflake/discovery.py` to walk `SHOW GRANTS ON SCHEMA`, `SHOW GRANTS ON TABLE` (for each table in the schema), `SHOW GRANTS ON FUNCTION` (for each function in the schema, signature resolved from `SHOW USER FUNCTIONS`).
+
+**Snowflake grant extract** maps Snowflake privileges to IR actions: `SELECT → Read`, `INSERT/UPDATE → Write`, `DELETE → Delete`, `USAGE` on `FUNCTION → Execute`, `USAGE` on `SCHEMA/DATABASE` skipped as scaffolding, `OWNERSHIP`/`ALL` skipped.
+
+**Migration demo extension** (`adapters/tests/live_migration_demo.py`) covers RBAC alongside row/column visibility. Six source-policy YAMLs now (three visibility shapes + three table-grants scenarios). Phase 1 provisions a `compute_customer_ltv` function and a staging schema; Phase 2 deploys all six policies on Snowflake; Phase 3 walks both `MIGRATION_DEMO` and `MIGRATION_DEMO_STAGING` for discovery; Phase 8 verifies grants on the migrated TABLE / staging-table / FUNCTION on Databricks.
+
+### Changed
+
+- **`AdapterConfig.bind_resource`** lookups for `byScope` now try `scope:<raw>` first (with inner prefix preserved), falling back to `scope:<stripped>`. Lets bindings be authored either way.
+- **UC AccessGrantConstraint dispatch** in `emit_policy` joins the existing dispatch for the other two policy kinds.
+
+### Fixed
+
+- **Snowflake schema-level `GRANT SELECT ON SCHEMA`** previously emitted a Snowflake-invalid statement. Now expands correctly to `GRANT SELECT ON ALL TABLES IN SCHEMA` + `GRANT SELECT ON FUTURE TABLES IN SCHEMA`.
+- **Snowflake function-grant signature resolution** previously emitted `()` placeholder which Snowflake rejected. Now resolves via `INFORMATION_SCHEMA.FUNCTIONS` when a cursor is available in `config.extras`.
+
+### Empirical verification (end of cycle)
+
+Migration demo runs end-to-end on fresh schemas both sides with all six policy shapes deploying and verifying:
+
+| Policy kind | Target | Verified |
+|---|---|---|
+| RowVisibilityConstraint (group, multi-rule) | `bg_rls_demo.migration_demo.demo_orders` | 59,998 rows visible (third branch) |
+| RowVisibilityConstraint (byDataset, EXISTS) | `bg_rls_demo.migration_demo.demo_orders_rls_acl` | 40,002 rows (caller's ACL codenames) |
+| ColumnVisibilityConstraint (mask) | `bg_rls_demo.migration_demo.demo_orders.o_clerk` | `CLERK-REDACTED` |
+| AccessGrantConstraint (table) | `bg_rls_demo.migration_demo.demo_orders` SELECT | 3 grants visible via SHOW GRANTS |
+| AccessGrantConstraint (schema → all tables) | `bg_rls_demo.migration_demo_staging.staged_orders` SELECT | 1 grant visible via SHOW GRANTS |
+| AccessGrantConstraint (function) | `bg_rls_demo.migration_demo.compute_customer_ltv` EXECUTE | 1 grant visible via SHOW GRANTS |
+
+### Issue tracker activity
+
+No issues filed or closed in this cycle. The migration-demo's RBAC capability now empirically validates the AccessGrantConstraint policyKind from 0.4.0 (ADR-026, closed #15).
+
+### What this version does not include
+
+- **UC ABAC byScope column-mask emission** ([#30](https://github.com/bgiesbrecht/tessera/issues/30)) — sibling of byScope row-filter from 0.3.0.
+- **Snowflake ABAC byScope** ([#31](https://github.com/bgiesbrecht/tessera/issues/31)) — different platform mechanism.
+- **Phase 2 scoping docs for #19/#21/#25** — queued for claude.ai.
+- **Schema-pattern resource bindings** — today the demo enumerates per-table bindings when migrating schema-scoped grants. A pattern-binding feature ("any table in schema X maps to corresponding table in schema Y") would reduce the binding boilerplate.
+
 ## [0.5.0] — 2026-05-20
 
 Three-commit increment focused on adapter-contract completeness and the documentation debt that emerged from the 0.4.0 migration cycle. The full ADR-024 adapter responsibility set — discover, extract, emit, reconcile — is now real on both Unity Catalog and Snowflake (modulo ABAC byScope shapes that remain queued under separate issues). Five issues closed.

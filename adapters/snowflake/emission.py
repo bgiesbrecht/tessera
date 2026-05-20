@@ -560,14 +560,25 @@ def _emit_access_grant(policy: dict[str, Any], config: AdapterConfig) -> Emissio
                          f"grant emitted on parent TABLE {target_name!r}."),
             ))
         elif prefix == "function":
-            object_kind = "FUNCTION"; target_name = f"{bound}()"
-            diagnostics.append(Diagnostic(
-                severity=DiagnosticSeverity.WARNING,
-                code="FUNCTION_SIGNATURE_PLACEHOLDER",
-                message=("Snowflake function grants require a signature; emitting `()` "
-                         "as placeholder. Update the emitted DDL with the actual signature "
-                         "before applying."),
-            ))
+            object_kind = "FUNCTION"
+            # If the bound resource already includes a signature (e.g.,
+            # `BRICETEST.SCHEMA.fn(NUMBER)`), use it verbatim. Otherwise resolve
+            # via the Snowflake cursor if one is available in extras; failing
+            # that, emit a `()` placeholder with a warning.
+            if "(" in bound:
+                target_name = bound
+            else:
+                sig = _resolve_function_signature(bound, config, diagnostics)
+                target_name = f"{bound}{sig}"
+                if sig == "()":
+                    diagnostics.append(Diagnostic(
+                        severity=DiagnosticSeverity.WARNING,
+                        code="FUNCTION_SIGNATURE_PLACEHOLDER",
+                        message=(f"Could not resolve signature for {bound!r}; emitted "
+                                 "with `()` placeholder. Provide the signature via the "
+                                 "resource binding (e.g., `fn(NUMBER)`) or supply a "
+                                 "Snowflake cursor in config.extras for auto-resolution."),
+                    ))
         else:
             diagnostics.append(Diagnostic(
                 severity=DiagnosticSeverity.WARNING,
@@ -576,7 +587,9 @@ def _emit_access_grant(policy: dict[str, Any], config: AdapterConfig) -> Emissio
             ))
     elif selector == "byScope":
         raw_scope = applies_to.get("scope") or ""
-        bound = config.bind_resource(f"scope:{_strip_iri(raw_scope)}") or _strip_iri(raw_scope)
+        bound = (config.bind_resource(f"scope:{raw_scope}")
+                 or config.bind_resource(f"scope:{_strip_iri(raw_scope)}")
+                 or _strip_iri(raw_scope))
         prefix, _ = (raw_scope.split(":", 1) + [""])[:2]
         prefix = prefix.lower()
         if prefix == "schema":
@@ -644,9 +657,28 @@ def _emit_access_grant(policy: dict[str, Any], config: AdapterConfig) -> Emissio
             )
 
         for priv in privileges:
-            statements.append(
-                f"{keyword} {priv} ON {object_kind} {target_name} TO ROLE {bound_principal};"
-            )
+            if object_kind == "SCHEMA" and priv != "USAGE":
+                # Snowflake doesn't allow privileges like SELECT directly on a SCHEMA.
+                # Schema-level read intent expands to "SELECT on all current + future
+                # tables in the schema" — matching Tessera's byScope downward-
+                # propagation semantics from ADR-019.
+                statements.append(
+                    f"{keyword} {priv} ON ALL TABLES IN SCHEMA {target_name} TO ROLE {bound_principal};"
+                )
+                statements.append(
+                    f"{keyword} {priv} ON FUTURE TABLES IN SCHEMA {target_name} TO ROLE {bound_principal};"
+                )
+            elif object_kind == "DATABASE" and priv != "USAGE":
+                statements.append(
+                    f"{keyword} {priv} ON ALL TABLES IN DATABASE {target_name} TO ROLE {bound_principal};"
+                )
+                statements.append(
+                    f"{keyword} {priv} ON FUTURE TABLES IN DATABASE {target_name} TO ROLE {bound_principal};"
+                )
+            else:
+                statements.append(
+                    f"{keyword} {priv} ON {object_kind} {target_name} TO ROLE {bound_principal};"
+                )
 
     return EmissionResult(
         policy_id=policy_id,
@@ -654,6 +686,53 @@ def _emit_access_grant(policy: dict[str, Any], config: AdapterConfig) -> Emissio
         statements=statements,
         diagnostics=diagnostics,
     )
+
+
+def _resolve_function_signature(
+    fq_function: str, config: AdapterConfig, diagnostics: list[Diagnostic],
+) -> str:
+    """Query Snowflake for the signature of a function by name. Returns '(...)'.
+
+    Uses INFORMATION_SCHEMA.FUNCTIONS via the cursor in config.extras['snowflake_cursor']
+    when available. Falls back to '()' if no cursor or no match.
+    """
+    cursor = config.extras.get("snowflake_cursor")
+    if cursor is None:
+        return "()"
+    parts = fq_function.split(".")
+    if len(parts) != 3:
+        return "()"
+    db, schema, name = parts
+    try:
+        cursor.execute(
+            "SELECT argument_signature FROM "
+            f"  {db}.INFORMATION_SCHEMA.FUNCTIONS "
+            f"WHERE function_schema = '{schema}' AND function_name = '{name.upper()}'"
+        )
+        rows = cursor.fetchall()
+        if rows:
+            sig = rows[0][0] or "()"
+            # argument_signature looks like "(CUSTOMER_KEY NUMBER)"; Snowflake's
+            # GRANT USAGE ON FUNCTION needs just the type list, e.g., "(NUMBER)".
+            import re
+            inner = sig.strip("()")
+            if not inner.strip():
+                return "()"
+            type_list = []
+            for arg in inner.split(","):
+                tokens = arg.strip().split()
+                if len(tokens) >= 2:
+                    type_list.append(tokens[-1])
+                elif tokens:
+                    type_list.append(tokens[-1])
+            return "(" + ", ".join(type_list) + ")"
+    except Exception as e:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.INFO,
+            code="FUNCTION_SIGNATURE_LOOKUP_FAILED",
+            message=f"Could not resolve signature for {fq_function}: {str(e).splitlines()[0][:160]}",
+        ))
+    return "()"
 
 
 def _map_action_to_snowflake(

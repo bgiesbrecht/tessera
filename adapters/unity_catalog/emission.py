@@ -848,7 +848,11 @@ def _emit_access_grant(policy: dict[str, Any], config: AdapterConfig) -> Emissio
             ))
     elif selector == "byScope":
         raw_scope = applies_to.get("scope") or ""
-        bound = config.bind_resource(f"scope:{_strip_iri(raw_scope)}") or _strip_iri(raw_scope)
+        # Look up `scope:<raw>` first (preserves the inner prefix for binding clarity);
+        # fall back to just the stripped identifier if the inner-prefixed key isn't bound.
+        bound = (config.bind_resource(f"scope:{raw_scope}")
+                 or config.bind_resource(f"scope:{_strip_iri(raw_scope)}")
+                 or _strip_iri(raw_scope))
         prefix, _ = (raw_scope.split(":", 1) + [""])[:2]
         prefix = prefix.lower()
         if prefix == "schema":
