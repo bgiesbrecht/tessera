@@ -21,10 +21,13 @@ What this provisions:
                 acme.tpch.rls_priority_acl      (CODE_NAME, O_ORDERPRIORITY)
                 acme.tpch_staging.initial_table ← samples.tpch.orders LIMIT 100
     Function:   acme.tpch.compute_customer_ltv (no-op UDF)
-    Groups:     acme_all_priority_ops, acme_high_priority_ops,
-                acme_marketing_analytics, acme_data_engineering,
-                orders_full_access
-                (empty by default — assign membership separately)
+    Groups:     NOT provisioned by this script — Unity Catalog GRANT
+                requires account-level groups, and the workspace SDK
+                creates only WorkspaceGroup-typed groups (visible to
+                SHOW GROUPS but rejected by GRANT with
+                PRINCIPAL_DOES_NOT_EXIST). Provision at:
+                  https://accounts.cloud.databricks.com → Groups
+                The script prints the exact list to create.
 
   Snowflake (no pre-existing state needed):
     Database:   ACME
@@ -151,18 +154,25 @@ def setup_databricks() -> None:
     print("  OK: acme.tpch.compute_customer_ltv")
 
     print()
-    print("--- Groups (account-level, empty) ---")
+    print("--- Groups: MANUAL PROVISIONING REQUIRED ---")
+    print("  Unity Catalog GRANT requires *account-level* groups, not workspace-local")
+    print("  groups. The workspace SDK's groups.create() makes WorkspaceGroup-typed")
+    print("  groups, which are visible to SHOW GROUPS but fail GRANT with")
+    print("  PRINCIPAL_DOES_NOT_EXIST. This script does NOT create groups for that")
+    print("  reason — provision them at account level instead:")
+    print()
+    print("    https://accounts.cloud.databricks.com  →  User management  →  Groups")
+    print()
+    print("  Groups to create (empty; assign membership as needed):")
     for group_name in DATABRICKS_GROUPS:
-        try:
-            w.groups.create(display_name=group_name)
-            print(f"  created: {group_name}")
-        except ResourceAlreadyExists:
-            print(f"  exists:  {group_name}")
-        except Exception as e:
-            # Account-level groups require account-admin. Workspace SDK might
-            # only allow workspace-local groups. Report and continue.
-            print(f"  FAILED:  {group_name} -> {str(e).splitlines()[0]}")
-            print("           (may require account-admin profile; see notes below)")
+        print(f"    - {group_name}")
+    print()
+    print("  After creating each group, assign it to the workspace (Workspaces →")
+    print("  your workspace → Permissions → Groups → Add).")
+    print()
+    print("  If you have an account-admin Databricks SDK profile configured,")
+    print("  AccountClient.groups.create() can do this programmatically — that")
+    print("  enhancement is a future increment to this script.")
 
     print()
     print("--- Databricks setup complete ---")
