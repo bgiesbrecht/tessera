@@ -28,13 +28,29 @@ A repo-wide cleanup: personal identifiers replaced with the conventional "any ad
 - **Adapter logic.** Adapters take identifiers from `AdapterConfig` bindings, not from hardcoded constants. The capability-profile prose was updated for honesty; the emission code paths are unchanged.
 - **Person-name attribution.** "Per Brice's framing," `@bgiesbrecht`, `bgiesbrecht.github.io/tessera/` (canonical namespace URLs per ADR-011), and the Snowflake user `BGIESBRECHT` and email `brice.giesbrecht@databricks.com` remain in place. Those are legitimate identity references, not "names scattered."
 
-### Operational implication (follow-up needed)
+### Operational follow-up (complete, 2026-05-20)
 
-Live integration scripts (`live_databricks.py`, `live_snowflake.py`, `live_snowflake_bydataset.py`, `live_migration_demo.py` and reverse, etc.) now target the new identifiers. Running them requires the new infrastructure to exist on each platform:
-- **Databricks:** `acme` catalog (created), schema `tpch` plus seed tables, groups `acme_all_priority_ops` and `acme_high_priority_ops`.
-- **Snowflake:** database `ACME`, schema `TESSERA`, seed tables (`SNOW_ORDERS`, `SNOW_ORDERS_RLS_ACL`, `RLS_ACL_MAPPING`, `RLS_PRIORITY_ACL`), roles `ACME_ALL_PRIORITY_OPS` and `ACME_HIGH_PRIORITY_OPS`.
+Live integration scripts (`live_databricks.py`, `live_snowflake.py`, `live_snowflake_bydataset.py`, `live_migration_demo.py` and reverse, etc.) now target the new identifiers. Required infrastructure was provisioned on each platform via the new `setup_demo_infra.py` script:
 
-The migration demos provision their own schemas (`migration_demo` and `migration_demo_staging`) at runtime under whichever catalog/DB is configured, so those just need the parent catalog/DB to exist.
+- **Snowflake:** `ACME` database, `ACME.TESSERA` schema, seed tables (`SNOW_ORDERS` and `SNOW_ORDERS_RLS_ACL` from `SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS`, ~1.5M rows each; empty `RLS_ACL_MAPPING` and `RLS_PRIORITY_ACL`), and three roles (`ACME_ALL_PRIORITY_OPS`, `ACME_HIGH_PRIORITY_OPS`, `ORDERS_FULL_ACCESS`). All created via SQL through ACCOUNTADMIN.
+- **Databricks:** `acme` catalog (pre-existing), `acme.tpch` and `acme.tpch_staging` schemas, seed tables (`orders` / `orders_rls_acl` / `orders_abac` from `samples.tpch.orders`, ~7.5M rows each; `initial_table` LIMIT 100; empty ACL tables), the `compute_customer_ltv` UDF, and five account-level groups (`acme_all_priority_ops`, `acme_high_priority_ops`, `acme_marketing_analytics`, `acme_data_engineering`, `orders_full_access`).
+
+**Lesson recorded in `setup_demo_infra.py`:** Databricks groups for UC GRANT must be account-level (`resource_type='Group'`) **and** assigned to the target workspace. The workspace SDK's `groups.create()` makes `WorkspaceGroup`-typed groups that are visible to `SHOW GROUPS` but rejected by `GRANT` with `PRINCIPAL_DOES_NOT_EXIST`. The script no longer attempts group creation; it prints the manual provisioning step instead.
+
+### Empirical validation (end of cycle, 2026-05-20)
+
+`live_migration_demo` re-run end-to-end on the new infra. All six policies migrate cleanly Snowflake → IR → Databricks and verify on the target. Verification numbers identical to the pre-rename baseline (CHANGELOG [0.6.0] "Empirical verification" table):
+
+| Policy kind | Target | Verified |
+|---|---|---|
+| RowVisibilityConstraint (group, multi-rule) | `acme.migration_demo.demo_orders` | 59,998 rows (third branch) |
+| RowVisibilityConstraint (byDataset, EXISTS) | `acme.migration_demo.demo_orders_rls_acl` | 40,002 rows |
+| ColumnVisibilityConstraint (mask) | `acme.migration_demo.demo_orders.o_clerk` | `CLERK-REDACTED` |
+| AccessGrantConstraint (table) | `acme.migration_demo.demo_orders` | 3 grants visible via `SHOW GRANTS` (`acme_all_priority_ops`, `acme_high_priority_ops`, `account users`) |
+| AccessGrantConstraint (schema → all tables) | `acme.migration_demo_staging.staged_orders` | 1 grant visible (`acme_all_priority_ops`) |
+| AccessGrantConstraint (function) | `acme.migration_demo.compute_customer_ltv` | 1 grant visible (`acme_high_priority_ops` EXECUTE) |
+
+The rename is fully validated end-to-end.
 
 ### Why this is a patch version
 

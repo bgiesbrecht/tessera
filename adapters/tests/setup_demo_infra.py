@@ -46,6 +46,26 @@ account-admin in Databricks, ACCOUNTADMIN in Snowflake).
 Seed ACL data is NOT inserted by this script either — the live-test
 scripts that need ACL seed rows insert them at runtime
 (see `live_snowflake_bydataset.py`).
+
+Lessons learned during 0.6.2 provisioning (2026-05-20):
+
+  - **Databricks groups must be account-level AND assigned to the
+    workspace.** Workspace SDK `groups.create()` makes
+    `WorkspaceGroup`-typed groups, which appear in `SHOW GROUPS` but
+    fail UC `GRANT` with `PRINCIPAL_DOES_NOT_EXIST`. This script no
+    longer attempts group creation; it prints the manual step
+    instead. AccountClient + an account-admin profile would let us
+    automate this; that enhancement is queued, not implemented.
+  - **Which workspace matters.** A Databricks account can have many
+    workspaces (Azure + AWS, prod + dev, etc.). Account-level groups
+    must be explicitly assigned to the workspace your SDK profile
+    targets (`adb-984752964297111.11.azuredatabricks.net` for this
+    repo). Creating groups in the right account but the wrong
+    workspace produces the same `PRINCIPAL_DOES_NOT_EXIST` failure
+    as not creating them at all.
+  - **The CREATE TABLE IF NOT EXISTS AS SELECT pattern is safe to
+    re-run** but skips the SELECT body if the table already exists.
+    First run gets the seed data; subsequent runs are no-ops.
 """
 
 from __future__ import annotations
