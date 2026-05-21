@@ -541,6 +541,8 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
 
     Supports:
         * `appliesTo: byIdentity` with `resource: column:<catalog>.<schema>.<table>.<col>`.
+        * `appliesTo: byScope` with `scope: catalog:|schema:|table:<id>` and `matching:` —
+          dispatched to `_emit_column_visibility_by_scope` (ABAC column mask).
         * Multiple rules; each rule with `effect: allow` contributes a `WHEN ... THEN <col>` branch.
         * `defaultBranch` with `effect: transform` + `transformation` produces the ELSE clause.
         * Redact transformation (literal replacement). Mask/Hash emit a TODO diagnostic
@@ -551,9 +553,16 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
     emitted UDF is emission-time scaffolding, not policy intent. The default grantee
     is `account users` (everyone); override via `config.extras["column_mask_grantee"]`.
     """
+    applies_to = policy.get("appliesTo") or {}
+
+    # byScope dispatches to the ABAC column-mask emission path: CREATE POLICY ...
+    # COLUMN MASK ... MATCH COLUMNS has_tag_value(...) AS alias ON COLUMN alias.
+    # See _emit_column_visibility_by_scope.
+    if applies_to.get("selector") == "byScope":
+        return _emit_column_visibility_by_scope(policy, config)
+
     diagnostics: list[Diagnostic] = []
     policy_id = policy.get("@id")
-    applies_to = policy.get("appliesTo") or {}
     raw_resource = applies_to.get("resource") or ""
     bound_resource = config.bind_resource(raw_resource) or _strip_iri(raw_resource)
     rules = policy.get("rules") or []
@@ -564,8 +573,8 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
             severity=DiagnosticSeverity.WARNING,
             code="UNIMPLEMENTED_SELECTOR_FOR_COLUMN_VISIBILITY",
             message=(
-                "scaffold currently emits column masks only for byIdentity column targets. "
-                f"Got selector={applies_to.get('selector')!r}. ABAC byScope column masking is queued."
+                "scaffold currently emits column masks only for byIdentity column targets "
+                f"or byScope ABAC targets. Got selector={applies_to.get('selector')!r}."
             ),
             location="appliesTo.selector",
         ))
@@ -660,6 +669,172 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
     return EmissionResult(
         policy_id=policy_id,
         target_artifacts=[target_table],
+        statements=statements,
+        diagnostics=diagnostics,
+    )
+
+
+def _emit_column_visibility_by_scope(
+    policy: dict[str, Any], config: AdapterConfig,
+) -> EmissionResult:
+    """Lower a byScope+matching ColumnVisibilityConstraint to Databricks ABAC DDL.
+
+    Emission target (parallel to _emit_row_visibility_by_scope, but for COLUMN MASK):
+
+        CREATE OR REPLACE FUNCTION <fn>(val STRING) RETURNS STRING
+        RETURN <transformation_expression>;
+
+        GRANT EXECUTE ON FUNCTION <fn> TO `account users`;
+
+        CREATE OR REPLACE POLICY <policy>
+          ON <CATALOG|SCHEMA> <id>
+          COMMENT '...'
+          COLUMN MASK <fn>
+            TO `account users`
+            EXCEPT `<allowed_group>`
+            FOR TABLES
+            MATCH COLUMNS has_tag_value('<tag_key>', '<tag_value>') AS <alias>
+            ON COLUMN <alias>;
+
+    Expected shape: defaultStrategy=negated-complement, one or more rules with
+    effect=allow naming the privileged group(s), and defaultBranch carrying the
+    transformation. The rule principals become the EXCEPT clause; the defaultBranch
+    transformation becomes the UDF body.
+
+    The Tessera→platform tag translation comes from config.tag_taxonomy (ADR-021).
+    """
+    diagnostics: list[Diagnostic] = []
+    policy_id = policy.get("@id")
+    applies_to = policy.get("appliesTo") or {}
+    raw_scope = applies_to.get("scope") or ""
+    scope_kind, scope_id = _split_scope_iri(raw_scope)
+    if not scope_kind or not scope_id:
+        return EmissionResult(
+            policy_id=policy_id, target_artifacts=[], statements=[],
+            diagnostics=[Diagnostic(
+                severity=DiagnosticSeverity.ERROR,
+                code="MALFORMED_SCOPE",
+                message=(
+                    f"byScope appliesTo.scope must be of the form <kind>:<id> "
+                    f"(catalog: / schema: / table: / column:); got {raw_scope!r}."
+                ),
+                location="appliesTo.scope",
+            )],
+        )
+
+    # MATCH COLUMNS clause from the IR's matching predicate (ADR-021 tag taxonomy).
+    matching = applies_to.get("matching") or {}
+    tag_clauses, tag_value_for_alias, tag_diags = _render_match_columns(matching, config)
+    diagnostics.extend(tag_diags)
+    alias = tag_value_for_alias or "matched_col"
+
+    # The transformation is carried in defaultBranch (negated-complement: rule
+    # principals are allowed; everyone else is transformed).
+    default_branch = policy.get("defaultBranch") or {}
+    if default_branch.get("effect") != "transform":
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="ABAC_COLUMN_MASK_MISSING_TRANSFORMATION",
+            message=(
+                "byScope column-mask emission expects defaultBranch.effect='transform' "
+                f"with a transformation specified; got effect={default_branch.get('effect')!r}. "
+                "The emitted UDF will fall through to NULL."
+            ),
+            location="defaultBranch.effect",
+        ))
+        transform_expr: str | None = "NULL"
+    else:
+        transform_expr, t_diags = _render_transformation_expression(
+            default_branch.get("transformation") or {}, "val", "default",
+        )
+        diagnostics.extend(t_diags)
+        if transform_expr is None:
+            transform_expr = "NULL"
+
+    # EXCEPT principals from rules. Each rule with effect=allow contributes a
+    # `EXCEPT \`<group>\`` entry. The hand-derived target uses a single EXCEPT
+    # group; multiple are supported by listing them comma-separated per
+    # Databricks ABAC syntax.
+    except_groups: list[str] = []
+    rules = policy.get("rules") or []
+    for idx, rule in enumerate(rules):
+        principal = rule.get("principal") or {}
+        effect = rule.get("effect")
+        if effect != "allow":
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="ABAC_COLUMN_MASK_RULE_EFFECT_IGNORED",
+                message=(
+                    f"rule {idx}: byScope column-mask emission interprets only "
+                    f"effect=allow rules as EXCEPT principals; got effect={effect!r}."
+                ),
+                location=f"rules[{idx}].effect",
+            ))
+            continue
+        if principal.get("selector") != "byIdentity":
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                code="UNSUPPORTED_PRINCIPAL_SELECTOR",
+                message=(
+                    f"rule {idx}: byScope column-mask scaffold supports only byIdentity "
+                    f"principal selectors for the EXCEPT clause; got "
+                    f"{principal.get('selector')!r}."
+                ),
+                location=f"rules[{idx}].principal.selector",
+            ))
+            continue
+        principal_ref = principal.get("resource") or ""
+        bound = config.bind_principal(principal_ref) or _strip_iri(principal_ref)
+        except_groups.append(f"`{bound}`")
+
+    # UDF lives in a schema; infer from the scope, overridable via config.extras.
+    function_schema = config.extras.get("abac_function_schema")
+    if not function_schema:
+        if scope_kind == "CATALOG":
+            function_schema = f"{scope_id}.tpch"
+        elif scope_kind == "SCHEMA":
+            function_schema = scope_id
+        else:
+            function_schema = scope_id.rsplit(".", 1)[0] if "." in scope_id else scope_id
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.INFO,
+            code="ABAC_FUNCTION_SCHEMA_INFERRED",
+            message=(
+                f"Function schema inferred as {function_schema!r}; override via "
+                "config.extras['abac_function_schema'] for production deployments."
+            ),
+        ))
+
+    slug = (policy_id or "policy").split(":")[-1].replace("-", "_")
+    function_name = f"{function_schema}.tessera__{slug}__mask"
+    policy_name = f"tessera__{slug}"
+    grantee = config.extras.get("column_mask_grantee", "account users")
+
+    # Build the policy statement. The EXCEPT clause is optional — if no rules
+    # produce allowed groups, the mask applies to everyone in the grantee set.
+    except_clause = ""
+    if except_groups:
+        except_clause = f"    EXCEPT {', '.join(except_groups)}\n"
+
+    statements = [
+        f"CREATE OR REPLACE FUNCTION {function_name}(val STRING)\n"
+        f"RETURNS STRING\n"
+        f"RETURN {transform_expr};",
+        f"GRANT EXECUTE ON FUNCTION {function_name} TO `{grantee}`;",
+        f"CREATE OR REPLACE POLICY {policy_name}\n"
+        f"  ON {scope_kind} {scope_id}\n"
+        f"  COMMENT 'Tessera ABAC column mask — {policy_id}'\n"
+        f"  COLUMN MASK {function_name}\n"
+        f"    TO `{grantee}`\n"
+        f"{except_clause}"
+        f"    FOR TABLES\n"
+        f"    {tag_clauses} AS {alias}\n"
+        f"    ON COLUMN {alias};",
+    ]
+
+    return EmissionResult(
+        policy_id=policy_id,
+        target_artifacts=[f"{scope_kind.lower()}:{scope_id}"],
         statements=statements,
         diagnostics=diagnostics,
     )

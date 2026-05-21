@@ -4,6 +4,49 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.6.3] — 2026-05-21
+
+A small adapter increment: UC ABAC byScope column-mask emission, closing issue [#30](https://github.com/bgiesbrecht/tessera/issues/30). Parallel to the byScope row-filter emission that has been working since 0.3.0; the hand-derived target SQL has existed in `spec/v0/examples/abac-column-mask.databricks.sql` since the ABAC scoping work landed. This commit makes the UC adapter produce that DDL from the IR.
+
+### Added
+
+**`_emit_column_visibility_by_scope` in `adapters/unity_catalog/emission.py`.** Lowers a `byScope` + `matching` `ColumnVisibilityConstraint` to Databricks ABAC DDL:
+
+```
+CREATE OR REPLACE FUNCTION <fn>(val STRING) RETURNS STRING
+RETURN <transformation_expression>;
+
+GRANT EXECUTE ON FUNCTION <fn> TO `account users`;
+
+CREATE OR REPLACE POLICY <policy>
+  ON <CATALOG|SCHEMA> <id>
+  COMMENT '...'
+  COLUMN MASK <fn>
+    TO `account users`
+    EXCEPT `<allowed_group>`
+    FOR TABLES
+    MATCH COLUMNS has_tag_value('<tag_key>', '<tag_value>') AS <alias>
+    ON COLUMN <alias>;
+```
+
+The function dispatches from `_emit_column_visibility` when `selector == 'byScope'`. Expected IR shape: `defaultStrategy=negated-complement`, one or more rules with `effect=allow` naming the privileged group(s), `defaultBranch.transformation` carrying the mask transformation. Rule principals become the `EXCEPT` clause; the defaultBranch transformation becomes the UDF body. Tag taxonomy translation (ADR-021) maps Tessera axis+value to Databricks tag key+value; unbound attributes fall back with a warning.
+
+### Changed
+
+- **UC `CapabilityProfile.COLUMN_VISIBILITY`**: still `SUPPORTED`, prose updated to record both byIdentity and byScope paths and the verification artifact.
+- **UC `CapabilityProfile.ATTRIBUTE_BASED_SCOPING`**: promoted from `PARTIAL` to `SUPPORTED` (both row-filter and column-mask ABAC paths now real on UC).
+- **`docs/showcase.md`**: policy-shape table gains a row for `ColumnVisibilityConstraint (byScope ABAC)`; the "UC ABAC byScope column-mask emission is queued" limitation removed; tracked-issue tally updated 21 → 20 open.
+
+### Verification
+
+Emission against `spec/v0/examples/abac-column-mask-policy-{a,b}.jsonld` produces DDL functionally equivalent to the hand-derived `spec/v0/examples/abac-column-mask.databricks.sql`. Only differences are stylistic: the auto-generated `MATCH COLUMNS ... AS <alias>` uses the tag value directly (`clerk`) instead of the hand-stylized `pii_clerk_col`, and the Hash UDF emits `sha2(cast(val AS STRING), 256)` instead of `sha2(val, 256)` (defensive no-op cast). The existing parity test (`adapters/tests/test_parity.py`) passes.
+
+### Issue tracker activity
+
+- Closed [#30](https://github.com/bgiesbrecht/tessera/issues/30): UC ABAC byScope column-mask emission.
+
+Twenty open issues now (down from twenty-one). The remaining ABAC gap is [#31](https://github.com/bgiesbrecht/tessera/issues/31) (Snowflake ABAC byScope; different platform mechanism — Snowflake uses tag-based-attachment masking/row-access policies rather than `MATCH COLUMNS`).
+
 ## [0.6.2] — 2026-05-20
 
 A repo-wide cleanup: personal identifiers replaced with the conventional "any adopter" stand-in `acme` / `ACME` / `acme:`. No spec semantics change; no adapter logic change. 80 files updated mechanically; regression tests (converter + parity) pass; all worked-example YAMLs re-validate clean against JSON Schema and SHACL.

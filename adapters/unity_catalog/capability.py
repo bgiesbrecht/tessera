@@ -23,32 +23,37 @@ UNITY_CATALOG_PROFILE = CapabilityProfile(
         Capability.COLUMN_VISIBILITY: (
             CapabilitySupport.SUPPORTED,
             "Emitted via CREATE OR REPLACE FUNCTION returning the masked value plus "
-            "ALTER TABLE ... ALTER COLUMN ... SET MASK. Live-verified 2026-05-19 against "
+            "ALTER TABLE ... ALTER COLUMN ... SET MASK (byIdentity), OR via CREATE POLICY "
+            "... COLUMN MASK ... FOR TABLES MATCH COLUMNS has_tag_value(...) ON COLUMN ... "
+            "(byScope ABAC; 0.6.3, closes #30). byIdentity live-verified 2026-05-19 against "
             "acme.tpch.orders.o_clerk: the same IR that produced the hand-derived "
             "spec/v0/examples/column-mask-orders-clerk.databricks.sql now emits byte-equivalent "
             "DDL through the adapter; the mask enforces correctly for non-members of the "
-            "granted group (caller sees CLERK-REDACTED). Coverage: byIdentity column targets; "
-            "rules with effect=allow or effect=transform; defaultBranch with effect=transform; "
-            "Redact transformation (literal replacement). Mask and Hash transformations land in "
-            "future scaffold passes (the parameter-shape semantics are settled in v0; the SQL "
-            "templates are queued). ABAC byScope column masking remains UNIMPLEMENTED — the IR "
-            "shape exists in spec/v0/examples/abac-column-mask-policy-* but the adapter does not "
-            "yet handle byScope+matching for column visibility.",
+            "granted group (caller sees CLERK-REDACTED). byScope verified against "
+            "spec/v0/examples/abac-column-mask-policy-{a,b}.jsonld: emission is functionally "
+            "equivalent to the hand-derived abac-column-mask.databricks.sql (only "
+            "stylistic differences — auto-generated alias `clerk` vs hand-stylized "
+            "`pii_clerk_col`; defensive `cast(val AS STRING)` in the Hash UDF). Coverage: "
+            "byIdentity column targets and byScope ABAC targets; rules with effect=allow or "
+            "effect=transform; defaultBranch with effect=transform; Redact and Hash (sha256) "
+            "transformations. Mask transformation emits NULL placeholder with a queued "
+            "diagnostic (parameter shape is settled in v0; SQL template queued).",
         ),
         Capability.ATTRIBUTE_BASED_SCOPING: (
-            CapabilitySupport.PARTIAL,
-            "ABAC row visibility via byScope + matching is implemented and live-verified 2026-05-19 "
-            "against acme.tpch.orders_abac. Emission produces the three-piece DDL: "
-            "(1) CREATE OR REPLACE FUNCTION ... RETURNS BOOLEAN with CASE branching (Mechanism B); "
-            "(2) GRANT EXECUTE ... TO `account users` (adapter scaffolding per ADR-025); "
-            "(3) CREATE OR REPLACE POLICY ... ON CATALOG/SCHEMA/TABLE ... ROW FILTER ... "
-            "FOR TABLES MATCH COLUMNS has_tag_value(<tag_key>, <tag_value>) AS alias "
-            "USING COLUMNS (alias). The IR's `column:$matched` reference substitutes the function "
-            "parameter at emit time. tag_taxonomy (ADR-021) translates Tessera axis+value to "
-            "Databricks tag key+value; unbound attributes fall back with a warning. "
-            "ABAC column masking via byScope is not yet implemented (the abac-column-mask-policy-* "
-            "IR shapes are queued). ADR-023's γ-with-refinement combination is observed but not "
-            "yet enforced at emission time.",
+            CapabilitySupport.SUPPORTED,
+            "ABAC row visibility AND column visibility via byScope + matching both implemented. "
+            "Row visibility live-verified 2026-05-19 against acme.tpch.orders_abac (three-piece DDL: "
+            "CREATE FUNCTION returning BOOLEAN with CASE branching (Mechanism B); GRANT EXECUTE "
+            "scaffolding; CREATE POLICY ... ON CATALOG/SCHEMA/TABLE ... ROW FILTER ... "
+            "MATCH COLUMNS has_tag_value(...) AS alias USING COLUMNS (alias)). Column "
+            "visibility added 0.6.3 (closes #30): parallel three-piece DDL with COLUMN MASK "
+            "in place of ROW FILTER and ON COLUMN <alias> in place of USING COLUMNS — the "
+            "rule's principal becomes the EXCEPT clause; the defaultBranch transformation "
+            "becomes the UDF body. The IR's `column:$matched` reference substitutes the "
+            "function parameter at emit time (row-filter path). tag_taxonomy (ADR-021) "
+            "translates Tessera axis+value to Databricks tag key+value; unbound attributes "
+            "fall back with a warning. ADR-023's γ-with-refinement combination is observed "
+            "but not yet enforced at emission time.",
         ),
         Capability.DATASET_DRIVEN_PRINCIPALS: (
             CapabilitySupport.PARTIAL,

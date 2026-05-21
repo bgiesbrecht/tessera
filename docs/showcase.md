@@ -62,6 +62,7 @@ The four compose. `reconcile` is the `discover` + `extract` of observed state vs
 | **`RowVisibilityConstraint`** (byScope ABAC) | UC ABAC: `CREATE POLICY ... ROW FILTER ... MATCH COLUMNS has_tag_value(...)` | (queued — see issue [#31](https://github.com/bgiesbrecht/tessera/issues/31)) |
 | **`RowVisibilityConstraint`** (byDataset) | `CREATE FUNCTION ... RETURN EXISTS (SELECT 1 FROM map JOIN acl ...)` | `CREATE ROW ACCESS POLICY ... -> EXISTS (... CURRENT_USER() ...)` |
 | **`ColumnVisibilityConstraint`** (byIdentity, Redact) | `CREATE FUNCTION` + `ALTER TABLE ... SET MASK` | `CREATE MASKING POLICY ... -> CASE ... END` + `ALTER TABLE ... SET MASKING POLICY` |
+| **`ColumnVisibilityConstraint`** (byScope ABAC) | UC ABAC: `CREATE POLICY ... COLUMN MASK ... MATCH COLUMNS has_tag_value(...) ON COLUMN ...` | (queued — see issue [#31](https://github.com/bgiesbrecht/tessera/issues/31)) |
 | **`AccessGrantConstraint`** (byIdentity, table) | `GRANT SELECT ON TABLE ... TO \`group\`` | `GRANT SELECT ON TABLE ... TO ROLE` |
 | **`AccessGrantConstraint`** (byIdentity, function) | `GRANT EXECUTE ON FUNCTION ... TO \`group\`` | `GRANT USAGE ON FUNCTION ... TO ROLE` (signature auto-resolved) |
 | **`AccessGrantConstraint`** (byScope, schema fan-out) | `GRANT USE SCHEMA` + `GRANT SELECT ON SCHEMA` | `GRANT USAGE` + `GRANT SELECT ON ALL TABLES IN SCHEMA` + `GRANT SELECT ON FUTURE TABLES IN SCHEMA` |
@@ -198,14 +199,13 @@ $ python -m adapters.tests.live_migration_demo
 The framing of these matters: not "TODO" items, but documented decisions about what the version does and doesn't cover. Each links to the tracking issue.
 
 - **Snowflake ABAC byScope is not implemented** ([#31](https://github.com/bgiesbrecht/tessera/issues/31)). Snowflake uses object tags + tag-based-attachment masking/row-access policies, which is structurally different from Databricks' `CREATE POLICY ... MATCH COLUMNS has_tag_value(...)`. Real design step, wants a worked exercise before implementation.
-- **UC ABAC byScope column-mask emission is queued** ([#30](https://github.com/bgiesbrecht/tessera/issues/30)). Sibling to the byScope row-filter that landed in 0.3.0; IR + hand-derived target SQL exist; ~60 minutes of adapter work to land.
 - **No comment preservation in YAML round-trips** ([deferred from converter v1](docs/user-guide/scenarios/acl-and-masking.md)). The converter uses `ruamel.yaml` from the start so the round-trip parser already preserves the structural metadata; the actual comment-mapping work (per ADR-004) is a future v2 increment.
 - **No formal `verify` adapter mode** for deployment-time configuration checks. Today's `reconcile` covers some of this surface (drift detection); a separate `verify` for things like "this principal binding maps to a role that doesn't exist on the target" or "the target column type doesn't match the policy's expected type" is queued as a design question.
 - **Schema-pattern resource bindings** would simplify migration tooling (today the demo enumerates per-table bindings when migrating schema-scoped grants); not yet built.
 - **Three governance gaps** ([#19](https://github.com/bgiesbrecht/tessera/issues/19) audit logging vocabulary, [#21](https://github.com/bgiesbrecht/tessera/issues/21) retention/deletion, [#25](https://github.com/bgiesbrecht/tessera/issues/25) AI governance attribute axes) have scoping documents queued.
 - **The IR is pre-1.0 by design** (ADR-002 documents the project's skunkworks posture; ADR-017 documents the suspended-immutability framing — additions continue to land in v0 until external dependency exists).
 
-Twenty-one of thirty-one filed issues remain open. The breakdown is in `docs/issue-drafts/README.md`. None of the open issues represents a blocking gap for the policy shapes the worked-example corpus exercises.
+Twenty of thirty-one filed issues remain open. The breakdown is in `docs/issue-drafts/README.md`. None of the open issues represents a blocking gap for the policy shapes the worked-example corpus exercises.
 
 ---
 
