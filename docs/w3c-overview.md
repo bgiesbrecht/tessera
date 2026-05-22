@@ -72,7 +72,7 @@ tessera:Execute  a tessera:Action ; rdfs:label "Execute"@en ;
                   in the IR."@en .
 ```
 
-The well-known-individuals pattern — `tessera:Read a tessera:Action` rather than `tessera:Read rdf:type tessera:Action` — is intentional. Actions are *named individuals*, not subclasses, because they are the closed enumeration of action verbs the IR commits to. The same pattern applies to attribute axes (`tessera:sensitivityAxis a tessera:AttributeAxis`), well-known effects, condition operators, and the four core attribute axes (sensitivity, dataSubject, regulatoryRegime, businessDomain — three flat, sensitivity hierarchical).
+The well-known-individuals pattern — `tessera:Read a tessera:Action` rather than `tessera:Read rdfs:subClassOf tessera:Action` — is intentional. Actions are *named individuals* (instances of the `Action` class), not subclasses (which would model each action as its own class). The closed enumeration of action verbs the IR commits to is captured as instances. (Recall that in Turtle, `a` is shorthand for `rdf:type`, so `tessera:Read a tessera:Action` simply asserts the instance-of relation.) The same individuals pattern applies to attribute axes (`tessera:sensitivityAxis a tessera:AttributeAxis`), well-known effects, condition operators, and the four core attribute axes (sensitivity, dataSubject, regulatoryRegime, businessDomain — three flat, sensitivity hierarchical).
 
 **Hierarchy where it carries weight.** Tessera's `Classification` class (the sensitivity axis) has real subsumption:
 
