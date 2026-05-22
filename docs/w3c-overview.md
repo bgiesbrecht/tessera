@@ -10,9 +10,9 @@ Tessera is a portable representation of data governance policy across data platf
 
 ```
 spec/v0/
-  ontology.ttl       # OWL 2 ontology, Turtle serialization (~880 lines, 567 triples)
+  ontology.ttl       # OWL 2 ontology, Turtle serialization
   context.jsonld     # JSON-LD 1.1 context (the canonical form's namespace machinery)
-  shapes.ttl         # SHACL shapes graph (~360 triples)
+  shapes.ttl         # SHACL shapes graph
   schema.json        # JSON Schema 2020-12 (structural pre-validation)
 ```
 
@@ -25,7 +25,7 @@ https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
 https://bgiesbrecht.github.io/tessera/spec/v0/shapes.ttl
 ```
 
-The namespace IRI is opaque — `tessera:Policy` resolves to `https://bgiesbrecht.github.io/tessera/spec/v0/vocab#Policy`, the Turtle file is what dereferences. This is ADR-011's persistent-URL choice; GitHub Pages serves the artifacts with whatever content types it serves them under (yes, `text/plain` on a `.ttl` — pragmatic, not pretty). The persistent-IRI discipline survives the content-type pragmatism.
+The namespace pattern is hash-based (fragment-identified): `tessera:Policy` resolves to `https://bgiesbrecht.github.io/tessera/spec/v0/vocab#Policy`; the ontology IRI without fragment is what dereferences. This is ADR-011's persistent-URL choice; GitHub Pages serves the artifacts with whatever content types it serves them under (yes, `text/plain` on a `.ttl` — pragmatic, not pretty). The persistent-IRI discipline survives the content-type pragmatism.
 
 ---
 
@@ -83,7 +83,7 @@ tessera:PII            a owl:Class ; rdfs:subClassOf tessera:Confidential .
 tessera:Restricted     a owl:Class ; rdfs:subClassOf tessera:Confidential .
 ```
 
-So `tessera:PII rdfs:subClassOf+ tessera:Classification` — a policy that gates on `Confidential` correctly covers `PII`-tagged data after rdfs inference. This is the one place v0 leans on RDFS reasoning at validation time; the rest is shapes-driven and inference-light.
+So under RDFS entailment, the transitive closure of `rdfs:subClassOf` puts `tessera:PII` under `tessera:Classification` — a policy that gates on `Confidential` correctly covers `PII`-tagged data. This is the one place v0 leans on RDFS reasoning at validation time; the rest is shapes-driven and inference-light.
 
 **Properties** are typed:
 
@@ -138,9 +138,9 @@ A few choices worth calling out for an audience that's actually read the JSON-LD
 
 - **`@protected: true`** prevents downstream consumers from silently redefining terms. Adopters can extend the vocabulary in their own namespaces; they cannot rebind `tessera:Read` to something else.
 - **`@version: 1.1`** opts into the 1.1 features actively used: scoped contexts (not used yet, but available), `@nest`, and the stricter expansion rules.
-- **`@type: @vocab`** on `action` and `effect` lets authors write `"action": "Read"` rather than `"action": "tessera:Read"`. The expansion resolves against the active vocabulary, which falls back to `tessera:` per the namespace declaration. This is the JSON-LD machinery that gives YAML authoring its readability.
+- **`@type: @vocab`** on `action` and `effect` lets authors write `"action": "Read"` rather than `"action": "tessera:Read"`. The value is looked up as a term in the context, which maps `Read` → `tessera:Read` (the context declares the mappings explicitly; no `@vocab` default is set). This is the JSON-LD machinery that gives YAML authoring its readability.
 - **`@type: @id`** on `appliesTo` and `principal` keeps these as resource references rather than literal strings.
-- **`@container: @list`** on `rules` — the rules list is ordered (per ADR-015's first-match combining), and JSON-LD's `rdf:List` semantics preserve order. Standard Container Container, but worth flagging: SHACL list-validation requires traversing `rdf:rest`/`rdf:first` paths (see "Shapes" below).
+- **`@container: @list`** on `rules` — the rules list is ordered (per ADR-015's first-match combining), and JSON-LD's `rdf:List` semantics preserve order. Standard JSON-LD container; worth flagging that SHACL list-validation requires traversing `rdf:rest`/`rdf:first` paths (see "Shapes" below).
 
 A policy in canonical form:
 
@@ -244,7 +244,7 @@ Reads as: starting from the focus node, follow `tessera:rules` to the list head;
 Some constraints are expressible in JSON Schema (enum closure on string values; required fields). Others are not:
 
 - **Class typing of IRI references.** `axis: sensitivityAxis` expands to `tessera:sensitivityAxis`; SHACL's `sh:class tessera:AttributeAxis` enforces that the referenced node is a member of the AttributeAxis class. JSON Schema cannot see this — it's syntactic.
-- **Adopter-extensible IRI value spaces.** For the hierarchical sensitivity axis, `sh:nodeKind sh:IRI` permits any IRI value (including adopter-namespaced extensions like `acme:CustomerPII`) without enumerating them. JSON Schema would require an open string but couldn't enforce IRI form.
+- **Adopter-extensible IRI value spaces.** For the hierarchical sensitivity axis, `sh:nodeKind sh:IRI` permits any IRI value (including adopter-namespaced extensions like `acme:CustomerPII`) without enumerating them. JSON Schema sees pre-expansion short names like `sensitivityAxis`; SHACL sees the post-expansion IRI and can require both that the node is an IRI (`sh:nodeKind sh:IRI`) and that it satisfies class membership (`sh:class tessera:AttributeAxis`, resolved against the ontology graph). JSON Schema can validate string format but cannot see the JSON-LD expansion.
 - **Operator vocabulary closure on condition algebra.** Condition operators (`and`, `or`, `eq`, `in`, `purpose-in`, `exists-in-dataset`, ...) are well-known individuals; `sh:in (tessera:and tessera:or ...)` enforces closure at the RDF layer.
 
 These three categories are SHACL's unique value-add in the validation pipeline. Other constraints (cardinality, required fields, type structure) are deliberately delegated to JSON Schema — see "Layered validation" below.
@@ -260,7 +260,7 @@ The validation pipeline is two-layer by design:
 | 1 | JSON Schema 2020-12 (`schema.json`) | Structural validity, conditional dependencies, enum closure on string values, type structure of nested objects |
 | 2 | SHACL (`shapes.ttl`) | Semantic well-formedness: IRI / class typing of references, closed-vocabulary on referenced IRIs, node-shape composition over blank-node structures |
 
-JSON Schema 2020-12 is not a W3C technology but it lives next to one — it's the structural-pre-pass that lets SHACL focus on what it uniquely does. Conditional dependencies (`baselineGroup` is required iff `defaultStrategy: explicit-baseline-group`; `transformation` is required iff `effect: transform`) are JSON-Schema-enforced via `if`/`then`/`else` branches. SHACL Advanced Features' `sh:if`/`sh:then` were tried and abandoned for two reasons: pyshacl's coverage was uneven, and the JSON-Schema layer already enforces them with no semantic loss.
+JSON Schema 2020-12 is not a W3C technology but it lives next to one — it's the structural-pre-pass that lets SHACL focus on what it uniquely does. Conditional dependencies (`baselineGroup` is required iff `defaultStrategy: explicit-baseline-group`; `transformation` is required iff `effect: transform`) are JSON-Schema-enforced via `if`/`then`/`else` branches. SHACL Core has logical-constraint components (`sh:and` / `sh:or` / `sh:not` / `sh:xone`) that could express these dependencies as verbose biconditionals; we deliberately did not, because the JSON Schema layer enforces them with less verbosity and no semantic loss, and the biconditional form would add no safety beyond what the schema already provides.
 
 The principle: **each layer does what it does best.** SHACL doesn't try to be JSON Schema; JSON Schema doesn't try to be SHACL. Together they catch everything an emitter can reasonably catch without running the policy.
 
@@ -286,7 +286,7 @@ tessera:Obligation a owl:Class ;
     skos:closeMatch odrl:Duty .
 ```
 
-`skos:exactMatch` declares semantic identity between terms; `skos:closeMatch` declares strong-but-not-perfect overlap. Both are conservative — they don't trigger OWL reasoning consequences; they're navigational annotations for tools and humans alike. Tooling that wants to reason across vocabularies can opt into the alignment; tooling that wants to ignore it is free to.
+`skos:exactMatch` declares near-equivalence strong enough for cross-vocabulary mapping in IR and discovery contexts — deliberately weaker than `owl:sameAs` or `owl:equivalentClass`. `skos:closeMatch` declares strong-but-not-perfect overlap. Both are conservative: they do not carry OWL identity semantics and do not trigger reasoning consequences. They're navigational annotations for tools and humans alike. Tooling that wants to reason across vocabularies can opt into the alignment; tooling that wants to ignore it is free to.
 
 The four upstream vocabularies Tessera aligns with:
 
@@ -323,7 +323,7 @@ Listed deliberately because the omissions matter as much as the inclusions:
 
 - **No SPARQL queries.** Tessera does not run SPARQL against policy graphs at evaluation time. Policy combination, conflict detection, and effective-rule resolution are *adapter responsibilities* — the platform's native enforcement mechanism evaluates the policy. Tessera compiles; the platform runs. SPARQL might appear in future tooling (a linter that queries the corpus for findings; a CLI that surfaces "all policies referencing axis X"), but it is not in the evaluation hot path because Tessera has no evaluation hot path.
 
-- **No OWL DL reasoning at validation time.** The validator uses `rdfs` inference for the `Classification` subsumption (so `PII ⊑ Confidential` is honored), but does not invoke a full OWL DL reasoner. pyshacl with `inference="rdfs"` is the configuration. The reasoning load is intentionally bounded.
+- **No OWL DL reasoning at validation time.** The validator does not invoke a full OWL DL reasoner. pyshacl runs with `inference="none"` on the data graph; the `Classification` subsumption (`PII ⊑ Confidential`) lives in the ontology graph supplied as `ont_graph`, and pyshacl honors it for `sh:class` checks without running an additional inference pass over the data. The reasoning load is intentionally bounded.
 
 - **No `owl:imports` of DPV / ODRL.** Alignment via SKOS is declarative and tooling-friendly without triggering imported axioms whose consequences may not match Tessera's scope (ADR-005).
 
@@ -383,7 +383,7 @@ Step 3's `inference='none'` is deliberate — the rdfs subsumption that matters 
 | Adapter contract (lowering to platform DDL) | `DECISIONS.md` ADR-024 |
 | Architecture overview (broader scope) | `docs/technical-design-v0.2.md` |
 
-The single concrete starting point for a W3C-savvy reader: open `spec/v0/ontology.ttl` and `spec/v0/shapes.ttl` side by side. The vocabulary is small (~50 classes, ~40 properties); the shapes are tight (~360 triples). Forty minutes of reading covers the substantive surface. The pragmatic-engineering decisions hidden in the comments — particularly around `sh:node` vs `sh:targetClass` for JSON-LD blank nodes — are the kind of detail that experienced practitioners will recognize as battle-scarred-but-defensible.
+The single concrete starting point for a W3C-savvy reader: open `spec/v0/ontology.ttl` and `spec/v0/shapes.ttl` side by side. The vocabulary is small — a few dozen classes and properties — and the shapes are tight. Under an hour of reading covers the substantive surface. The pragmatic-engineering decisions hidden in the comments — particularly around `sh:node` vs `sh:targetClass` for JSON-LD blank nodes — are the kind of detail that experienced practitioners will recognize as battle-scarred-but-defensible.
 
 ---
 
