@@ -160,13 +160,13 @@ For a principal **not** in `acme_all_priority_ops`, both policies match `o_clerk
 - Policy A: replace with literal `'CLERK-REDACTED'`.
 - Policy B: replace with `sha256(o_clerk)`.
 
-The matching predicate is identical between the two policies — the conflict is **pure-overlap, different effect**, the cleanest possible shape for surfacing cross-policy combination. What Databricks ABAC actually does when both policies are attached and both apply to the same column is what Stage 3 observes. The observation discriminates among ADR-019's three resolution paths:
+The matching predicate is identical — the conflict is **pure-overlap, different effect**, the cleanest shape for surfacing cross-policy combination. What Databricks ABAC does when both policies are attached to the same column is what Stage 3 observes. The observation discriminates among ADR-019's three resolution paths:
 
 - If Databricks picks one deterministically (some priority rule), we have evidence for α (defer to platform) or β (Tessera adopts the same rule).
 - If Databricks blends or chains them, we have a different observation that may require a different design.
 - If Databricks rejects the configuration (refuses to attach both policies), we learn a constraint on what Tessera can express.
 
-An earlier draft of this exercise had Policy B match the broader hierarchical parent (`sensitivity: PII`) to also exercise the hierarchical-subsumption emission question. That mixed two findings into one exercise — the cross-policy combination question and the hierarchical-emission question. The simpler shape above isolates the cross-policy question; hierarchical-emission becomes a follow-on exercise if needed.
+An earlier draft had Policy B match the broader parent (`sensitivity: PII`), mixing the cross-policy combination question with the hierarchical-emission question. The simpler shape isolates the cross-policy question; hierarchical-emission becomes a follow-on exercise if needed.
 
 ---
 
@@ -234,7 +234,7 @@ The exercise is structurally designed to surface findings, not to validate a hyp
 
 **8.1 — Cross-policy combination (ADR-019's α/β/γ).** This is the load-bearing observation. Scenario 7.1.2 reveals what Databricks does; the result drives a follow-on ADR (number TBD) that picks among α/β/γ.
 
-**8.2 — Hierarchical-axis match in adapter configuration (deferred to follow-on exercise).** A policy matching a hierarchical *parent* (e.g., `sensitivity: PII`) should emit a predicate that matches all subclasses (`PIIEmail`, `PIIClerk`, etc.). On Databricks this likely translates to `has_tag('abac_column')` rather than per-value predicates, and the tag-taxonomy mapping (ADR-021) needs to either (a) enumerate the subclasses or (b) describe subsumption explicitly. This exercise originally included Policy B matching `sensitivity: PII` to surface this finding, but the design was simplified to isolate the cross-policy combination question. The hierarchical-subsumption finding remains a tracked follow-on; it will be exercised by an exercise that uses two different specific values (e.g., one policy matching `PIIClerk`, another matching `PIIEmail`, with a third policy matching the parent `PII` — observing how all three compose).
+**8.2 — Hierarchical-axis match in adapter configuration (deferred to follow-on exercise).** A policy matching a hierarchical *parent* (e.g., `sensitivity: PII`) should emit a predicate that matches all subclasses. On Databricks this likely translates to `has_tag('abac_column')` rather than per-value predicates, and the tag-taxonomy mapping (ADR-021) needs to address subsumption explicitly. This exercise was simplified to isolate the cross-policy question. Hierarchical-subsumption will be exercised separately with policies matching different values and their parent.
 
 **8.3 — Adapter capability profile for ABAC support.** The Databricks adapter (when built) declares which ABAC concepts it supports. This exercise informs that capability profile.
 

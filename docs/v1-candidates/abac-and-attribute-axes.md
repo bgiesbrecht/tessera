@@ -34,7 +34,7 @@ The existing `purpose-in` condition operator therefore stays as a condition, not
 
 ### What this rules out
 
-The framework does *not* introduce a `Tag` class into the IR. A `Tag` class would model the platform mechanism, not the meaning. We previously avoided this kind of leak in the timing-disclosure conversation (where "timing categories" were considered for IR-level enumeration and rejected because they were per-mechanism vocabulary); the same logic applies here.
+The framework does *not* introduce a `Tag` class into the IR. A `Tag` class would model the platform mechanism, not the meaning. The timing-disclosure conversation applied the same logic (timing categories were rejected because they were per-mechanism vocabulary); this applies symmetrically here.
 
 The framework does *not* model coordination labels — `team: fraud-ops`, `cost-center: 12345`, `environment: production` — as data attributes. These are operational metadata about ownership and accounting. They may correspond to principal attributes (a user's team) or to scope attributes (a catalog's environment), but they are not properties of the data the policy protects. Policies that gate on team membership do so via principal selectors, not via data-attribute selectors.
 
@@ -100,7 +100,7 @@ attributes:
 
 Hierarchical inference applies only within hierarchical axes: if `sensitivity: PIIEmail` is asserted, the resource is also `sensitivity: PII` by subsumption. On flat axes, no such inference holds — `dataSubject: EUResident` does not imply any other `dataSubject` value.
 
-### Why this is right shape, not over-engineering
+### Why these axes are right
 
 The four axes above correspond to the four most common policy distinctions across the platforms surveyed:
 
@@ -108,7 +108,7 @@ The four axes above correspond to the four most common policy distinctions acros
 - Snowflake tag examples follow the same pattern (the documented use case in the Snowflake quickstart uses `PII`, `FINANCIAL` as values).
 - W3C DPV models these dimensions as separate vocabularies, not as one hierarchy.
 
-The framework is recognizing a structure that already exists in practice, not inventing one. The risk of over-engineering is bounded because the axes are *adopter-extensible* — a v0 with four named axes is a starting point, not a closed set.
+The framework recognizes a structure that already exists in practice. The axes are *adopter-extensible* — a v0 with four named axes is a starting point, not a closed set.
 
 ---
 
@@ -242,7 +242,7 @@ This is sugar that desugars to the canonical form with `match: and`. The convert
 - **Snowflake** emits explicit `SYSTEM$GET_TAG_ON_CURRENT_*` calls inside policy bodies, or attaches the policy to the appropriate tag via `ALTER TAG SET MASKING POLICY` for the simple single-attribute cases. The composition algebra translates to SQL conditional logic in the policy body.
 - **Custom-pattern adapters** emit JOIN conditions against their classification tables.
 
-The point of capturing the composition algebra at the IR level is that the algebra is the same across platforms; only the surface syntax differs.
+The algebra is the same across platforms; only the surface syntax differs.
 
 ---
 

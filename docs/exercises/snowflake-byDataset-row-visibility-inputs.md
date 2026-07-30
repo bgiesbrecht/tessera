@@ -119,7 +119,7 @@ Expressed in the row-access policy body as a correlated `EXISTS` subquery.
 - `('BGIESBRECHT', 'urgent_priority_ops')`
 - `('BGIESBRECHT', 'high_priority_ops')`
 
-Under this seed, the user `BGIESBRECHT` sees only `1-URGENT` and `2-HIGH` priorities; any other principal sees no rows. The Databricks brief seeded a second user; this exercise can extend during Phase 3 if a second test identity is available, otherwise the second user's absence is itself a test (any non-`BGIESBRECHT` session sees zero rows).
+Under this seed, `BGIESBRECHT` sees only `1-URGENT` and `2-HIGH`; any other principal sees no rows.
 
 ---
 
@@ -129,13 +129,11 @@ Under this seed, the user `BGIESBRECHT` sees only `1-URGENT` and `2-HIGH` priori
 
 `CURRENT_USER()` (Snowflake builtin). Returns the login name of the current session user. Unaffected by `USE ROLE`, by primary/secondary role activation, or by warehouse choice.
 
-This function is the specific reason the `byDataset` pattern is secondary-roles-immune: it gates on user identity (which Snowflake resolves deterministically per session), not on role activation (which the `DEFAULT_SECONDARY_ROLES = ('ALL')` default collapses).
+This function is the specific reason the `byDataset` pattern is secondary-roles-immune: it gates on user identity, not role activation.
 
 **3.2 — Matching session identity to ACL**
 
-Default: exact-match on `CURRENT_USER() = RLS_ACL_MAPPING.USERNAME`. Snowflake folds unquoted identifiers to uppercase by default, so seed-data usernames should be stored uppercase (`'BGIESBRECHT'`).
-
-A `lower(trim(...))` normalization (as in the Databricks brief) is optional and not required for this exercise — Snowflake's identifier folding handles the case-normalization case structurally. If the diagnostic finds a real-world need for trim normalization (e.g., ACL data sourced from a CSV with whitespace), that is a v1 candidate, not an in-scope finding.
+Exact-match on `CURRENT_USER() = RLS_ACL_MAPPING.USERNAME`. Snowflake folds unquoted identifiers to uppercase, so usernames should be stored uppercase (`'BGIESBRECHT'`).
 
 **3.3 — Role or group hierarchy**
 
@@ -143,7 +141,7 @@ Not used. Membership is per-user, individual. Roles are irrelevant to the policy
 
 **3.4 — Exceptional principals**
 
-None. No admin bypass. ACCOUNTADMIN is subject to the policy unless explicitly granted access via the ACL tables. (Snowflake row-access policies do not exempt the table owner; verify during Phase 3.)
+None. No admin bypass. ACCOUNTADMIN is subject to the policy unless explicitly granted access via the ACL tables.
 
 ---
 

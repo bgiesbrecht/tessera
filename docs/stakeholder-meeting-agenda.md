@@ -77,7 +77,7 @@ Any objections to the framing itself are taken first or deferred to a separate s
 
 **Decision needed:** Confirm "support both, organization chooses" as the design constraint, or commit to a single model and document the reasoning.
 
-**Why this is the longest item:** This decision has the largest downstream consequences for governance processes, tooling deployment, and ownership boundaries — but is also the one most prone to being decided implicitly rather than deliberately. Worth the 20 minutes.
+**Scope note:** This decision has the largest downstream consequences for governance processes, tooling deployment, and ownership boundaries — but is also the one most prone to being decided implicitly rather than deliberately. Worth the 20 minutes.
 
 **Failure mode if not decided:** Each implementation choice gets re-litigated through this lens. Adapter design, deployment topology, and change-management workflow all depend on it.
 

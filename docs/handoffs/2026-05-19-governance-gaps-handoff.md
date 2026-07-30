@@ -8,13 +8,13 @@
 
 ## Purpose
 
-The claude.ai conversation surveyed external sources on common data governance requirements and produced a top-10 list. Three real gaps in Tessera's current model were identified (audit logging refinement, retention/deletion, AI-specific governance). Several other needs are covered, underexercised, or explicitly out of scope. Filing all ten as issues — including the covered ones — gives future contributors a complete tracking surface and makes it visible which concerns the project considered and how it dispositioned them.
+The claude.ai conversation surveyed external sources on common data governance requirements and produced a top-10 list. Three real gaps were identified (audit logging refinement, retention/deletion, AI-specific governance). Several other needs are covered, underexercised, or explicitly out of scope. Filing all ten gives future contributors a complete tracking surface.
 
-The handoff's value proposition:
+The handoff creates a tracking surface for all concerns:
 
-- **Covered items** (issues #16/#17/#18/#22) — filed so a future contributor searching "data masking" or "purpose limitation" finds an issue explaining what's covered, not silence.
-- **Out-of-scope items** (issue #20) — filed deliberately. A future proposal to add lineage tracking gets redirected to the issue rather than re-litigated in conversation.
-- **Underexercised items** (issue #23) — covered in design but not yet validated by a worked exercise. Candidate for a future exercise.
+- **Covered items** (issues #16/#17/#18/#22) — filed so future contributors find explanations of coverage, not silence.
+- **Out-of-scope items** (issue #20) — filed deliberately to redirect future proposals to the issue.
+- **Underexercised items** (issue #23) — covered in design but not yet validated by worked exercise.
 - **Integration questions** (issue #24) — partially covered; the remaining question is per-environment configuration.
 - **Real gaps** (issues #19, #21, #25) — these get Phase 2 scoping documents.
 
@@ -89,9 +89,9 @@ Brice (project lead) will signal before any scoping documents land. The signal m
 
 ## What this handoff does not include
 
-- **No spec changes.** All issues are tracking-only.
-- **No new ADRs.** Decisions to address the gaps come after scoping documents settle.
-- **No worked exercises.** Exercises driven by these issues come later in the cycle.
-- **No CLAUDE.md edits beyond the issue-count update.** Substantive framing changes wait until scoping documents are reviewed.
+- No spec changes (tracking-only).
+- No new ADRs (decisions come after scoping documents).
+- No worked exercises (driven by these issues later).
+- No CLAUDE.md edits beyond issue-count update.
 
 The issues create the tracking surface. Subsequent handoffs build on it.

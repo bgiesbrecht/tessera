@@ -138,7 +138,7 @@ This data is the basis for the behavioral verification test cases in §7.1.
 
 Case-insensitive, whitespace-trimmed match: `lower(trim(m.username)) = lower(trim(current_user()))`. The trim is defensive against accidental whitespace in the ACL data.
 
-This is a substantive detail for the Tessera representation: the `byDataset` selector needs to either capture the normalization or rely on the adapter's emission to apply it. The v0 IR doesn't have a "case-insensitive match" knob on `PrincipalSetFromTable`; this should surface as a finding either in the diagnostic or as a v1 candidate.
+The `byDataset` selector needs to either capture the normalization or rely on the adapter to apply it. The v0 IR lacks a "case-insensitive match" knob on `PrincipalSetFromTable`; this will surface as a finding in the diagnostic.
 
 **3.3 — Role or group hierarchy**
 
@@ -154,7 +154,7 @@ None. No admin bypass, no break-glass role, no service-account exception. A prin
 
 **4.1 — In plain English**
 
-A user sees rows in `orders_rls_acl` if and only if the ACL mapping tables grant them access to that row's `o_orderpriority` value via the codename indirection. The grant is computed at query time as the result of the two-table join.
+A user sees rows in `orders_rls_acl` if and only if the ACL mapping tables grant access to that row's `o_orderpriority` value via the codename indirection.
 
 **4.2 — Principals with an entry**
 
@@ -162,9 +162,7 @@ A principal whose username appears in `rls_acl_mapping`, with a codename that ap
 
 **4.3 — Principals without an entry**
 
-A principal with no row in `rls_acl_mapping` sees no rows in the protected table. The policy is fail-closed: there is no implicit baseline access. This is unambiguously `defaultStrategy: none` in the v0 vocabulary.
-
-The implementation makes this implicit by the `EXISTS` semantics — no matching ACL row, no visible row. There is no explicit `ELSE` branch granting anything to non-mapped users.
+A principal with no row in `rls_acl_mapping` sees no rows. The policy is fail-closed: no implicit baseline access. This is `defaultStrategy: none` in the v0 vocabulary.
 
 **4.4 — Purpose binding**
 

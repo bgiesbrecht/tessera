@@ -70,7 +70,7 @@ provenance:
 
 The alternative would deprecate `RowVisibilityConstraint`, `AccessConstraint`, etc. as top-level classes and replace them with `tessera:Policy` + `kind` discriminator. Each "rule" sub-object would become the primary structural unit; the existing constraint classes would survive only as discriminator values for `kind`.
 
-**Why I prefer Option B:**
+**Why Option B is preferred:**
 
 - **Backward compatibility.** A v0 single-constraint policy artifact remains a valid Tessera document. Migration is opt-in (rewrite as Policy when multi-branch is needed). Option A requires rewriting every existing artifact.
 - **Lower disruption.** The existing constraint classes carry semantics adapters already know how to translate. Option B reuses them; Option A retires them and re-introduces them under a different structural role.
@@ -115,7 +115,7 @@ This is XACML's "first-applicable" combining algorithm.
 
 ### 2.3 Alternatives considered
 
-- **Union semantics** ("any matching rule's effect = keep is OR'd together"): defensible for additive permission models, but breaks down when rules have different row predicates. The first worked example would not work cleanly under union — a principal in `all_priority_ops` AND `high_priority_ops` would see the union of {all rows} and {1-URGENT, 2-HIGH rows} = all rows, which happens to be correct here, but the model doesn't generalize.
+- **Union semantics** ("any matching rule's effect = keep is OR'd together"): defensible for additive permission models, but breaks down when rules have different row predicates. A principal in `all_priority_ops` AND `high_priority_ops` would see the union of {all rows} and {1-URGENT, 2-HIGH rows} = all rows. This happens to be correct here, but the model doesn't generalize.
 - **Priority field per rule** (XACML "deny-overrides" / "permit-overrides"): more flexible but adds a per-rule field. Not needed for the worked example; can be added in v1.x if a corpus exposes the need.
 - **Declared combining algorithm per Policy**: most flexible. Punted to v1.x as an extension; v1 only supports first-match, with a `combiningAlgorithm` field potentially added later if needed.
 
@@ -222,9 +222,9 @@ The structural change in §1–§4 is significant: a new top-level class, new pr
 
 ### 5.3 Case for hold
 
-- **Two backports signal churn.** ADR-013 was one pre-publication correction; ADR-014 would be a second. A reader might reasonably wonder how many more are coming. "v0 is stable" becomes harder to claim.
-- **v0 is supposed to stabilize.** The project's posture is "ship less and label it correctly." Holding the line on what v0 includes — even when later additions look attractive — is part of stabilization.
-- **The workaround is documented.** The diagnostic explicitly surfaces the multi-branch gap. A future reader picking up v0 artifacts knows the workaround is a workaround, not a permanent design.
+- **Two backports signal churn.** ADR-013 was one pre-publication correction; ADR-014 would be a second. A reader might reasonably wonder how many more are coming.
+- **v0 is supposed to stabilize.** The project's posture is "ship less and label it correctly." Holding the line on what v0 includes is part of stabilization.
+- **The workaround is documented.** The diagnostic explicitly surfaces the multi-branch gap. A future reader knows the workaround is a workaround, not permanent design.
 - **The work is real.** Even at 4–8 hours, it's work that delays other priorities (SHACL shapes, converter, first adapter scaffolding).
 
 ### 5.4 Recommendation: backport
@@ -233,13 +233,13 @@ Backport. ADR-014.
 
 Three reasons that together tip the balance:
 
-1. **The workaround is structural, not cosmetic.** Compare to other corrections that might come up — say, renaming a vocabulary term, or adjusting a label. Those would be cosmetic and could reasonably hold for v1. The container change reaches into how policies are written, validated, emitted, and reasoned about. It's the wrong shape for the framework to publish.
+1. **The workaround is structural, not cosmetic.** The container change reaches into how policies are written, validated, emitted, and reasoned about. It's the wrong shape for the framework to publish.
 
-2. **The cost of holding compounds.** Every v0 artifact built on the workaround is rework at v1 cut. Backporting caps the cost; holding accumulates it. The math only gets worse from here.
+2. **The cost of holding compounds.** Every v0 artifact built on the workaround is rework at v1 cut. Backporting caps the cost; holding accumulates it.
 
-3. **The "two backports" objection is weaker than it looks.** ADR-013 backported a property addition; ADR-014 would backport a structural correction. Both are pre-publication. Both are responses to what the first worked example surfaced. A future reader who sees both will likely see them as *the project taking its first worked example seriously* — which is the right read.
+3. **The "two backports" objection is weaker than it looks.** ADR-013 backported a property addition; ADR-014 would backport a structural correction. Both are pre-publication responses to the first worked example. A future reader will see both as the project taking its worked examples seriously.
 
-The case for hold isn't wrong, but it's a case for being conservative; backporting is the case for being honest. The project's voice consistently chooses honest over conservative.
+The case for hold is conservative; backporting is honest. The project's voice chooses honest over conservative.
 
 ### 5.5 If backport: what ADR-014 says
 

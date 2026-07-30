@@ -98,7 +98,7 @@ Members of `acme_all_priority_ops` see all rows. Members of `acme_high_priority_
 
 - Members of `acme_all_priority_ops`: see all rows regardless of `o_orderpriority`.
 - Members of `acme_high_priority_ops`: see rows with `o_orderpriority IN ('1-URGENT', '2-HIGH')`.
-- (If a principal is in both, the more permissive grant applies, which is `all_priority_ops`. Standard union semantics; the policies should not require explicit overlap resolution.)
+- (If a principal is in both, the more permissive grant applies: `all_priority_ops`. No overlap resolution needed.)
 
 **4.3 — Principals without an entry**
 
@@ -114,7 +114,7 @@ None.
 
 **4.6 — Obligations**
 
-None expressed by the policy. Observed audit behavior in this exercise is the operator manipulating group membership and observing the change in query results. Tessera should not insert audit-log obligations the existing implementation does not have; doing so would introduce a divergence the comparison would have to handle.
+None. The existing implementation carries no audit-log obligations; the exercise should not introduce divergence by adding them.
 
 ---
 
@@ -130,15 +130,15 @@ Not applicable. Group memberships do not expire in this demonstration. Membershi
 
 **5.3 — Mid-session changes**
 
-`is_account_group_member` reflects current account-level membership. Mid-session group changes propagate at query evaluation time per Databricks' caching semantics. For this demo, "next query reflects current membership" is the correct expectation.
+`is_account_group_member` reflects current membership. Changes propagate at query evaluation time per Databricks' caching semantics.
 
 **5.4 — Joins with other tables**
 
-Unity Catalog row filters apply to the base table; joins downstream see only the filtered rows. Standard behavior; no special handling needed in the policy.
+Row filters apply to the base table; joins downstream see only filtered rows.
 
 **5.5 — Views over the protected table**
 
-Unity Catalog row filters propagate to views over the protected table. Standard behavior.
+Row filters propagate to views over the protected table.
 
 **5.6 — Service accounts**
 
@@ -146,7 +146,7 @@ Treated as ordinary principals. A service account that is not in either restrict
 
 **5.7 — Group lookup unavailability**
 
-If `is_account_group_member` cannot determine membership (Databricks internal failure), the row filter returns no rows for that user. Fail-closed by default; consistent with the framework's disposition.
+If `is_account_group_member` cannot determine membership, the row filter returns no rows. Fail-closed.
 
 **5.8 — Empty membership for restrictive groups**
 

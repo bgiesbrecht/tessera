@@ -18,9 +18,9 @@ Five things happened, in order:
 
 4. **ABAC column-mask exercise ran** with full blind-derivation. The deliberate two-policy overlap (Redact + Hash, same matching predicate) produced **the discriminating empirical result for ADR-019's α/β/γ question**: Databricks ABAC rejects multi-mask evaluation with a `COLUMN_MASKS_FEATURE_NOT_SUPPORTED.MULTIPLE_MASKS` error. **ADR-023** records the γ-with-refinement resolution.
 
-5. **ABAC row-filter exercise ran** with full blind-derivation. Reinforced the Mechanism A vs B distinction (three branches force B), confirmed cross-policy/cross-mechanism behavior, and surfaced a new v1 candidate (`policy-two-axis-attribute-matching` — issue #12) when Brice's existing implementation revealed a table-level + column-level matching pattern Tessera v0 doesn't model.
+5. **ABAC row-filter exercise ran** with full blind-derivation. Reinforced Mechanism A vs B (three branches force B), confirmed cross-policy/cross-mechanism behavior, and surfaced a new v1 candidate (issue #12) when Brice's implementation revealed a table-level + column-level matching pattern Tessera v0 doesn't model.
 
-The project has effectively moved from "design sketched" to "design validated against three platform-level worked examples, with one substantive design refinement at each."
+The project has moved from "design sketched" to "design validated against three platform-level worked examples, with one substantive design refinement at each."
 
 ---
 
@@ -95,9 +95,9 @@ Issue tracker: <https://github.com/bgiesbrecht/tessera/issues>
 
 ## Design questions resolved since your last input
 
-1. **Mechanism A vs Mechanism B** (where principal logic lives — policy header vs UDF body). The ABAC column-mask exercise surfaced this distinction (binary exempt/not-exempt → A; multi-branch → B forced). Tessera v0's IR shape essentially mandates Mechanism A; multi-branch exercises (like the row-filter exercise) collapse to Mechanism B at SQL emission via a single CASE-based UDF.
+1. **Mechanism A vs Mechanism B** (where principal logic lives — policy header vs UDF body). The ABAC column-mask exercise surfaced this distinction. Tessera v0's IR shape essentially mandates Mechanism A; multi-branch exercises collapse to Mechanism B at SQL emission via a single CASE-based UDF.
 
-2. **Cross-policy combination on the same effective resource** — γ-with-refinement per ADR-023. Tessera doesn't pick an algorithm; adapters declare platform constraints; emit diagnostics surface conflicts.
+2. **Cross-policy combination on the same effective resource** — γ-with-refinement per ADR-023. Tessera doesn't pick an algorithm; adapters declare platform constraints.
 
 3. **GRANT SELECT on the protected table** (initially flagged as a Tessera IR gap; corrected via Glean) — it is **deployment scaffolding for new tables**, not a policy concern. The IR correctly does not model it. Note: a corresponding lesson was written to Claude Code's memory file — verify Databricks platform claims via Glean before flagging them as IR findings.
 

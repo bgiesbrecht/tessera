@@ -4,12 +4,12 @@ Staging area for issues queued to be filed against `bgiesbrecht/tessera`. Keepin
 
 ## How to use
 
-1. Write the issue body as a Markdown file (the first H1 is **not** the title — pass the title separately).
+1. Write the issue body as Markdown (the first H1 is **not** the title — pass the title separately).
 2. With `gh` authenticated to `bgiesbrecht`, file with:
    ```bash
    gh issue create --label <label> --title "<title>" --body-file docs/issue-drafts/<file>.md
    ```
-3. Once filed, delete the draft file (the live issue is now the source of truth).
+3. Once filed, delete the draft file.
 
 ## Filed history
 

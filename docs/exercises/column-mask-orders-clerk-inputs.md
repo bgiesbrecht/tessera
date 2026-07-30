@@ -43,9 +43,9 @@ The mask affects only `o_clerk`. Other columns (`o_orderkey`, `o_orderstatus`, `
 
 **1.4 — Existing classifications**
 
-None on the column. The mask is gated by principal group membership, not by data classification — this is an *attribute-on-principal* pattern, not an *attribute-on-data* pattern. (The ABAC scoping document's §1 three-category framing places this in the "properties of the principal" category.)
+None on the column. The mask is gated by principal group membership, not by data classification — this is an *attribute-on-principal* pattern, not an *attribute-on-data* pattern.
 
-A future ABAC exercise might re-express the same masking intent driven by a `sensitivity: PIIClerk` (or similar) attribute axis applied to the column; that is the Stage 3 exercise in the ABAC scoping document and is not this exercise.
+A future ABAC exercise will re-express the same intent driven by a `sensitivity: PIIClerk` attribute axis applied to the column.
 
 ---
 
@@ -88,7 +88,7 @@ In Tessera terms (ADR-014, ADR-016):
 
 **3.3 — Default-handling strategy**
 
-The existing SQL is structurally **negated-complement**: there is one explicit branch (full-access pass-through) and an unconditional `ELSE` (redact). The Tessera derivation uses `defaultStrategy: negated-complement` with `defaultBranch` carrying the Redact transformation. The alternative shape — `defaultStrategy: explicit-baseline-group` with `account users` as the baseline rule — is also valid and produces the same observable behavior; this exercise produces only the negated-complement form to match the existing SQL directly.
+The existing SQL is structurally **negated-complement**: one explicit branch (full-access pass-through) and an unconditional `ELSE` (redact). The Tessera derivation uses `defaultStrategy: negated-complement` with `defaultBranch` carrying the Redact transformation. This exercise produces only the negated-complement form to match the existing SQL directly.
 
 **3.4 — Purpose binding**
 

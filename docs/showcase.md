@@ -6,11 +6,11 @@ The claim it makes — and demonstrates with real numbers from real workspaces �
 
 > The same data governance policy, authored once in YAML, can be validated, lowered to Databricks-native enforcement and Snowflake-native enforcement, deployed on both platforms, behaviorally verified, and migrated between platforms in either direction. End to end. Runnable. Today.
 
-Everything below is grounded in scripts and committed artifacts in this repository. None of it is aspirational.
+Everything below is grounded in scripts and committed artifacts in this repository.
 
 ---
 
-## The shape of the thing
+## Policy flow
 
 ```
                  ┌─────────────────────────────┐
@@ -39,7 +39,7 @@ Three policy shapes carry across both platforms. Each shape exists in the IR (`s
 
 ---
 
-## What 0.6.0 ships
+## At 0.6.0
 
 ### The full adapter cycle, on both platforms
 
@@ -98,13 +98,13 @@ All six policies enforcing. Bidirectional cycle. Run it yourself: the scripts ar
 
 ---
 
-## Why the IR pivot matters
+## The IR's value
 
-The conventional answer to "how do I keep my Databricks and Snowflake governance in sync" is "you can't, exactly — write equivalent policies in both, hope they stay aligned, audit when they drift." The cost is real: policy drift between platforms is one of the more expensive governance failure modes, and every customer with a multi-platform footprint either pays it or builds bespoke tooling.
+The conventional answer to "how do I keep my Databricks and Snowflake governance in sync" is "you can't, exactly — write equivalent policies in both, hope they stay aligned, audit when they drift." Policy drift between platforms is a significant governance failure mode; every multi-platform customer either pays the cost or builds bespoke tooling.
 
-Tessera's IR is what changes that. The same `.tessera.yaml` file lowers to clean Databricks DDL and clean Snowflake DDL via per-platform adapters. The bindings layer (`AdapterConfig`) carries the per-environment translation — group names, role names, table identifiers, governed-tag mappings — without contaminating the policy itself. The policy author writes intent; the operator configures the translation; the platform handles enforcement.
+Tessera's IR addresses this. The same `.tessera.yaml` file lowers to clean Databricks DDL and clean Snowflake DDL via per-platform adapters. The bindings layer (`AdapterConfig`) carries the per-environment translation — group names, role names, table identifiers, governed-tag mappings — without contaminating the policy itself. The policy author writes intent; the operator configures the translation; the platform handles enforcement.
 
-This is the W3C semantic-web stack used seriously, not decoratively. The vocabulary is in OWL (`spec/v0/ontology.ttl`); the canonical form is JSON-LD 1.1 (`spec/v0/context.jsonld`); validation is layered between JSON Schema and SHACL; vocabulary alignment to DPV and ODRL is declared via SKOS. None of this is overhead — it's the substrate that makes the cross-platform claim mean something. See `docs/w3c-overview.md` for the semantic-web-savvy view.
+The implementation uses the W3C semantic-web stack: OWL for the vocabulary (`spec/v0/ontology.ttl`), JSON-LD 1.1 for the canonical form (`spec/v0/context.jsonld`), JSON Schema and SHACL for validation, and SKOS for vocabulary alignment to DPV and ODRL. This is not overhead; it is the substrate that makes the cross-platform claim sound. See `docs/w3c-overview.md` for details.
 
 ---
 
@@ -239,10 +239,8 @@ The `docs/user-guide/evaluating.md` page expands these into a fuller adopt/don't
 
 ---
 
-## One last framing
+## The 0.6.0 status
 
-Tessera is honest engineering practice on a real problem: governance policy that has to mean the same thing across data platforms. The cross-platform claim is empirically grounded — the migration scripts run; the verification queries return the expected numbers; the IR validates; the adapters round-trip.
+The version is 0.6.0 because v0 isn't frozen yet (per ADR-017). Whether it reaches 1.0 depends on external dependency — a real customer corpus, a third adapter, a tooling integration — at which point the spec freezes and the project commits to the surface it has.
 
-The version is 0.6.0 because v0 isn't frozen yet (per ADR-017's suspended-immutability framing). Whether it ever reaches 1.0 depends on whether external dependency arrives — a real customer corpus, a third adapter, a tooling integration — at which point the spec freezes and the project commits to the surface it has.
-
-Until then: the corpus is open, the artifacts are runnable, and the discipline holds. That is what 0.6.0 ships.
+Until then: the corpus is open, the artifacts are runnable, the discipline holds, and the migration scripts work.

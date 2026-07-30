@@ -21,7 +21,7 @@ Databricks Unity Catalog, ABAC mechanism — specifically `CREATE POLICY ... ROW
 
 A **three-branch row-visibility policy** driven by ABAC tag-matching rather than per-table row-filter attachment. The three branches are the same shape as the original group row-visibility exercise — but the mechanism is ABAC, not the legacy `ALTER TABLE … SET ROW FILTER`.
 
-This exercise's design output, in order of expected substance:
+The expected substantive outputs from this exercise:
 
 1. **Mechanism A vs Mechanism B forced into Mechanism B.** The prior ABAC column-mask exercise surfaced two ways to encode the principal split (TO/EXCEPT in policy header vs. `is_account_group_member` inside the UDF). For binary exempt/not-exempt cases, A is cleaner. For *three-branch* cases, A cannot express it — Databricks ABAC's principal binding is binary (`TO ... EXCEPT ...`). Tessera's three-rule IR must compile to a single UDF with CASE branches (Mechanism B). The exercise validates that the IR's clean multi-rule shape compiles correctly to the single-UDF emission.
 2. **An axis-naming gap.** The `abac_column=orderpriority` tag doesn't fit any of the four well-known v0 axes (`sensitivity`, `dataSubject`, `regulatoryRegime`, `businessDomain`). The exercise surfaces what axis a "row-classification-key column" belongs to. Likely a v1-candidate finding.
@@ -58,7 +58,7 @@ Unaffected. The row filter narrows which rows are visible; the column mask on `o
 
 **2.1 — Tessera axis for the row-discriminator column**
 
-This is a real design choice. The tag `abac_column=orderpriority` doesn't fit the v0 well-known axes (`sensitivity`, `dataSubject`, `regulatoryRegime`, `businessDomain`) cleanly. The column carries data that *drives row-level access decisions*, but it's neither a sensitivity classifier per se nor a data-subject identifier.
+The tag `abac_column=orderpriority` doesn't fit the v0 well-known axes cleanly. The column carries data that *drives row-level access decisions*, but it's neither a sensitivity classifier nor a data-subject identifier.
 
 **Interpretive choice for this exercise:** declare an **adopter-namespaced axis** to make the gap visible. Specifically:
 
@@ -80,10 +80,8 @@ tagTaxonomy:
 
 **2.2 — Why not use a v0 well-known axis?**
 
-Considered and rejected:
-
-- `sensitivity`: stretchy. One could argue priority IS a sensitivity classification, but the policy isn't about sensitivity-graded access; it's about category-graded access. The semantic mismatch would bury the actual pattern under a misleading label.
-- `businessDomain`: even more stretchy. `businessDomain: orderpriority` reads like "the orderpriority business domain," which isn't what's being said.
+- `sensitivity`: The semantic mismatch — this is category-graded access, not sensitivity-graded — would bury the pattern under a misleading label.
+- `businessDomain`: `businessDomain: orderpriority` reads as "the orderpriority business domain," which isn't what's being said.
 - `dataSubject` / `regulatoryRegime`: not applicable.
 
 Declaring an adopter-namespaced axis is the honest framing. The diagnostic records the finding.
@@ -139,7 +137,7 @@ None.
 
 ## 5. Mechanism choice (Mechanism A vs Mechanism B)
 
-This is the central design point this exercise validates.
+This is the core design point the exercise validates.
 
 **Mechanism A** (TO/EXCEPT in policy header, unconditional UDF body) **cannot express three branches**. Databricks ABAC's principal binding supports `TO principal_set EXCEPT principal_set` — a binary split, not a three-way one. With three branches, the policy must encode the principal logic somewhere other than `TO/EXCEPT`.
 

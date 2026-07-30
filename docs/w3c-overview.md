@@ -1,8 +1,8 @@
 # Tessera and the W3C stack
 
-**Audience:** semantic-web practitioners, ontologists, knowledge-graph engineers, and anyone who reaches reflexively for RDF when modeling cross-domain semantics. This document is a tour of *how* Tessera uses W3C technologies — vocabulary, serialization, validation, alignment — and *why* the choices look the way they do.
+**Audience:** semantic-web practitioners, ontologists, knowledge-graph engineers, and anyone who reaches reflexively for RDF when modeling cross-domain semantics. This document explains *how* Tessera uses W3C technologies — vocabulary, serialization, validation, alignment — and *why* the choices are structured as they are.
 
-Tessera is a portable representation of data governance policy across data platforms. The semantic-web stack is not bolted on; it is the spine. Policy authoring is YAML for ergonomics, but the canonical form is JSON-LD, the formal semantics live in OWL, validation is split between JSON Schema and SHACL, and alignment to existing privacy and rights vocabularies is declared with SKOS. The whole architecture exists *because* the value proposition — "PII means the same thing on Databricks and Snowflake" — is a semantic claim, not a syntactic one. The cleanest way to make a semantic claim is to write down the semantics.
+Tessera is a portable representation of data governance policy across data platforms. The semantic-web stack is not an add-on; it is the core. Policy authoring is YAML for readability, but the canonical form is JSON-LD, formal semantics live in OWL, validation splits between JSON Schema and SHACL, and alignment to existing privacy and rights vocabularies is declared with SKOS. The architecture rests on this stack because the value proposition — "PII means the same thing on Databricks and Snowflake" — is a semantic claim.
 
 ---
 
@@ -134,7 +134,7 @@ Policy authoring is `.tessera.yaml` for ergonomics — comments, multi-line stri
 }
 ```
 
-A few choices worth calling out for an audience that's actually read the JSON-LD 1.1 spec:
+Key design choices:
 
 - **`@protected: true`** prevents downstream consumers from silently redefining terms. Adopters can extend the vocabulary in their own namespaces; they cannot rebind `tessera:Read` to something else.
 - **`@version: 1.1`** opts into the 1.1 features actively used: scoped contexts (not used yet, but available), `@nest`, and the stricter expansion rules.
@@ -209,7 +209,7 @@ tessera:PolicyShape a sh:NodeShape ;
     ] .
 ```
 
-Three pragmatic decisions are worth showing off because they're the kind of thing that comes from actually shipping a SHACL graph against JSON-LD documents:
+Three pragmatic decisions emerged from shipping a SHACL graph against JSON-LD documents:
 
 ### 1. `sh:node` over `sh:targetClass` for blank-node shapes
 
@@ -244,7 +244,7 @@ Reads as: starting from the focus node, follow `tessera:rules` to the list head;
 Some constraints are expressible in JSON Schema (enum closure on string values; required fields). Others are not:
 
 - **Class typing of IRI references.** `axis: sensitivityAxis` expands to `tessera:sensitivityAxis`; SHACL's `sh:class tessera:AttributeAxis` enforces that the referenced node is a member of the AttributeAxis class. JSON Schema cannot see this — it's syntactic.
-- **Adopter-extensible IRI value spaces.** For the hierarchical sensitivity axis, `sh:nodeKind sh:IRI` permits any IRI value (including adopter-namespaced extensions like `acme:CustomerPII`) without enumerating them. JSON Schema sees pre-expansion short names like `sensitivityAxis`; SHACL sees the post-expansion IRI and can require both that the node is an IRI (`sh:nodeKind sh:IRI`) and that it satisfies class membership (`sh:class tessera:AttributeAxis`, resolved against the ontology graph). JSON Schema can validate string format but cannot see the JSON-LD expansion.
+- **Adopter-extensible IRI value spaces.** For the hierarchical sensitivity axis, `sh:nodeKind sh:IRI` permits any IRI value (including adopter-namespaced extensions like `acme:CustomerPII`) without enumerating them. JSON Schema sees pre-expansion short names like `sensitivityAxis`; SHACL sees the post-expansion IRI and can enforce both that the node is an IRI (`sh:nodeKind sh:IRI`) and that it satisfies class membership (`sh:class tessera:AttributeAxis`, resolved against the ontology graph).
 - **Operator vocabulary closure on condition algebra.** Condition operators (`and`, `or`, `eq`, `in`, `purpose-in`, `exists-in-dataset`, ...) are well-known individuals; `sh:in (tessera:and tessera:or ...)` enforces closure at the RDF layer.
 
 These three categories are SHACL's unique value-add in the validation pipeline. Other constraints (cardinality, required fields, type structure) are deliberately delegated to JSON Schema — see "Layered validation" below.
@@ -387,12 +387,10 @@ The single concrete starting point for a W3C-savvy reader: open `spec/v0/ontolog
 
 ---
 
-## A note on posture
+## On posture
 
-Tessera is not a W3C submission and is not seeking standardization. It is engineering practice that happens to use the W3C stack credibly because the stack is the right tool for the job — modeling cross-domain semantics, declaring vocabulary alignment, validating documents against constraints that are simultaneously structural and semantic. The project leans on RDF, OWL, JSON-LD, SHACL, and SKOS the way a competent engineer leans on a well-maintained library: confidently, but without ceremony.
+Tessera is not a W3C submission and is not seeking standardization (ADR-002). It uses the W3C stack because the technology fits the problem — modeling cross-domain semantics, declaring vocabulary alignment, validating documents against constraints that are simultaneously structural and semantic.
 
-If the project ever does seek formalization (it currently does not), the artifacts are in shape for that conversation. The persistent IRIs resolve; the ontology is internally consistent; the SHACL shapes are portable across validators; the SKOS alignment is conservative; the JSON-LD context is `@protected`. The W3C-savvy reader's evaluation question — "could this be picked up by a working group without rework?" — has a defensible answer.
+If formalization were pursued, the artifacts are ready: persistent IRIs resolve; the ontology is internally consistent; the SHACL shapes are portable across validators; the SKOS alignment is conservative; the JSON-LD context is `@protected`.
 
-But the more interesting question is whether the *practice* survives evaluation: does the cross-platform fidelity claim hold? does the meaning-over-mechanism principle survive contact with real platforms? Eight worked exercises and one live cross-platform deployment say yes, with the discipline of recording where they don't.
-
-The semantic-web stack is not the thing being shown off. The thing being shown off is what becomes possible when the stack is used seriously.
+The substantial question is whether the practice survives contact with real platforms: does the cross-platform fidelity claim hold? Does meaning-over-mechanism survive deployment? Eight worked exercises and one live cross-platform migration say yes.

@@ -56,9 +56,9 @@ What it does propose is that we provide tooling — open or shared with customer
 
 The strategic posture is principled cooperation: we build this because customers need it, we build it in a way that does not privilege Databricks at the representational layer (privileging the platform there would defeat the point of the project), and the Unity Catalog adapter is the most thoroughly developed adapter because that is the platform we know best. We do not coordinate with Snowflake on this; we do not exclude them either. Their adapter is built against the public surface of their platform, as any partner integration would be.
 
-## Why this is achievable
+## Precedent and technical foundation
 
-The pattern is proven in adjacent domains. Healthcare standards bodies have done exactly this for clinical logic: a shared representation, grounded in a standardized vocabulary, translated to multiple execution environments. The technical building blocks for governance — policy vocabularies, ontology standards, modern authorization languages — exist and can be reused rather than reinvented. The scope is deliberately narrow: data-platform governance, not universal authorization.
+Healthcare standards bodies have done exactly this for clinical logic: a shared representation, grounded in a standardized vocabulary, translated to multiple execution environments. The technical building blocks for governance — policy vocabularies, ontology standards, modern authorization languages — exist and can be reused rather than reinvented. The scope is deliberately narrow: data-platform governance, not universal authorization.
 
 ## What we are asking for
 
@@ -68,7 +68,7 @@ This brief is to inform leadership of the work and to align on three questions:
 2. **Standards posture.** Whether the eventual artifact is shared as open documentation, contributed to a neutral body, or kept as customer-engagement tooling. The default is the third; the first two require explicit conversation.
 3. **Relationship to Unity Catalog.** Confirmation that the framing — Unity Catalog as the source of truth inside Databricks, the portable representation as the lingua franca between estates — is acceptable as the public stance of the work.
 
-## What success looks like
+## Success criteria
 
 - Joint Databricks–Snowflake customers expressing governance policy once, in the portable representation, with Unity Catalog and Snowflake each enforcing equivalent translations — and with the trade-offs of each translation explicit and reviewable.
 - Customers treating the portable artifact as the authoritative statement of cross-platform policy, while continuing to treat Unity Catalog as authoritative inside their Databricks estate.

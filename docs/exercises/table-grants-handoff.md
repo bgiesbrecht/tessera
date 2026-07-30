@@ -10,11 +10,10 @@
 
 Six completed exercises so far have exercised row-visibility (group, ACL, ABAC, Snowflake-byDataset) and column masking. ABAC support landed in ADRs 018–021. What hasn't been exercised: **basic table-level grants** — the bread-and-butter "users in group X can read tables in schema Y" pattern that predates ABAC and is what most customers reach for first.
 
-The exercise validates that Tessera expresses three progressively richer grant patterns cleanly. It also addresses open issue #10 (policy-execute-grants), which was surfaced during the row-visibility exercises but never directly exercised.
+The exercise validates that Tessera expresses three progressively richer grant patterns cleanly. It also addresses open issue #10 (policy-execute-grants).
 
-The framework's value proposition is **load-bearing on the simple cases as much as the complex ones**, because Tessera's primary driving activity is migration. If a customer is moving hundreds of grants between platforms, "use native DDL for the simple ones" defeats the framework — the operator has to translate manually and maintain two sources of truth. The IR must express the full corpus, simple and complex, or it cannot serve the migration use case.
+The framework must be **load-bearing on simple cases as much as complex ones**. For migration, if a customer moving hundreds of grants has to use native DDL for the simple ones, they maintain two sources of truth. The IR must express the full corpus, simple and complex.
 
-This framing was sharpened in conversation 2026-05-19; the exercise's value is now understood as validating a load-bearing capability, not just demonstrating expressiveness on a simple case.
 
 ---
 
@@ -84,7 +83,7 @@ Two design questions, resolved:
 
 - **Execute action — add to v0 first, let exercise discover, or what?** Added prior to Phase 2 across `ontology.ttl`, `context.jsonld`, `schema.json`, `shapes.ttl`. Semantic-only scope (gating who can invoke business-logic resources); platform-mechanism uses of EXECUTE (UDFs as policy-enforcement vehicles, EXECUTE grants required to attach a UDF to a Tessera-emitted column-mask policy) remain **adapter scaffolding, not IR-modeled**. This boundary is the load-bearing finding the exercise records — Glean's enumeration of EXECUTE uses on Unity Catalog made the boundary visible.
 
-- **`policyKind` for affirmative grants.** Open. Phase 2 should derive both forms (squeeze under `RowVisibilityConstraint` with `effect: allow`, and sketch what an `AccessGrantConstraint` would look like). Diagnostic compares; design decision deferred to a follow-up ADR after the comparison lands.
+- **`policyKind` for affirmative grants.** Open. Phase 2 should derive both forms (squeeze under `RowVisibilityConstraint` with `effect: allow`, and sketch what an `AccessGrantConstraint` would look like). Diagnostic compares; design decision deferred to a follow-up ADR.
 
 ---
 
