@@ -19,9 +19,9 @@ Everything below is grounded in scripts and committed artifacts in this reposito
                               │  converter (lossless)
                               ▼
                  ┌─────────────────────────────┐
-                 │   JSON-LD canonical form     │
-                 │   (validated by JSON Schema  │
-                 │    + SHACL)                  │
+                 │   JSON-LD canonical form    │
+                 │   (validated by JSON Schema │
+                 │    + SHACL)                 │
                  └──┬──────────────────────┬───┘
                     │  UC adapter          │  Snowflake adapter
                     ▼                      ▼
