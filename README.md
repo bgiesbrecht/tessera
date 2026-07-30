@@ -39,17 +39,16 @@ If you run a single platform and that platform's governance meets your needs, Te
 
 ## Status
 
-Current version: **0.6.0** (see `VERSION`, `CHANGELOG.md`).
+Current version: **0.6.3** (see `VERSION`, `CHANGELOG.md`).
 
 Both reference adapters are real and exercise the full ADR-024 cycle — `emit` / `discover` / `extract` / `reconcile` — on Databricks Unity Catalog and on Snowflake. Three policy shapes are implemented across both platforms: `RowVisibilityConstraint` (`byIdentity`, `byScope`, `byDataset`), `ColumnVisibilityConstraint` (`Redact`), and `AccessGrantConstraint` (table, function, schema-fan-out). Bidirectional migration between the two platforms is demonstrated end-to-end in `adapters/tests/live_migration_demo.py` and its reverse-direction sibling, with verification queries confirming the same policy intent enforces the same way on both sides.
 
 The IR — JSON-LD context, OWL ontology, JSON Schema, SHACL shapes — lives in `spec/v0/`. Per ADR-017, the v0 immutability bar is **suspended** until external dependency exists (a third-party adapter, a customer corpus, downstream tooling): additions continue to land in v0, each captured as an ADR. The published GitHub Pages URLs under `bgiesbrecht.github.io/tessera/spec/v0/` will not change once external consumers exist.
 
-For a demo-ready tour of what's working today, read [`docs/showcase.md`](docs/showcase.md). For per-version detail, read `CHANGELOG.md`. Twenty-one of thirty-one tracked issues remain open; the breakdown is in `docs/issue-drafts/README.md`.
+For a demo-ready tour of what's working today, read [`docs/showcase.md`](docs/showcase.md). For per-version detail, read `CHANGELOG.md`. Twenty of thirty-one tracked issues remain open; the breakdown is in `docs/issue-drafts/README.md`.
 
-Known limitations at 0.6.0:
+Known limitations at 0.6.3:
 
-- UC ABAC `byScope` column-mask emission is queued ([#30](https://github.com/bgiesbrecht/tessera/issues/30)).
 - Snowflake ABAC `byScope` is queued ([#31](https://github.com/bgiesbrecht/tessera/issues/31)) — different platform mechanism.
 - YAML comment preservation in round-trips is deferred to converter v2.
 - Schema-pattern resource bindings are not yet implemented.
@@ -89,11 +88,11 @@ Three forms exist:
 .
 ├── README.md                              ← this file
 ├── LICENSE                                ← Apache 2.0
-├── DECISIONS.md                           ← 26 numbered ADRs
+├── DECISIONS.md                           ← 27 numbered ADRs
 ├── CHANGELOG.md                           ← per-version detail
-├── VERSION                                ← current: 0.6.0
+├── VERSION                                ← current: 0.6.3
 ├── docs/
-│   ├── showcase.md                        ← demo-anchored tour of 0.6.0
+│   ├── showcase.md                        ← demo-anchored tour of 0.6.3
 │   ├── executive-summary.md               ← one-page leadership brief
 │   ├── problem-and-recommendation.md      ← stakeholder framing
 │   ├── technical-design-v0.2.md           ← current technical spec

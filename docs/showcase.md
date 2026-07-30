@@ -1,4 +1,4 @@
-# Tessera at 0.6.0 — what works, end to end
+# Tessera at 0.6.3 — what works, end to end
 
 This document is for someone who has heard about Tessera and wants to know what it actually does today, before reading the README, the technical design, or any of the ADRs. It is a 5–10 minute read. Pointers throughout to runnable artifacts and supporting docs.
 
@@ -39,11 +39,11 @@ Three policy shapes carry across both platforms. Each shape exists in the IR (`s
 
 ---
 
-## At 0.6.0
+## At 0.6.3
 
 ### The full adapter cycle, on both platforms
 
-Per ADR-024, every adapter implements four responsibilities. At 0.6.0 the four are real (not stubbed) on both Unity Catalog and Snowflake:
+Per ADR-024, every adapter implements four responsibilities. At 0.6.3 the four are real (not stubbed) on both Unity Catalog and Snowflake:
 
 | Responsibility | Unity Catalog | Snowflake | What it does |
 |---|---|---|---|
@@ -194,7 +194,7 @@ $ python -m adapters.tests.live_migration_demo
 
 ---
 
-## Honest limitations at 0.6.0
+## Honest limitations at 0.6.3
 
 The framing of these matters: not "TODO" items, but documented decisions about what the version does and doesn't cover. Each links to the tracking issue.
 
@@ -239,8 +239,6 @@ The `docs/user-guide/evaluating.md` page expands these into a fuller adopt/don't
 
 ---
 
-## The 0.6.0 status
+## Version status
 
-The version is 0.6.0 because v0 isn't frozen yet (per ADR-017). Whether it reaches 1.0 depends on external dependency — a real customer corpus, a third adapter, a tooling integration — at which point the spec freezes and the project commits to the surface it has.
-
-Until then: the corpus is open, the artifacts are runnable, the discipline holds, and the migration scripts work.
+The version is 0.6.3 because v0 isn't frozen yet (per ADR-017). Whether it reaches 1.0 depends on external dependency — a real customer corpus, a third adapter, a tooling integration — at which point the spec freezes and the project commits to the surface it has.
