@@ -15,7 +15,7 @@ The spine of the project is real and exercised end-to-end.
 - **The v0 IR** — JSON-LD context, OWL ontology, JSON Schema, SHACL shapes — in `spec/v0/`. The immutability bar is suspended per ADR-017 until external dependency exists; additions land in v0, each as an ADR.
 - **Both reference adapters** (Unity Catalog, Snowflake) run the full ADR-024 cycle — `emit` / `discover` / `extract` / `reconcile`. Three policy shapes across both platforms: `RowVisibilityConstraint` (`byIdentity`, `byScope`, `byDataset`), `ColumnVisibilityConstraint` (`Redact`), `AccessGrantConstraint` (table, function, schema fan-out). Bidirectional Snowflake↔UC migration is demonstrated with behavioral-equivalence verification.
 - **The converter** (`tools/converter/`) — YAML → JSON-LD, both authoring shapes.
-- **The unified CLI** (`tools/cli/`, `python -m tools.cli`) — `validate`, `convert`, `emit`, `discover`, `extract`, `reconcile`.
+- **The unified CLI** (`tools/cli/`, `python -m tools.cli`) — `validate`, `convert`, `emit`, `discover`, `extract`, `reconcile`, and `impact` / `lint` (change-impact analysis).
 - **Change-impact analysis** (`tools/impact/`) — given a policy corpus and a proposed change, reports how the change alters what the corpus decides about data, *before* it is emitted. All planned checks are built: C1 (fall-through coverage), C2 (default-net removal), C3 (reachability/shadowing), C4 (cross-policy overlap, ADR-023), C5 (dangling reference), C6 (exposure polarity), plus standing lints L1 (dead rules) and L2 (cross-policy overlap). Reasons only about selector *expressions*, never populations (the ADR-001 line); findings are PROVEN or CANDIDATE. Design in [`docs/v1-candidates/change-impact-analysis.md`](v1-candidates/change-impact-analysis.md); worked demos in `docs/exercises/`.
 - **Eight worked examples** (`spec/v0/examples/`) — seven Databricks, one Snowflake — each with diagnostic and comparison records.
 
@@ -27,7 +27,6 @@ For a demo-ready tour, read [`docs/showcase.md`](showcase.md).
 
 Work that is scoped and committed in direction, awaiting implementation.
 
-- **Wire `impact` and `lint` into the `tessera` CLI.** Change-impact currently runs as its own entry point (`python -m tools.impact`). The user guide advertises a single unified CLI; `impact` and `lint` should join it as `tessera impact` / `tessera lint` subcommands so there is one command surface. Small, mechanical; no design open.
 - **UC ABAC `byScope` column-mask emission** ([#30](https://github.com/bgiesbrecht/tessera/issues/30)). The Databricks adapter does not yet emit ABAC-scoped column masks. Named a v0 coverage gap because ABAC is the pattern Databricks now recommends.
 - **Snowflake ABAC `byScope` emission** ([#31](https://github.com/bgiesbrecht/tessera/issues/31)), row and column. The Snowflake mechanism is genuinely different from Databricks; this is more than a port.
 - **Converter v2 — comment preservation** (ADR-004). Round-trip YAML comment retention and `rdfs:comment` mapping. The converter is already comment-preservation-ready (ruamel round-trip parser); the feature is a follow-up, not a refactor.
@@ -98,3 +97,4 @@ Directions that are real but not yet scoped, recorded so the shape of the projec
 ## Revision log
 
 - **2026-08-04** — Initial roadmap. Consolidated scattered status; recorded change-impact tool as fully shipped (C1–C6, L1/L2) and the decision to fold `impact`/`lint` into the `tessera` CLI.
+- **2026-08-04** — `impact` / `lint` wired into the `tessera` CLI (`tessera impact`, `tessera lint`); the standalone `python -m tools.impact` entry point remains. Added the [Analyzing changes](user-guide/analyzing-changes.md) user-guide page.

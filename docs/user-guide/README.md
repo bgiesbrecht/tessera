@@ -10,7 +10,7 @@ Tessera is a portable representation of data governance policy. It expresses *wh
 |---|---|---|
 | **Practitioner with an ACL table + masking situation** — you have YAML skills and a real governance problem; you don't need the semantic-web theory | [Scenario: ACL & masking](./scenarios/acl-and-masking.md) | [Authoring](./authoring.md) for vocabulary, [Operating](./operating.md) for deployment |
 | **Policy author** — you write `.tessera.yaml` files describing what governance the organization needs | [Tutorial](./tutorial.md) → [Authoring](./authoring.md) | The capability profiles linked from `operating.md` to know what your target platforms can and can't express |
-| **Operator / adopter** — you wire Tessera into a deployment pipeline (CI, configuration management, audit) | [Tutorial](./tutorial.md) → [Operating](./operating.md) | [Authoring](./authoring.md) for the vocabulary you'll be lowering |
+| **Operator / adopter** — you wire Tessera into a deployment pipeline (CI, configuration management, audit) | [Tutorial](./tutorial.md) → [Operating](./operating.md) | [Analyzing changes](./analyzing-changes.md) to review edits before deploy; [Authoring](./authoring.md) for the vocabulary you'll be lowering |
 | **Evaluator** — you're deciding whether Tessera fits | [Evaluating](./evaluating.md) | [Scenario: ACL & masking](./scenarios/acl-and-masking.md) for a concrete end-to-end |
 | **Future contributor** — you're extending Tessera (new adapter, new IR concept) | [Contributing](./contributing.md) | `DECISIONS.md` (ADRs) and [Operating](./operating.md) |
 
@@ -21,6 +21,7 @@ Tessera is a portable representation of data governance policy. It expresses *wh
 - [**Tutorial**](./tutorial.md) — write a policy, validate it, emit DDL through both adapters, deploy on Databricks and Snowflake, verify. More concept-focused; ~30 minutes end to end.
 - [**Authoring**](./authoring.md) — the policy vocabulary. Selectors, conditions, transformations, the Policy container, the recommended Snowflake authoring pattern.
 - [**Operating**](./operating.md) — adapter configuration, identity / resource / tag bindings, capability profiles, deployment patterns per platform, the Snowflake `DEFAULT_SECONDARY_ROLES` caveat.
+- [**Analyzing changes**](./analyzing-changes.md) — `tessera impact` / `tessera lint`: how a proposed change alters what the corpus decides, and standing corpus health checks. Read-only, advisory, static (never touches a platform).
 - [**Evaluating**](./evaluating.md) — scope, non-goals, honest limitations, posture.
 - [**Contributing**](./contributing.md) — how to extend Tessera. Adapter contract, ADR discipline, validation pipeline.
 
@@ -37,12 +38,21 @@ tessera convert  path/to/policy.tessera.yaml [--out path/to/policy.jsonld]
 tessera emit     path/to/policy.{tessera.yaml,jsonld} \
                  --adapter {unity-catalog,snowflake} [--config bindings.yaml]
 
+# Change analysis (offline, read-only — never touches a platform)
+tessera impact                              # git-tracked corpus, HEAD → working tree
+tessera impact --git <base-ref> <prop-ref>  # between two commits
+tessera impact --baseline A... --proposed B...   # explicit file sets
+tessera lint                                # standing corpus health check
+tessera lint  --corpus path/to/policies     # lint a directory
+
 # Platform-touching
 tessera discover  --adapter unity-catalog --catalog C --schema S
 tessera discover  --adapter snowflake     --database D --schema S
 tessera extract   --adapter unity-catalog --catalog C --schema S [--name N] [--out dir/]
 tessera reconcile --adapter unity-catalog --catalog C --schema S --intended path-or-dir/
 ```
+
+`impact` and `lint` are the change-impact tool; see [`analyzing-changes.md`](./analyzing-changes.md). Both are static and advisory — they read policy files and never connect to a platform.
 
 Connection details accept `--profile` / `--warehouse-id` (Databricks) or `--account` / `--user` / `--warehouse` / `--database` / `--auth-file` (Snowflake), and read the same values from `TESSERA_DB_*` / `TESSERA_SF_*` env vars when CLI args are absent. The Snowflake auth file defaults to `~/snowflake_auth.txt`.
 
