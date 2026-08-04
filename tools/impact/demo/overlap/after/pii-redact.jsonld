@@ -1,0 +1,34 @@
+{
+  "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
+  "@type": "Policy",
+  "@id": "policy:pii-redact",
+  "policyKind": "ColumnVisibilityConstraint",
+  "description": "Redact PII columns across the catalog for non-stewards.",
+  "appliesTo": {
+    "selector": "byScope",
+    "scope": "catalog:acme",
+    "matching": {
+      "attributes": {
+        "sensitivity": "PII"
+      }
+    }
+  },
+  "action": "Read",
+  "defaultStrategy": "negated-complement",
+  "rules": [
+    {
+      "principal": {
+        "selector": "byIdentity",
+        "resource": "group:acme_stewards"
+      },
+      "effect": "allow"
+    }
+  ],
+  "defaultBranch": {
+    "effect": "transform",
+    "transformation": {
+      "type": "Redact",
+      "replacement": "REDACTED"
+    }
+  }
+}

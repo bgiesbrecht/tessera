@@ -1,0 +1,29 @@
+{
+  "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
+  "@type": "Policy",
+  "@id": "policy:clerk-redact",
+  "policyKind": "ColumnVisibilityConstraint",
+  "description": "Redact the specific o_clerk column.",
+  "appliesTo": {
+    "selector": "byIdentity",
+    "resource": "column:acme.tpch.orders.o_clerk"
+  },
+  "action": "Read",
+  "defaultStrategy": "negated-complement",
+  "rules": [
+    {
+      "principal": {
+        "selector": "byIdentity",
+        "resource": "group:acme_stewards"
+      },
+      "effect": "allow"
+    }
+  ],
+  "defaultBranch": {
+    "effect": "transform",
+    "transformation": {
+      "type": "Redact",
+      "replacement": "REDACTED"
+    }
+  }
+}
