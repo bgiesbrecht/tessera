@@ -1,0 +1,880 @@
+"""Change-impact checks (scoping doc §5).
+
+Shipped:
+    C1  fall-through coverage — a selector loses its last governing rule
+    C2  default-net removal   — the fallback itself weakens
+    C3  reachability          — a rule shadowed / un-shadowed under first-match
+    C5  dangling reference    — referential integrity, seeded by the change
+    C6  exposure polarity     — WIDEN / NARROW / INVERT / NEUTRAL per change
+
+Each check is a thin composition over the kernel (§4). Checks take a baseline
+corpus and a proposed corpus and emit selector-relative, confidence-tagged
+findings. Later stages add C4 (cross-policy overlap).
+"""
+
+from __future__ import annotations
+
+from tools.impact import kernel
+from tools.impact.findings import Confidence, Finding, Polarity
+from tools.impact.kernel import Polarity as EffPolarity
+from tools.impact.model import Corpus, Policy, Rule
+
+
+# ============================================================================
+# C6 — Exposure polarity (the headline check)
+# ============================================================================
+
+
+def check_c6_exposure_polarity(baseline: Corpus, proposed: Corpus) -> list[Finding]:
+    """Classify each policy-level change by its net effect on exposure (§5-C6).
+
+    Works per-policy (matched by @id). For each policy present in both corpora,
+    compare rule lists position-wise plus set membership, and classify:
+
+      WIDEN   — the change exposes strictly more
+      NARROW  — the change exposes strictly less
+      INVERT  — an effect flips polarity, or a transform is swapped
+      NEUTRAL — provably no exposure change
+
+    Added / removed whole policies are also classified (a new expose-bearing
+    policy is WIDEN for its selector; a removed one NARROW, subject to §4.4).
+    """
+    findings: list[Finding] = []
+
+    # Policies added or removed wholesale. Sorted for deterministic report order.
+    for pid in sorted(proposed.ids() - baseline.ids()):
+        findings.extend(_whole_policy_findings(proposed.get(pid), added=True))
+    for pid in sorted(baseline.ids() - proposed.ids()):
+        findings.extend(_whole_policy_findings(baseline.get(pid), added=False))
+
+    # Policies present in both: diff their rules and default branch.
+    for pid in sorted(baseline.ids() & proposed.ids()):
+        findings.extend(_diff_policy_c6(baseline.get(pid), proposed.get(pid)))
+
+    return findings
+
+
+def _whole_policy_findings(policy: Policy | None, *, added: bool) -> list[Finding]:
+    if policy is None:
+        return []
+    # A policy that exposes anywhere widens exposure when added, narrows when
+    # removed. A purely-restrictive policy is the mirror.
+    exposes = any(
+        kernel.effect_polarity(r.effect) == EffPolarity.EXPOSE for r in policy.rules
+    )
+    restricts = any(
+        kernel.effect_polarity(r.effect) in (EffPolarity.RESTRICT, EffPolarity.PARTIAL_RESTRICT)
+        for r in _rules_and_default(policy)
+    )
+    subj = policy.applies_to.describe() if policy.applies_to else policy.id
+    if added:
+        pol = Polarity.WIDEN if exposes and not restricts else (
+            Polarity.NARROW if restricts and not exposes else Polarity.INVERT
+        )
+        verb = "adds"
+    else:
+        pol = Polarity.NARROW if exposes and not restricts else (
+            Polarity.WIDEN if restricts and not exposes else Polarity.INVERT
+        )
+        verb = "removes"
+    return [
+        Finding(
+            check="C6",
+            subject=f"scope {subj}",
+            polarity=pol,
+            consequence=(
+                f"Change {verb} policy {policy.id}. Net exposure for the "
+                f"attached scope shifts accordingly."
+            ),
+            confidence=Confidence.PROVEN,
+            grounding="§4.3 effect polarity",
+            policy_id=policy.id,
+        )
+    ]
+
+
+def _rules_and_default(policy: Policy) -> list[Rule]:
+    rules = list(policy.rules)
+    if policy.default_branch is not None:
+        rules.append(policy.default_branch)
+    return rules
+
+
+def _diff_policy_c6(base: Policy, prop: Policy) -> list[Finding]:
+    findings: list[Finding] = []
+
+    # Match rules across versions by principal selector (the stable key). A
+    # rule whose selector exists in both is compared; selectors only in one
+    # side are added/removed rules.
+    base_by_sel = _index_by_selector(base.rules)
+    prop_by_sel = _index_by_selector(prop.rules)
+
+    base_keys = set(base_by_sel)
+    prop_keys = set(prop_by_sel)
+
+    # Iterate in source declaration order (dicts preserve insertion order, which
+    # is rule order from _index_by_selector) so report output is deterministic.
+
+    # Removed rules — in baseline order.
+    for key in base_by_sel:
+        if key not in prop_keys:
+            findings.append(_removed_rule_finding(prop.id, base_by_sel[key]))
+
+    # Added rules — in proposed order.
+    for key in prop_by_sel:
+        if key not in base_keys:
+            findings.append(_added_rule_finding(prop.id, prop_by_sel[key]))
+
+    # Rules present in both — in proposed order.
+    for key in prop_by_sel:
+        if key in base_keys:
+            f = _changed_rule_finding(prop.id, base_by_sel[key], prop_by_sel[key])
+            if f is not None:
+                findings.append(f)
+
+    return findings
+
+
+def _index_by_selector(rules: list[Rule]) -> dict[str, Rule]:
+    """Index rules by a stable selector key. Rules whose principal cannot be
+    described distinctly fall back to positional keys to avoid collisions."""
+    out: dict[str, Rule] = {}
+    for i, r in enumerate(rules):
+        key = r.principal.describe() if r.principal else f"<pos:{i}>"
+        # Guard against two rules with the same selector: disambiguate.
+        if key in out:
+            key = f"{key}#{i}"
+        out[key] = r
+    return out
+
+
+def _rule_subject(policy_id: str, rule: Rule) -> str:
+    sel = rule.principal.describe() if rule.principal else "<no-principal>"
+    return f"selector {sel}"
+
+
+def _removed_rule_finding(policy_id: str, rule: Rule) -> Finding:
+    pol = kernel.effect_polarity(rule.effect)
+    # Removing an expose rule narrows; removing a restrict rule widens.
+    if pol == EffPolarity.EXPOSE:
+        polarity, word = Polarity.NARROW, "reduced"
+    elif pol in (EffPolarity.RESTRICT, EffPolarity.PARTIAL_RESTRICT):
+        polarity, word = Polarity.WIDEN, "increased"
+    else:
+        polarity, word = Polarity.INVERT, "changed"
+    cond = _describe_condition(rule)
+    return Finding(
+        check="C6",
+        subject=_rule_subject(policy_id, rule),
+        polarity=polarity,
+        consequence=(
+            f"Removed a {rule.effect} rule{cond}. Net exposure for the "
+            f"affected selector is strictly {word}."
+        ),
+        confidence=Confidence.PROVEN,
+        grounding="§4.3 effect polarity",
+        policy_id=policy_id,
+    )
+
+
+def _added_rule_finding(policy_id: str, rule: Rule) -> Finding:
+    pol = kernel.effect_polarity(rule.effect)
+    if pol == EffPolarity.EXPOSE:
+        polarity, word = Polarity.WIDEN, "increased"
+    elif pol in (EffPolarity.RESTRICT, EffPolarity.PARTIAL_RESTRICT):
+        polarity, word = Polarity.NARROW, "reduced"
+    else:
+        polarity, word = Polarity.INVERT, "changed"
+    cond = _describe_condition(rule)
+    return Finding(
+        check="C6",
+        subject=_rule_subject(policy_id, rule),
+        polarity=polarity,
+        consequence=(
+            f"Added a {rule.effect} rule{cond}. Net exposure for the "
+            f"affected selector is strictly {word}."
+        ),
+        confidence=Confidence.PROVEN,
+        grounding="§4.3 effect polarity",
+        policy_id=policy_id,
+    )
+
+
+def _changed_rule_finding(policy_id: str, base: Rule, prop: Rule) -> Finding | None:
+    # Effect changed?
+    if base.effect != prop.effect:
+        base_pol = kernel.effect_polarity(base.effect)
+        prop_pol = kernel.effect_polarity(prop.effect)
+        # Classification rule (scoping-doc §5-C6):
+        #   * A full polarity flip between EXPOSE and RESTRICT (allow↔deny,
+        #     keep↔drop) is INVERT — the doc reserves INVERT for exactly this.
+        #   * A change involving PARTIAL_RESTRICT (transform) on one side is
+        #     directional on the exposure ordering EXPOSE > PARTIAL > RESTRICT:
+        #     more exposure → WIDEN, less → NARROW (a transform relaxed to
+        #     allow widens; an allow tightened to transform narrows).
+        #   * Anything the kernel can't rank falls back to INVERT ("changed;
+        #     review it") rather than a fabricated direction.
+        rank = {EffPolarity.EXPOSE: 2, EffPolarity.PARTIAL_RESTRICT: 1, EffPolarity.RESTRICT: 0}
+        full = {EffPolarity.EXPOSE, EffPolarity.RESTRICT}
+        if base_pol in full and prop_pol in full and base_pol != prop_pol:
+            polarity = Polarity.INVERT
+        elif base_pol in rank and prop_pol in rank:
+            polarity = Polarity.WIDEN if rank[prop_pol] > rank[base_pol] else Polarity.NARROW
+        else:
+            polarity = Polarity.INVERT
+        return Finding(
+            check="C6",
+            subject=_rule_subject(policy_id, prop),
+            polarity=polarity,
+            consequence=f"Rule effect changed {base.effect} → {prop.effect}.",
+            confidence=Confidence.PROVEN,
+            grounding="§4.3 effect polarity",
+            policy_id=policy_id,
+        )
+
+    # Effect unchanged: did the condition value-set change?
+    b_cond, p_cond = base.condition, prop.condition
+    if b_cond == p_cond:
+        # Transformation swap on a transform rule -> INVERT (no natural order
+        # between two transforms; flag for review per scoping-doc §9.2).
+        if base.effect == "transform" and base.transformation != prop.transformation:
+            return Finding(
+                check="C6",
+                subject=_rule_subject(policy_id, prop),
+                polarity=Polarity.INVERT,
+                consequence=(
+                    f"Transformation changed "
+                    f"{_tf(base.transformation)} → {_tf(prop.transformation)}. "
+                    f"No total order between transforms; review the substitution."
+                ),
+                confidence=Confidence.PROVEN,
+                grounding="§9.2 transform substitution",
+                policy_id=policy_id,
+            )
+        return None  # genuinely no exposure-relevant change
+
+    # Condition changed on a same-effect rule. Determine widen/narrow via
+    # value-set containment, scoped to the rule's exposure polarity.
+    pol = kernel.effect_polarity(base.effect)
+    if not (kernel.condition_comparable(b_cond) and kernel.condition_comparable(p_cond)):
+        return Finding(
+            check="C6",
+            subject=_rule_subject(policy_id, prop),
+            polarity=Polarity.INVERT,
+            consequence="Condition changed on an operator static analysis cannot compare.",
+            confidence=Confidence.CANDIDATE,
+            grounding="§4.4 unknown boundary",
+            policy_id=policy_id,
+            unknown="condition operator is opaque (e.g. exists-in-dataset)",
+        )
+
+    prop_superset = kernel.condition_value_superset(p_cond, b_cond)
+    base_superset = kernel.condition_value_superset(b_cond, p_cond)
+
+    # For an EXPOSE rule: a larger matched value-set exposes MORE.
+    # For a RESTRICT/PARTIAL rule: a larger matched value-set restricts MORE.
+    if prop_superset and not base_superset:
+        larger = "prop"
+    elif base_superset and not prop_superset:
+        larger = "base"
+    else:
+        # incomparable columns or equal sets already handled -> flag as change
+        return Finding(
+            check="C6",
+            subject=_rule_subject(policy_id, prop),
+            polarity=Polarity.INVERT,
+            consequence="Condition value-set changed without a containment relation.",
+            confidence=Confidence.PROVEN,
+            grounding="§4.2 value-set arithmetic",
+            policy_id=policy_id,
+        )
+
+    grew = larger == "prop"
+    if pol == EffPolarity.EXPOSE:
+        polarity = Polarity.WIDEN if grew else Polarity.NARROW
+    else:
+        polarity = Polarity.NARROW if grew else Polarity.WIDEN
+
+    direction = "increased" if polarity == Polarity.WIDEN else "decreased"
+    change = _describe_condition_change(b_cond, p_cond, grew)
+    return Finding(
+        check="C6",
+        subject=_rule_subject(policy_id, prop),
+        polarity=polarity,
+        consequence=f"{change} on a {base.effect} rule → exposure {direction}.",
+        confidence=Confidence.PROVEN,
+        grounding="§4.2 value-set arithmetic",
+        policy_id=policy_id,
+    )
+
+
+def _describe_condition_change(b_cond, p_cond, grew: bool) -> str:
+    """Phrase the condition change, handling the whole-condition add/remove
+    cases (a rule becoming unconditional, or gaining a first condition) that a
+    bare value-set diff would render as a confusing empty set."""
+    if p_cond is None:
+        return "Condition removed (rule is now unconditional)"
+    if b_cond is None:
+        return f"Condition added (matching {sorted(p_cond.values)})"
+    delta = sorted(set(p_cond.values) ^ set(b_cond.values))
+    return f"Condition value-set {'gained' if grew else 'lost'} {delta}"
+
+
+def _describe_condition(rule: Rule) -> str:
+    if rule.condition is None or not rule.condition.values:
+        return ""
+    return f" (kept {sorted(rule.condition.values)})"
+
+
+def _tf(tf: dict | None) -> str:
+    if not tf:
+        return "none"
+    return str(tf.get("type", tf))
+
+
+# ============================================================================
+# C5 — Dangling reference
+# ============================================================================
+
+
+def check_c5_dangling_reference(baseline: Corpus, proposed: Corpus) -> list[Finding]:
+    """Referential-integrity check, seeded by the change (§5-C5).
+
+    The check examines only policies the change *touched* — those added in the
+    proposed corpus, or present in both but with differing content. Pre-existing
+    issues in unchanged files are out of scope: this is change-impact analysis,
+    not a whole-corpus linter (that is the Priority-5 linter's job).
+
+    For each changed policy it flags references left dangling by the edit:
+      * baselineGroup naming a group no rule targets;
+      * a condition operand column outside the (possibly narrowed) appliesTo;
+      * an unprefixed attribute axis key not declared in the ontology (adopter-
+        namespaced axes, carrying a `prefix:` per ADR-018, are legitimate
+        extensions and are not flagged).
+    Cross-file dataset references (tableRef) are structural but their contents
+    are opaque (§4.4); only the reference's presence is checked.
+    """
+    findings: list[Finding] = []
+    for pid, policy in proposed.policies.items():
+        base = baseline.get(pid)
+        if base is not None and base.raw == policy.raw:
+            continue  # unchanged policy — not part of this change
+        findings.extend(_c5_policy(policy))
+    return findings
+
+
+def _c5_policy(policy: Policy) -> list[Finding]:
+    findings: list[Finding] = []
+
+    # baselineGroup must be targeted by some rule under explicit-baseline-group.
+    if policy.default_strategy == "explicit-baseline-group" and policy.baseline_group:
+        bg = policy.baseline_group
+        # A rule targets it if some principal resource IRI's last segment
+        # matches the baseline group (accounting for the IRI-safety convention
+        # noted in the group-row-visibility example, where "account users"
+        # is carried as group:account-users).
+        targeted = any(
+            _principal_matches_group(r.principal, bg) for r in policy.rules
+        )
+        if not targeted:
+            findings.append(
+                Finding(
+                    check="C5",
+                    subject=f"baselineGroup '{bg}'",
+                    consequence=(
+                        f"defaultStrategy is explicit-baseline-group but no rule "
+                        f"targets baselineGroup '{bg}'. The default branch is "
+                        f"unreachable."
+                    ),
+                    confidence=Confidence.PROVEN,
+                    grounding="ADR-013 (baselineGroup↔strategy invariant)",
+                    policy_id=policy.id,
+                )
+            )
+
+    # Condition operand columns must sit within the appliesTo scope/resource.
+    scope_iri = None
+    if policy.applies_to:
+        scope_iri = policy.applies_to.resource or policy.applies_to.scope
+    if scope_iri:
+        for r in _rules_and_default(policy):
+            if r.condition is None:
+                continue
+            for operand in r.condition.operands:
+                if not _operand_within_scope(operand, scope_iri):
+                    findings.append(
+                        Finding(
+                            check="C5",
+                            subject=f"condition operand {operand}",
+                            consequence=(
+                                f"Condition references column '{operand}' outside the "
+                                f"policy's appliesTo scope '{scope_iri}'."
+                            ),
+                            confidence=Confidence.PROVEN,
+                            grounding="structural (operand within appliesTo)",
+                            policy_id=policy.id,
+                        )
+                    )
+
+    # Attribute axis keys in byScope matching must be known axes.
+    for sel in _all_selectors(policy):
+        for axis_key, _val in sel.attributes:
+            if not _is_known_axis(axis_key):
+                findings.append(
+                    Finding(
+                        check="C5",
+                        subject=f"attribute axis '{axis_key}'",
+                        consequence=(
+                            f"Selector references attribute axis '{axis_key}' not "
+                            f"declared in the ontology."
+                        ),
+                        confidence=Confidence.PROVEN,
+                        grounding="ADR-018 (declared axes)",
+                        policy_id=policy.id,
+                    )
+                )
+
+    return findings
+
+
+def _principal_matches_group(principal, group: str) -> bool:
+    if principal is None or not principal.resource:
+        return False
+    res = principal.resource
+    tail = res.split(":", 1)[1] if ":" in res else res
+    # Compare against the group name and its IRI-safe slug (spaces -> hyphens).
+    slug = group.replace(" ", "-")
+    return tail in (group, slug)
+
+
+# ABAC sentinel operands that resolve to the matched column/scope at emission
+# time rather than naming a fixed path. They are never "outside" any scope.
+_SENTINEL_OPERANDS = {"column:$matched", "$matched"}
+
+
+def _operand_within_scope(operand: str, scope_iri: str) -> bool:
+    # ABAC sentinels (`column:$matched`) are placeholders the adapter binds to
+    # the matched column at emission; they carry no fixed path to check.
+    if operand in _SENTINEL_OPERANDS:
+        return True
+    # A column operand `column:a.b.c.col` is within `table:a.b.c` /
+    # `catalog:a` / `schema:a.b` when the scope's path is a prefix.
+    return kernel.scope_contains(scope_iri, operand)
+
+
+def _all_selectors(policy: Policy):
+    if policy.applies_to:
+        yield policy.applies_to
+    for r in _rules_and_default(policy):
+        if r.principal:
+            yield r.principal
+
+
+def _is_known_axis(axis_key: str) -> bool:
+    # Adopter-namespaced axes (carrying a `prefix:`) are legitimate extensions
+    # per ADR-018; static analysis cannot know the adopter's ontology, so it
+    # does not flag them. Only unprefixed keys are checked against v0's axes.
+    if ":" in axis_key:
+        return True
+    _supers, axis_types = kernel._ontology_relations()
+    return f"{axis_key}Axis" in axis_types
+
+
+# ============================================================================
+# C1 — Fall-through coverage
+# ============================================================================
+
+
+# Plain-language description of what each strategy's terminal does when a
+# principal matches no rule. Read straight from the declared intent (ADR-013);
+# no evaluation of who those principals are.
+_STRATEGY_TERMINAL = {
+    "none": "fail-closed terminal (no rows / full restriction)",
+    "explicit-baseline-group": "the baselineGroup rule's grant (if a baseline member)",
+    "negated-complement": "the defaultBranch effect",
+    None: "an unspecified fallback (no defaultStrategy declared)",
+}
+
+
+def check_c1_fallthrough_coverage(baseline: Corpus, proposed: Corpus) -> list[Finding]:
+    """Detect selectors that lose their last governing rule (§5-C1).
+
+    Per policy matched by @id, count the governing rules for each principal
+    selector before and after. A selector dropping to zero rules changes
+    coverage class for the principals matching it; the consequence is read from
+    the policy's declared defaultStrategy (ADR-013) — no population is resolved.
+
+    PROVEN: the selector's rule count dropped to zero.
+    CANDIDATE: the downstream fate under explicit-baseline-group depends on
+    baseline-group membership, which static analysis cannot see (§4.4).
+    """
+    findings: list[Finding] = []
+    for pid in sorted(baseline.ids() & proposed.ids()):
+        base, prop = baseline.get(pid), proposed.get(pid)
+        base_sels = _selector_rule_counts(base)
+        prop_sels = _selector_rule_counts(prop)
+        for sel_key, count in base_sels.items():
+            if count > 0 and prop_sels.get(sel_key, 0) == 0:
+                findings.append(_c1_finding(prop, sel_key))
+    return findings
+
+
+def _selector_rule_counts(policy: Policy) -> dict[str, int]:
+    """Count governing rules per principal-selector key. The defaultBranch is
+    not counted — it has no principal (it applies to whoever matched no rule),
+    so it is not a governing rule *for* any selector."""
+    counts: dict[str, int] = {}
+    for r in policy.rules:
+        if r.principal is None:
+            continue
+        key = r.principal.describe()
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _c1_finding(policy: Policy, sel_key: str) -> Finding:
+    strategy = policy.default_strategy
+    terminal = _STRATEGY_TERMINAL.get(strategy, "the declared fallback")
+    # The downstream fate is a CANDIDATE only under explicit-baseline-group,
+    # where it hinges on unseen baseline membership. Under none/negated-
+    # complement the terminal is fully determined by the declared policy.
+    if strategy == "explicit-baseline-group":
+        confidence = Confidence.CANDIDATE
+        unknown = "baseline-group membership is not visible to static analysis"
+    else:
+        confidence = Confidence.PROVEN
+        unknown = None
+    return Finding(
+        check="C1",
+        subject=f"selector {sel_key}",
+        consequence=(
+            f"Lost its last governing rule. defaultStrategy = "
+            f"{strategy or '(none declared)'}. Principals matching this "
+            f"selector now fall through to {terminal}."
+        ),
+        confidence=confidence,
+        grounding="ADR-013 (declared default-handling intent)",
+        policy_id=policy.id,
+        unknown=unknown,
+    )
+
+
+# ============================================================================
+# C2 — Default-net removal or weakening
+# ============================================================================
+
+# Ordering of default strategies by how much of a safety net they provide when
+# a principal matches no rule. `none` is fail-closed (strongest restriction,
+# weakest net); a baseline/complement branch grants *something* to the
+# unmatched set (weaker restriction, stronger net). Moving toward `none`
+# removes net; moving away adds it. This is a declared-intent ordering
+# (ADR-013/014), not a runtime measurement.
+_NET_STRENGTH = {
+    "none": 0,
+    "explicit-baseline-group": 1,
+    "negated-complement": 1,
+}
+
+
+def check_c2_default_net(baseline: Corpus, proposed: Corpus) -> list[Finding]:
+    """Detect changes to the fallback itself (§5-C2).
+
+    Flags: defaultStrategy changing; the baselineGroup value changing; the
+    defaultBranch being added or removed. All are direct comparisons of
+    policy-level default-handling fields against the ADR-013/014 invariants —
+    PROVEN, since they are structural properties of the declared policy.
+    """
+    findings: list[Finding] = []
+    for pid in sorted(baseline.ids() & proposed.ids()):
+        base, prop = baseline.get(pid), proposed.get(pid)
+
+        if base.default_strategy != prop.default_strategy:
+            findings.append(_c2_strategy_finding(base, prop))
+
+        if base.baseline_group != prop.baseline_group:
+            findings.append(
+                Finding(
+                    check="C2",
+                    subject=f"baselineGroup",
+                    consequence=(
+                        f"baselineGroup changed "
+                        f"{base.baseline_group!r} → {prop.baseline_group!r}. The "
+                        f"default branch now grounds in a different group; the set "
+                        f"of principals receiving baseline coverage shifts."
+                    ),
+                    confidence=Confidence.PROVEN,
+                    grounding="ADR-013 (baselineGroup grounds the default branch)",
+                    policy_id=prop.id,
+                )
+            )
+
+        base_has_branch = base.default_branch is not None
+        prop_has_branch = prop.default_branch is not None
+        if base_has_branch and not prop_has_branch:
+            findings.append(
+                Finding(
+                    check="C2",
+                    subject="defaultBranch",
+                    polarity=Polarity.NARROW,
+                    consequence=(
+                        "defaultBranch removed. Principals matching no rule lose "
+                        "their explicit fallback effect."
+                    ),
+                    confidence=Confidence.PROVEN,
+                    grounding="ADR-014 (defaultBranch under negated-complement)",
+                    policy_id=prop.id,
+                )
+            )
+        elif prop_has_branch and not base_has_branch:
+            findings.append(
+                Finding(
+                    check="C2",
+                    subject="defaultBranch",
+                    consequence=(
+                        "defaultBranch added. Principals matching no rule now "
+                        "receive an explicit fallback effect."
+                    ),
+                    confidence=Confidence.PROVEN,
+                    grounding="ADR-014 (defaultBranch under negated-complement)",
+                    policy_id=prop.id,
+                )
+            )
+
+    return findings
+
+
+def _c2_strategy_finding(base: Policy, prop: Policy) -> Finding:
+    b_net = _NET_STRENGTH.get(base.default_strategy)
+    p_net = _NET_STRENGTH.get(prop.default_strategy)
+    polarity = None
+    net_note = ""
+    if b_net is not None and p_net is not None and b_net != p_net:
+        if p_net < b_net:
+            # Toward `none`: the fail-closed terminal replaces a grant. For the
+            # unmatched principals this is a NARROW (they now see less).
+            polarity = Polarity.NARROW
+            net_note = (
+                " Fail-closed terminal replaces a fallback grant; principals "
+                "previously covered by the default net now match nothing."
+            )
+        else:
+            polarity = Polarity.WIDEN
+            net_note = (
+                " A fallback grant replaces the fail-closed terminal; principals "
+                "previously seeing nothing now inherit default coverage."
+            )
+    return Finding(
+        check="C2",
+        subject="defaultStrategy",
+        polarity=polarity,
+        consequence=(
+            f"defaultStrategy changed "
+            f"{base.default_strategy or '(none)'} → "
+            f"{prop.default_strategy or '(none)'}.{net_note}"
+        ),
+        confidence=Confidence.PROVEN,
+        grounding="ADR-013 / ADR-014 (default-handling intent)",
+        policy_id=prop.id,
+        # The *magnitude* for a byDataset/ACL policy depends on ACL contents we
+        # do not read; note it where the policy's rules are opaque.
+        unknown=(
+            "row/principal magnitude depends on data not read by static analysis"
+            if _policy_has_opaque_selector(prop)
+            else None
+        ),
+    )
+
+
+def _policy_has_opaque_selector(policy: Policy) -> bool:
+    for sel in _all_selectors(policy):
+        if kernel.selector_opaque(sel):
+            return True
+    return False
+
+
+# ============================================================================
+# C3 — Reachability / shadowing
+# ============================================================================
+#
+# Under ordered first-match (ADR-015), a rule is unreachable ("shadowed") when
+# some earlier rule provably matches every principal-and-condition case the
+# later rule would. C3 reports two change deltas:
+#
+#   * a rule NEWLY shadowed by the change — dead policy introduced;
+#   * a rule NEWLY un-shadowed by the change — dormant policy silently
+#     activated (the scoping doc flags this as the more dangerous direction).
+#
+# This is the check nearest the ADR-001 line. It reasons ONLY about selector
+# *expressions* subsuming one another (kernel.selector_subsumes) and condition
+# value-set containment (kernel.condition_value_superset) — never about which
+# concrete principals populate a selector. Shadowing that would depend on group
+# membership or a group-subset relation is unknowable and is deliberately not
+# claimed: opaque selectors never subsume (kernel), so a pair involving one
+# simply does not produce a shadowing finding.
+
+
+def check_c3_reachability(baseline: Corpus, proposed: Corpus) -> list[Finding]:
+    """Report rules whose reachability changed under first-match (§5-C3).
+
+    For each policy in both corpora, compute the provably-shadowed rule set
+    before and after the change, and emit a finding for each rule that crossed
+    the reachability boundary. Every finding is PROVEN: it is only emitted when
+    an earlier rule's selector AND condition provably subsume the later rule's
+    (opaque selectors never subsume, so membership-dependent shadowing is never
+    guessed).
+    """
+    findings: list[Finding] = []
+    for pid in sorted(baseline.ids() & proposed.ids()):
+        base, prop = baseline.get(pid), proposed.get(pid)
+
+        base_shadowed = _shadowed_rules(base)
+        prop_shadowed = _shadowed_rules(prop)
+
+        # Key shadowed rules by their selector description so we compare the
+        # *same* rule across versions rather than by list index (which shifts
+        # when rules are added/removed).
+        base_keys = {_rule_key(base, i): i for i in base_shadowed}
+        prop_keys = {_rule_key(prop, i): i for i in prop_shadowed}
+
+        # Newly shadowed: shadowed in proposed, and either absent from baseline
+        # or not shadowed there.
+        for key, idx in prop_keys.items():
+            if key not in base_keys:
+                by_idx = prop_shadowed[idx]
+                findings.append(_c3_shadowed_finding(prop, idx, by_idx, key))
+
+        # Newly un-shadowed: was shadowed in baseline, now reachable (present in
+        # proposed but no longer shadowed).
+        prop_rule_keys = {_rule_key(prop, i) for i in range(len(prop.rules))}
+        for key, idx in base_keys.items():
+            if key in prop_rule_keys and key not in prop_keys:
+                findings.append(_c3_unshadowed_finding(prop, key))
+
+    return findings
+
+
+def _rule_key(policy: Policy, index: int) -> str:
+    """A stable per-rule key: principal selector + condition signature. Two
+    rules with an identical selector are disambiguated by their condition, and
+    finally by index, so distinct rules never collide."""
+    rule = policy.rules[index]
+    sel = rule.principal.describe() if rule.principal else "<no-principal>"
+    cond = rule.condition
+    if cond is None:
+        cond_sig = "∅"
+    else:
+        cond_sig = f"{cond.op}:{','.join(cond.operands)}={','.join(sorted(cond.values))}"
+    return f"{sel}||{cond_sig}"
+
+
+def _shadowed_rules(policy: Policy) -> dict[int, int]:
+    """Map each provably-unreachable rule index to the index of an earlier rule
+    that shadows it (§5-C3 mechanism).
+
+    Rule j is shadowed by an earlier rule i (i < j) when i provably matches
+    every case j would: i.selector ⊇ j.selector AND i's condition is a superset
+    of j's (an unconditional earlier rule is a superset of any condition). Only
+    provable subsumptions count; opaque selectors never subsume, so a rule
+    behind an opaque earlier rule is not claimed shadowed.
+    """
+    shadowed: dict[int, int] = {}
+    rules = policy.rules
+    for j in range(len(rules)):
+        for i in range(j):
+            if i in shadowed:
+                # An already-dead rule cannot do the shadowing (it never fires).
+                continue
+            if _rule_shadows(rules[i], rules[j]):
+                shadowed[j] = i
+                break
+    return shadowed
+
+
+def _rule_shadows(earlier: Rule, later: Rule) -> bool:
+    """True if `earlier` provably fires in every case `later` would (§4.2)."""
+    if not kernel.selector_subsumes(earlier.principal, later.principal):
+        return False
+    # earlier's condition must be a superset of later's matched set. A None
+    # (unconditional) earlier condition subsumes any later condition.
+    return kernel.condition_value_superset(earlier.condition, later.condition)
+
+
+def _c3_shadowed_finding(policy: Policy, idx: int, by_idx: int, key: str) -> Finding:
+    later_sel = policy.rules[idx].principal.describe() if policy.rules[idx].principal else "?"
+    earlier_sel = policy.rules[by_idx].principal.describe() if policy.rules[by_idx].principal else "?"
+    return Finding(
+        check="C3",
+        subject=f"selector {later_sel}",
+        consequence=(
+            f"Rule {idx} (selector {later_sel}) is now unreachable: earlier rule "
+            f"{by_idx} (selector {earlier_sel}) provably matches every case it "
+            f"would, under ordered first-match. The rule is dead code."
+        ),
+        confidence=Confidence.PROVEN,
+        grounding="ADR-015 (ordered first-match) + §4.2 subsumption",
+        policy_id=policy.id,
+    )
+
+
+def _c3_unshadowed_finding(policy: Policy, key: str) -> Finding:
+    sel = key.split("||", 1)[0]
+    return Finding(
+        check="C3",
+        subject=f"selector {sel}",
+        consequence=(
+            f"A previously-unreachable rule (selector {sel}) is now reachable "
+            f"under ordered first-match. Dormant policy has been activated — "
+            f"verify the newly-live effect is intended."
+        ),
+        confidence=Confidence.PROVEN,
+        grounding="ADR-015 (ordered first-match) + §4.2 subsumption",
+        policy_id=policy.id,
+    )
+
+
+# ============================================================================
+# L1 — Dead-rule lint (whole-corpus, not change-seeded)
+# ============================================================================
+#
+# C3 reports reachability *changes* between two corpus versions. L1 is the
+# standing lint counterpart: it reports every provably-dead rule in a single
+# corpus state, regardless of when it went dead. Same reachability mechanism
+# and the same ADR-001 guard (opaque selectors never subsume, so a dead-rule
+# claim is never membership-dependent); different framing — a health check on
+# the corpus as it stands, not a diff. This is what powers the "lint my whole
+# corpus for dead rules" mode.
+
+
+def lint_dead_rules(corpus: Corpus) -> list[Finding]:
+    """Report every provably-unreachable rule across a whole corpus (L1).
+
+    For each policy, compute its shadowed-rule set and emit one PROVEN finding
+    per dead rule, naming the earlier rule that shadows it. Unlike C3 this does
+    not diff versions — it audits the corpus as it currently stands.
+    """
+    findings: list[Finding] = []
+    for pid in sorted(corpus.ids()):
+        policy = corpus.get(pid)
+        shadowed = _shadowed_rules(policy)
+        for idx in sorted(shadowed):
+            by_idx = shadowed[idx]
+            findings.append(_l1_dead_rule_finding(policy, idx, by_idx))
+    return findings
+
+
+def _l1_dead_rule_finding(policy: Policy, idx: int, by_idx: int) -> Finding:
+    later_sel = policy.rules[idx].principal.describe() if policy.rules[idx].principal else "?"
+    earlier_sel = policy.rules[by_idx].principal.describe() if policy.rules[by_idx].principal else "?"
+    return Finding(
+        check="L1",
+        subject=f"rule {idx} (selector {later_sel})",
+        consequence=(
+            f"Rule {idx} (selector {later_sel}) is unreachable: earlier rule "
+            f"{by_idx} (selector {earlier_sel}) provably matches every case it "
+            f"would, under ordered first-match. The rule is dead code and can be "
+            f"removed or reordered."
+        ),
+        confidence=Confidence.PROVEN,
+        grounding="ADR-015 (ordered first-match) + §4.2 subsumption",
+        policy_id=policy.id,
+    )
