@@ -16,8 +16,10 @@ from tools.impact.checks import (
     check_c1_fallthrough_coverage,
     check_c2_default_net,
     check_c3_reachability,
+    check_c4_cross_policy_overlap,
     check_c5_dangling_reference,
     check_c6_exposure_polarity,
+    lint_cross_policy_overlap,
     lint_dead_rules,
 )
 from tools.impact.findings import Report
@@ -25,12 +27,12 @@ from tools.impact.model import Corpus, load_corpus_from_paths
 
 
 # The check registry. Each entry is (name, callable(baseline, proposed) -> [Finding]).
-# C4 (cross-policy overlap) lands in a later stage.
 DEFAULT_CHECKS = [
     ("C6", check_c6_exposure_polarity),
     ("C1", check_c1_fallthrough_coverage),
     ("C2", check_c2_default_net),
     ("C3", check_c3_reachability),
+    ("C4", check_c4_cross_policy_overlap),
     ("C5", check_c5_dangling_reference),
 ]
 
@@ -59,6 +61,7 @@ def analyze_paths(
 # The standing lint registry. Each entry is (name, callable(corpus) -> [Finding]).
 LINT_CHECKS = [
     ("L1", lint_dead_rules),
+    ("L2", lint_cross_policy_overlap),
 ]
 
 

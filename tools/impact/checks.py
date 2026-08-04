@@ -878,3 +878,235 @@ def _l1_dead_rule_finding(policy: Policy, idx: int, by_idx: int) -> Finding:
         grounding="ADR-015 (ordered first-match) + §4.2 subsumption",
         policy_id=policy.id,
     )
+
+
+# ============================================================================
+# C4 — Cross-policy overlap / conflict  (and L2, its standing counterpart)
+# ============================================================================
+#
+# Two policies of the same policyKind whose attachment scopes provably overlap
+# AND whose attribute-matches provably overlap, but whose effects diverge, are
+# the MULTIPLE_MASKS situation that drove ADR-023. On a platform declaring
+# `single-column-mask-per-column` / `single-row-filter-per-table`, the adapter
+# will refuse to emit the pair; Tessera surfaces the conflict at analysis time.
+#
+# C4 stays strictly static (the ADR-001 line): it proves scope-IRI containment
+# and attribute-axis subsumption from the policy text, and reports the overlap
+# plus the ADR-023 resolution rule. It does NOT compute which policy "wins" at
+# runtime — γ-with-refinement leaves that to the author, guided by the finding.
+#
+# Only these policyKinds are subject to the platform single-policy-per-target
+# constraint; RowVisibility filters compose (AND) rather than conflict, so
+# overlapping row-visibility policies are not flagged as conflicts here.
+_CONFLICTING_KINDS = {
+    "ColumnVisibilityConstraint": "single-column-mask-per-column",
+    "RowVisibilityConstraint": "single-row-filter-per-table",
+}
+
+
+def check_c4_cross_policy_overlap(baseline: Corpus, proposed: Corpus) -> list[Finding]:
+    """Report cross-policy overlaps the change introduces or resolves (§5-C4).
+
+    Computes the provable-overlap pair set in each corpus and reports the
+    delta: pairs that are newly overlapping in the proposed corpus (a conflict
+    introduced) and pairs no longer overlapping (a conflict resolved). This is
+    the diff view, run alongside the other change-impact checks.
+    """
+    findings: list[Finding] = []
+    base_pairs = _overlap_pairs(baseline)
+    prop_pairs = _overlap_pairs(proposed)
+
+    base_keys = {p[0] for p in base_pairs}
+    prop_map = {p[0]: p for p in prop_pairs}
+    prop_keys = set(prop_map)
+
+    for key in sorted(prop_keys - base_keys):
+        findings.append(_c4_overlap_finding(prop_map[key], introduced=True))
+    base_map = {p[0]: p for p in base_pairs}
+    for key in sorted(base_keys - prop_keys):
+        findings.append(_c4_overlap_finding(base_map[key], introduced=False))
+
+    return findings
+
+
+def _unpack_pair(pair):
+    key, pid_a, pid_b, kind, constraint, confidence, unknown = pair
+    return key, pid_a, pid_b, kind, constraint, confidence, unknown
+
+
+def lint_cross_policy_overlap(corpus: Corpus) -> list[Finding]:
+    """Report every current cross-policy overlap in a corpus (L2).
+
+    The standing counterpart to C4: audits the corpus as it stands, flagging
+    all provable same-kind scope+attribute overlaps with divergent effects,
+    regardless of when they were introduced.
+    """
+    return [_c4_overlap_finding(pair, introduced=None) for pair in _overlap_pairs(corpus)]
+
+
+def _overlap_pairs(corpus: Corpus):
+    """Return the sorted list of overlapping policy pairs.
+
+    Each entry is (key, pid_a, pid_b, kind, constraint, confidence, unknown),
+    where key is a stable sorted-id string. Only same-policyKind pairs subject
+    to a single-policy platform constraint, whose scopes and attribute-matches
+    intersect and whose effects diverge, are included. Confidence is PROVEN when
+    the overlap follows from the policy text alone, and CANDIDATE when it would
+    require assuming a concrete resource carries an attribute tag (§4.4).
+    """
+    pairs = []
+    ids = sorted(corpus.ids())
+    for i in range(len(ids)):
+        for j in range(i + 1, len(ids)):
+            a, b = corpus.get(ids[i]), corpus.get(ids[j])
+            result = _policies_conflict(a, b)
+            if result is not None:
+                constraint, confidence, unknown = result
+                key = "||".join(sorted((a.id, b.id)))
+                lo, hi = sorted((a.id, b.id))
+                pairs.append((key, lo, hi, a.policy_kind, constraint, confidence, unknown))
+    pairs.sort(key=lambda p: p[0])
+    return pairs
+
+
+def _policies_conflict(a: Policy, b: Policy):
+    """Return (constraint, confidence, unknown) if a and b conflict, else None.
+
+    Conflict requires: same conflict-prone policyKind, overlapping scope,
+    overlapping attribute-match, and divergent effects (§4.2 + ADR-023).
+
+    Confidence discipline (the ADR-001 line): overlap between two attribute
+    *predicates* (both byScope) or between two *concrete* resources (both
+    byIdentity paths) is PROVEN — it follows from scope containment and ontology
+    subsumption alone. But overlap between an attribute-constrained predicate
+    and a concrete resource is only CANDIDATE: proving it would require knowing
+    whether that specific resource carries the attribute tag, which is a
+    platform-tagging fact static analysis does not read.
+    """
+    if a.policy_kind != b.policy_kind:
+        return None
+    constraint = _CONFLICTING_KINDS.get(a.policy_kind or "")
+    if constraint is None:
+        return None
+    if not _scopes_overlap(a.applies_to, b.applies_to):
+        return None
+    if not _attributes_overlap(a.applies_to, b.applies_to):
+        return None
+    if not _effects_diverge(a, b):
+        return None
+
+    confidence, unknown = _overlap_confidence(a.applies_to, b.applies_to)
+    return constraint, confidence, unknown
+
+
+def _overlap_confidence(a: Selector | None, b: Selector | None):
+    """Classify an overlap as PROVEN or CANDIDATE (§4.4 boundary).
+
+    CANDIDATE exactly when one side constrains attributes and the other names a
+    concrete resource whose membership in that attribute set is unknown."""
+    a_attr = bool(a and a.attributes)
+    b_attr = bool(b and b.attributes)
+    a_concrete = _is_concrete_resource(a)
+    b_concrete = _is_concrete_resource(b)
+    if (a_attr and b_concrete) or (b_attr and a_concrete):
+        constrained = a if a_attr else b
+        concrete = b if a_attr else a
+        axis_desc = ", ".join(f"{k}:{v}" for k, v in (constrained.attributes if constrained else ()))
+        return Confidence.CANDIDATE, (
+            f"whether resource '{concrete.resource}' carries attribute(s) "
+            f"[{axis_desc}] is a platform-tagging fact not visible to static analysis"
+        )
+    return Confidence.PROVEN, None
+
+
+def _is_concrete_resource(sel: Selector | None) -> bool:
+    """True if the selector names a concrete resource IRI with no attribute
+    predicate (byIdentity resource:…), as opposed to a byScope predicate."""
+    return bool(sel and sel.resource and not sel.attributes)
+
+
+def _scopes_overlap(a: Selector | None, b: Selector | None) -> bool:
+    """True if two appliesTo selectors provably target a common resource.
+
+    Handles both the byScope form (scope IRI containment either direction) and
+    the byIdentity/resource form (equal resource IRIs, or one containing the
+    other as a scope path)."""
+    if a is None or b is None:
+        return False
+    a_iri = a.scope or a.resource
+    b_iri = b.scope or b.resource
+    if not a_iri or not b_iri:
+        return False
+    return kernel.scope_contains(a_iri, b_iri) or kernel.scope_contains(b_iri, a_iri)
+
+
+def _attributes_overlap(a: Selector | None, b: Selector | None) -> bool:
+    """True if two selectors' attribute-matches provably intersect.
+
+    Two attribute sets intersect when, for every axis they share, one value
+    subsumes the other (§4.2 #4). An axis constrained by only one side does not
+    block intersection (the other side is unconstrained on that axis, i.e.
+    matches any value). If neither side constrains any attribute, the whole
+    scope is matched and they trivially overlap."""
+    a_attrs = dict(a.attributes) if a else {}
+    b_attrs = dict(b.attributes) if b else {}
+    shared = set(a_attrs) & set(b_attrs)
+    for axis in shared:
+        av, bv = a_attrs[axis], b_attrs[axis]
+        if not (kernel.attribute_value_subsumes(axis, av, bv)
+                or kernel.attribute_value_subsumes(axis, bv, av)):
+            return False
+    return True
+
+
+def _effects_diverge(a: Policy, b: Policy) -> bool:
+    """True if the two policies would impose different transformations/effects
+    on the overlapping target. A conservative signature comparison: same effect
+    AND same transformation means no conflict; any difference diverges.
+
+    For column masks the transformation is the discriminator (Redact vs Hash on
+    the same column is the MULTIPLE_MASKS case). We compare the effective
+    (rule-level) transformation signatures across each policy."""
+    return _policy_effect_signature(a) != _policy_effect_signature(b)
+
+
+def _policy_effect_signature(policy: Policy):
+    """A hashable signature of what a policy does to its target: the sorted set
+    of (effect, transformation-type) pairs across its rules and default branch."""
+    sig = set()
+    for rule in _rules_and_default(policy):
+        tf_type = None
+        if rule.transformation:
+            tf_type = rule.transformation.get("type")
+        sig.add((rule.effect, tf_type))
+    return frozenset(sig)
+
+
+def _c4_overlap_finding(pair, *, introduced: bool | None) -> Finding:
+    _key, pid_a, pid_b, kind, constraint, confidence, unknown = _unpack_pair(pair)
+    overlap_word = "provably overlap" if confidence is Confidence.PROVEN else "may overlap"
+    if introduced is True:
+        lead = "Change introduces a cross-policy overlap:"
+        tail = ("On a platform declaring this constraint the adapter will refuse to "
+                "emit the pair; resolve before deployment (ADR-023 γ-with-refinement).")
+    elif introduced is False:
+        lead = "Change resolves a previously-overlapping pair:"
+        tail = "The conflicting overlap is no longer present."
+    else:
+        lead = "Cross-policy overlap:"
+        tail = ("On a platform declaring this constraint the adapter will refuse to "
+                "emit the pair; resolve before deployment (ADR-023 γ-with-refinement).")
+    check = "C4" if introduced is not None else "L2"
+    return Finding(
+        check=check,
+        subject=f"{pid_a} ∩ {pid_b}",
+        consequence=(
+            f"{lead} {pid_a} and {pid_b} are both {kind} policies whose scopes and "
+            f"attribute-matches {overlap_word}, with divergent effects — the "
+            f"platform '{constraint}' constraint. {tail}"
+        ),
+        confidence=confidence,
+        grounding="ADR-023 (γ-with-refinement) + §4.2 overlap",
+        policy_id=pid_a,
+        unknown=unknown,
+    )
