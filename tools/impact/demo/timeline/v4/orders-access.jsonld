@@ -1,0 +1,48 @@
+{
+  "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
+  "@type": "Policy",
+  "@id": "policy:orders-access",
+  "version": "1.3.0",
+  "policyKind": "RowVisibilityConstraint",
+  "description": "Urgent desk disbanded; its rule removed. (Dead analysts rule lingers.)",
+  "appliesTo": {
+    "selector": "byIdentity",
+    "resource": "table:acme.tpch.orders"
+  },
+  "action": "Read",
+  "defaultStrategy": "none",
+  "rules": [
+    {
+      "principal": {
+        "selector": "byIdentity",
+        "resource": "group:acme_all_priority_ops"
+      },
+      "effect": "keep-matching-rows"
+    },
+    {
+      "principal": {
+        "selector": "byIdentity",
+        "resource": "group:acme_analysts"
+      },
+      "effect": "keep-matching-rows"
+    },
+    {
+      "principal": {
+        "selector": "byIdentity",
+        "resource": "group:acme_analysts"
+      },
+      "effect": "keep-matching-rows",
+      "condition": {
+        "op": "in",
+        "operands": [
+          "column:acme.tpch.orders.o_orderpriority"
+        ],
+        "values": [
+          "3-MEDIUM",
+          "4-NOT SPECIFIED",
+          "5-LOW"
+        ]
+      }
+    }
+  ]
+}
