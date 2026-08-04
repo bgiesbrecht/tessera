@@ -11,6 +11,9 @@ Subcommands:
                                               — discover + lift each (or one) artifact to IR
     reconcile --adapter NAME [scope args] --intended PATH
                                               — diff intended IR against deployed state
+    impact    [--git BASE PROP | --baseline … --proposed … | --corpus DIR]
+                                              — how a proposed change alters what the corpus decides
+    lint      [--at REF | --corpus DIR]       — standing corpus health check (dead rules, overlap)
 
 Platform connection details:
 
@@ -343,6 +346,41 @@ def cmd_extract(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_impact(args: argparse.Namespace) -> int:
+    """Change-impact analysis: how a proposed change alters what the corpus
+    decides. Delegates to the tools.impact entry point (translating flags) so
+    the git-tracked discovery, checks, and rendering are not duplicated here."""
+    from tools.impact.__main__ import main as impact_main
+
+    argv: list[str] = []
+    if args.git:
+        argv += ["--git", args.git[0], args.git[1]]
+    if args.corpus:
+        argv += ["--corpus", args.corpus]
+    if args.baseline:
+        argv += ["--baseline", *args.baseline]
+    if args.proposed:
+        argv += ["--proposed", *args.proposed]
+    argv += ["--format", args.format]
+    if args.exit_on:
+        argv += ["--exit-on", args.exit_on]
+    return impact_main(argv)
+
+
+def cmd_lint(args: argparse.Namespace) -> int:
+    """Standing whole-corpus health check (dead rules, cross-policy overlap).
+    Delegates to the tools.impact --lint mode."""
+    from tools.impact.__main__ import main as impact_main
+
+    argv: list[str] = ["--lint"]
+    if args.at:
+        argv += ["--at", args.at]
+    if args.corpus:
+        argv += ["--corpus", args.corpus]
+    argv += ["--format", args.format]
+    return impact_main(argv)
+
+
 def cmd_reconcile(args: argparse.Namespace) -> int:
     config = _load_bindings_config(args.config)
     adapter = _build_adapter(args.adapter, config)
@@ -472,6 +510,25 @@ def make_parser() -> argparse.ArgumentParser:
     _add_snowflake_conn_args(r)
     _add_scope_args(r)
     r.set_defaults(func=cmd_reconcile)
+
+    # impact — change-impact analysis over a policy corpus
+    im = sub.add_parser("impact", help="Report how a proposed change alters what the corpus decides.")
+    im.add_argument("--git", nargs=2, metavar=("BASE_REF", "PROP_REF"),
+                    help="Compare across two git refs (default: HEAD WORKING). WORKING = working tree.")
+    im.add_argument("--corpus", help="Filesystem override: treat every policy file under this directory as the corpus.")
+    im.add_argument("--baseline", nargs="+", help="Baseline policy files (explicit file mode).")
+    im.add_argument("--proposed", nargs="+", help="Proposed policy files (explicit file mode).")
+    im.add_argument("--format", choices=("text", "md", "json"), default="text")
+    im.add_argument("--exit-on", choices=["WIDEN", "NARROW", "INVERT", "NEUTRAL"],
+                    help="Exit nonzero if any finding has this polarity (CI gating; opt-in).")
+    im.set_defaults(func=cmd_impact)
+
+    # lint — standing whole-corpus health check
+    ln = sub.add_parser("lint", help="Standing corpus health check: dead rules, cross-policy overlap.")
+    ln.add_argument("--at", metavar="REF", help="Ref to lint (default WORKING = working tree).")
+    ln.add_argument("--corpus", help="Filesystem override: lint every policy file under this directory.")
+    ln.add_argument("--format", choices=("text", "md", "json"), default="text")
+    ln.set_defaults(func=cmd_lint)
 
     return p
 
