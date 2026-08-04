@@ -45,7 +45,7 @@ Both reference adapters are real and exercise the full ADR-024 cycle — `emit` 
 
 The IR — JSON-LD context, OWL ontology, JSON Schema, SHACL shapes — lives in `spec/v0/`. Per ADR-017, the v0 immutability bar is **suspended** until external dependency exists (a third-party adapter, a customer corpus, downstream tooling): additions continue to land in v0, each captured as an ADR. The published GitHub Pages URLs under `bgiesbrecht.github.io/tessera/spec/v0/` will not change once external consumers exist.
 
-For a demo-ready tour of what's working today, read [`docs/showcase.md`](docs/showcase.md). For per-version detail, read `CHANGELOG.md`. Twenty of thirty-one tracked issues remain open; the breakdown is in `docs/issue-drafts/README.md`.
+For a demo-ready tour of what's working today, read [`docs/showcase.md`](docs/showcase.md). For where the project is going — shipped, in flight, deferred, and out of scope — read [`docs/ROADMAP.md`](docs/ROADMAP.md). For per-version detail, read `CHANGELOG.md`. Twenty of thirty-one tracked issues remain open; the breakdown is in `docs/issue-drafts/README.md`.
 
 Known limitations at 0.6.3:
 
