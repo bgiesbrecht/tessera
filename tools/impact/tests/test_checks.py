@@ -148,6 +148,22 @@ def test_allow_to_transform_is_narrow():
     assert c6[0].polarity == Polarity.NARROW
 
 
+def test_transform_swap_is_invert_not_a_fabricated_direction():
+    # Redact → Hash has no total order (§9.4): the tool must flag INVERT and
+    # route to review, never invent a WIDEN/NARROW ranking.
+    base = _load("group-row-visibility-policy-a.jsonld")
+    base = copy.deepcopy(base)
+    base["rules"][0]["effect"] = "transform"
+    base["rules"][0]["transformation"] = {"type": "Redact", "replacement": "X"}
+    prop = copy.deepcopy(base)
+    prop["rules"][0]["transformation"] = {"type": "Hash", "algorithm": "sha256"}
+    c6 = _c6(analyze(_corpus(base), _corpus(prop)).findings)
+    assert len(c6) == 1
+    assert c6[0].polarity == Polarity.INVERT
+    assert "review the substitution" in c6[0].consequence
+    assert "ADR-016" in c6[0].grounding
+
+
 # ============================================================================
 # Whole-policy add / remove
 # ============================================================================

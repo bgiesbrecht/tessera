@@ -235,8 +235,13 @@ def _changed_rule_finding(policy_id: str, base: Rule, prop: Rule) -> Finding | N
     # Effect unchanged: did the condition value-set change?
     b_cond, p_cond = base.condition, prop.condition
     if b_cond == p_cond:
-        # Transformation swap on a transform rule -> INVERT (no natural order
-        # between two transforms; flag for review per scoping-doc §9.2).
+        # Transformation swap on a transform rule -> INVERT (scoping-doc §9.4).
+        # There is no total order between two transformations — whether Hash is
+        # "more exposed" than Redact depends on the threat model, which the tool
+        # cannot read from the policy text. Rather than fabricate a WIDEN/NARROW
+        # direction, C6 flags the swap as INVERT ("changed; review it"). This is
+        # exactly the case the tool exists for: a new change silently altering
+        # how an existing policy transforms data.
         if base.effect == "transform" and base.transformation != prop.transformation:
             return Finding(
                 check="C6",
@@ -248,7 +253,7 @@ def _changed_rule_finding(policy_id: str, base: Rule, prop: Rule) -> Finding | N
                     f"No total order between transforms; review the substitution."
                 ),
                 confidence=Confidence.PROVEN,
-                grounding="§9.2 transform substitution",
+                grounding="ADR-016 (transformation parameterization) + §9.4",
                 policy_id=policy_id,
             )
         return None  # genuinely no exposure-relevant change
