@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tools.impact.demo import build_output_reference as output_ref_gen
 from tools.impact.demo import build_overlap_demo as overlap_gen
 from tools.impact.demo import build_timeline_demo as timeline_gen
 
@@ -60,4 +61,17 @@ def test_overlap_demo_matches_generator_output(tmp_path, monkeypatch):
         EXERCISES / "cross-policy-overlap-demo.md", DEMO_ROOT / "overlap",
         out_doc, out_fixtures,
         "./.venv/bin/python -m tools.impact.demo.build_overlap_demo",
+    )
+
+
+def test_output_reference_matches_generator_output(tmp_path, monkeypatch):
+    # The output reference captures real tool output per check and per format;
+    # it must stay in sync with what the tool actually emits.
+    out_doc = tmp_path / "OUTPUT-REFERENCE.md"
+    monkeypatch.setattr(output_ref_gen, "OUT_DOC", out_doc)
+    output_ref_gen.build()
+    committed = DEMO_ROOT / "OUTPUT-REFERENCE.md"
+    assert out_doc.read_text() == committed.read_text(), (
+        "Committed OUTPUT-REFERENCE.md is stale — regenerate with "
+        "`./.venv/bin/python -m tools.impact.demo.build_output_reference`."
     )
