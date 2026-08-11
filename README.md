@@ -39,15 +39,17 @@ If you run a single platform and that platform's governance meets your needs, Te
 
 ## Status
 
-Current version: **0.6.3** (see `VERSION`, `CHANGELOG.md`).
+Current version: **0.7.0** (see `VERSION`, `CHANGELOG.md`).
 
 Both reference adapters are real and exercise the full ADR-024 cycle — `emit` / `discover` / `extract` / `reconcile` — on Databricks Unity Catalog and on Snowflake. Three policy shapes are implemented across both platforms: `RowVisibilityConstraint` (`byIdentity`, `byScope`, `byDataset`), `ColumnVisibilityConstraint` (`Redact`), and `AccessGrantConstraint` (table, function, schema-fan-out). Bidirectional migration between the two platforms is demonstrated end-to-end in `adapters/tests/live_migration_demo.py` and its reverse-direction sibling, with verification queries confirming the same policy intent enforces the same way on both sides.
+
+**Change-impact analysis** (`tools/impact/`, `tessera impact` / `tessera lint`) reports how a proposed change to a policy corpus alters what it decides about data — coverage gaps, dead or newly-live rules, cross-policy mask conflicts, and exposure widening/narrowing — before anything is emitted. It is static and advisory: it reasons about the policy text, never connecting to a platform or evaluating who is in which group (the ADR-001 line), and labels each finding as provable or membership-dependent. See [`docs/user-guide/analyzing-changes.md`](docs/user-guide/analyzing-changes.md).
 
 The IR — JSON-LD context, OWL ontology, JSON Schema, SHACL shapes — lives in `spec/v0/`. Per ADR-017, the v0 immutability bar is **suspended** until external dependency exists (a third-party adapter, a customer corpus, downstream tooling): additions continue to land in v0, each captured as an ADR. The published GitHub Pages URLs under `bgiesbrecht.github.io/tessera/spec/v0/` will not change once external consumers exist.
 
 For a demo-ready tour of what's working today, read [`docs/showcase.md`](docs/showcase.md). For where the project is going — shipped, in flight, deferred, and out of scope — read [`docs/ROADMAP.md`](docs/ROADMAP.md). For per-version detail, read `CHANGELOG.md`. Twenty of thirty-one tracked issues remain open; the breakdown is in `docs/issue-drafts/README.md`.
 
-Known limitations at 0.6.3:
+Known limitations at 0.7.0:
 
 - Snowflake ABAC `byScope` is queued ([#31](https://github.com/bgiesbrecht/tessera/issues/31)) — different platform mechanism.
 - YAML comment preservation in round-trips is deferred to converter v2.
@@ -90,9 +92,9 @@ Three forms exist:
 ├── LICENSE                                ← Apache 2.0
 ├── DECISIONS.md                           ← 27 numbered ADRs
 ├── CHANGELOG.md                           ← per-version detail
-├── VERSION                                ← current: 0.6.3
+├── VERSION                                ← current: 0.7.0
 ├── docs/
-│   ├── showcase.md                        ← demo-anchored tour of 0.6.3
+│   ├── showcase.md                        ← demo-anchored tour
 │   ├── executive-summary.md               ← one-page leadership brief
 │   ├── problem-and-recommendation.md      ← stakeholder framing
 │   ├── technical-design-v0.2.md           ← current technical spec
@@ -124,6 +126,7 @@ Three forms exist:
 │   └── tests/                             ← parity tests + live demo scripts
 └── tools/
     ├── converter/                         ← YAML → JSON-LD
+    ├── impact/                            ← change-impact analysis (impact / lint)
     └── cli/                               ← unified `tessera` CLI
 ```
 

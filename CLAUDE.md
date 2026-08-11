@@ -270,3 +270,17 @@ The user values:
 This document is itself an artifact and may need updating. When ADRs are added, when the project's state changes meaningfully, when the priorities shift — this document should be revised so that the next handoff (whether to another tool, another contributor, or a future session) inherits an accurate picture rather than a stale one.
 
 The document should be revised by appending updates with dates, not by silently rewriting history. Stale sections can be marked as such rather than deleted.
+
+---
+
+## State update — 2026-08-05
+
+Several sections above predate substantial work and are **superseded**; read this update over them:
+
+- **"What's planned but not built" and "No converter, linter, or adapter scaffolding exists yet" are stale.** The converter (`tools/converter/`), both adapters (UC + Snowflake, full ADR-024 emit/discover/extract/reconcile cycle), SHACL shapes (`spec/v0/shapes.ttl`), and a unified CLI (`tools/cli/`, `python -m tools.cli`) all exist. The "next concrete deliverable is SHACL shapes" note is long overtaken.
+- **Change-impact analysis shipped (0.7.0).** `tools/impact/` — a static, advisory tool that reports how a proposed change to a policy corpus alters what it decides, before emission. Checks C1–C6 plus standing lints L1/L2; `tessera impact` / `tessera lint` in the unified CLI. It holds the ADR-001 line rigorously (reasons about selector expressions, never populations). Design: `docs/v1-candidates/change-impact-analysis.md`; usage: `docs/user-guide/analyzing-changes.md`; project map: `docs/ROADMAP.md` (new).
+- **Worked examples: eight** (not seven as stated above) — seven Databricks, one Snowflake.
+- **Issue status:** #30 (UC ABAC byScope column-mask) closed in 0.6.3; the listing above showing it open is stale. #31 (Snowflake ABAC byScope) remains the open adapter item.
+- **The ABAC sequencing note is historical** — that work completed (ADRs 018–023, Stage 4 spec changes, and byScope emission on UC).
+
+Current priorities, superseding the "recommended priorities" framing above: (1) Snowflake ABAC `byScope` emission (#31); (2) the scoping-needed in-scope gaps — audit-logging obligation vocabulary (#19), retention (#21), AI-governance axes (#25); (3) the third adapter (custom ACL-table pattern). See `docs/ROADMAP.md` for the consolidated, maintained view — prefer it over this handoff's older status prose.

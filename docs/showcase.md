@@ -1,4 +1,4 @@
-# Tessera at 0.6.3 — what works, end to end
+# Tessera at 0.7.0 — what works, end to end
 
 This document is for someone who has heard about Tessera and wants to know what it actually does today, before reading the README, the technical design, or any of the ADRs. It is a 5–10 minute read. Pointers throughout to runnable artifacts and supporting docs.
 
@@ -39,11 +39,11 @@ Three policy shapes carry across both platforms. Each shape exists in the IR (`s
 
 ---
 
-## At 0.6.3
+## At 0.7.0
 
 ### The full adapter cycle, on both platforms
 
-Per ADR-024, every adapter implements four responsibilities. At 0.6.3 the four are real (not stubbed) on both Unity Catalog and Snowflake:
+Per ADR-024, every adapter implements four responsibilities. At 0.7.0 the four are real (not stubbed) on both Unity Catalog and Snowflake:
 
 | Responsibility | Unity Catalog | Snowflake | What it does |
 |---|---|---|---|
@@ -194,7 +194,33 @@ $ python -m adapters.tests.live_migration_demo
 
 ---
 
-## Honest limitations at 0.6.3
+## Analyzing a change before you deploy
+
+Authoring and deploying is one half; the other is knowing what a *change* to a policy corpus does before you emit anything. `tessera impact` diffs two versions of the corpus (git-tracked by default — committed policies are the corpus, uncommitted drafts excluded until staged); `tessera lint` audits the current corpus for latent problems. Both are static and advisory: they reason about the policy text, never connecting to a platform or resolving who is in which group (the ADR-001 line), and tag each finding `PROVEN` or `CANDIDATE` depending on whether it follows from the text alone or would need a platform fact the tool doesn't read.
+
+```bash
+# What does my working-tree edit do to the git-tracked policies?
+$ tessera impact
+[C6]  NARROW  selector group:acme_high_priority_ops   PROVEN
+     Removed a keep-matching-rows rule (kept ['1-URGENT', '2-HIGH']). Net exposure
+     for the affected selector is strictly reduced.
+[C1]  selector group:acme_high_priority_ops   CANDIDATE
+     Lost its last governing rule. defaultStrategy = explicit-baseline-group. ...
+     unknown: baseline-group membership is not visible to static analysis
+
+# Is the corpus healthy right now? (dead rules, conflicting masks)
+$ tessera lint --corpus spec/v0/examples
+[L2]  policy:abac-column-mask-clerk-hash ∩ policy:abac-column-mask-clerk-redact   PROVEN
+     ... both ColumnVisibilityConstraint policies whose scopes and attribute-matches
+     provably overlap, with divergent effects — the 'single-column-mask-per-column'
+     constraint. (ADR-023 γ-with-refinement.)
+```
+
+It catches coverage gaps (a group that now matches no rule), dead or newly-live rules under ordered first-match, cross-policy mask conflicts (the ADR-023 `MULTIPLE_MASKS` situation, surfaced at analysis time instead of at query time after deployment), and exposure widening/narrowing per edit. Advisory by default; opt-in CI gating via `--exit-on`. Full guide: `docs/user-guide/analyzing-changes.md`; captured output for every check: `tools/impact/demo/OUTPUT-REFERENCE.md`.
+
+---
+
+## Honest limitations at 0.7.0
 
 The framing of these matters: not "TODO" items, but documented decisions about what the version does and doesn't cover. Each links to the tracking issue.
 
@@ -230,6 +256,7 @@ The `docs/user-guide/evaluating.md` page expands these into a fuller adopt/don't
 |---|---|
 | Try Tessera against a real situation | `docs/user-guide/scenarios/acl-and-masking.md` (practitioner tutorial) |
 | See the full migration cycle in prose | `docs/user-guide/scenarios/migrating-snowflake-to-uc.md` |
+| Review the impact of a policy change before deploying | `docs/user-guide/analyzing-changes.md` |
 | Understand the IR semantics | `docs/technical-design-v0.2.md` |
 | Audit the W3C-stack usage | `docs/w3c-overview.md` |
 | Decide whether Tessera fits | `docs/user-guide/evaluating.md` |
@@ -241,4 +268,4 @@ The `docs/user-guide/evaluating.md` page expands these into a fuller adopt/don't
 
 ## Version status
 
-The version is 0.6.3 because v0 isn't frozen yet (per ADR-017). Whether it reaches 1.0 depends on external dependency — a real customer corpus, a third adapter, a tooling integration — at which point the spec freezes and the project commits to the surface it has.
+The version is 0.7.0 because v0 isn't frozen yet (per ADR-017). Whether it reaches 1.0 depends on external dependency — a real customer corpus, a third adapter, a tooling integration — at which point the spec freezes and the project commits to the surface it has.

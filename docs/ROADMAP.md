@@ -4,7 +4,7 @@
 
 **How to read it.** This is a *living* document, revised by appending dated updates rather than rewriting history (same discipline as the CLAUDE.md handoff). It is not a commitment schedule — ordering reflects current priority, not promised dates. The authoritative decision log remains `DECISIONS.md`; tracked work items remain the GitHub issues. Where an item has an issue or ADR, it is cited.
 
-Current version: **0.6.3** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-04**.
+Current version: **0.7.0** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-05**.
 
 ---
 
@@ -27,8 +27,7 @@ For a demo-ready tour, read [`docs/showcase.md`](showcase.md).
 
 Work that is scoped and committed in direction, awaiting implementation.
 
-- **UC ABAC `byScope` column-mask emission** ([#30](https://github.com/bgiesbrecht/tessera/issues/30)). The Databricks adapter does not yet emit ABAC-scoped column masks. Named a v0 coverage gap because ABAC is the pattern Databricks now recommends.
-- **Snowflake ABAC `byScope` emission** ([#31](https://github.com/bgiesbrecht/tessera/issues/31)), row and column. The Snowflake mechanism is genuinely different from Databricks; this is more than a port.
+- **Snowflake ABAC `byScope` emission** ([#31](https://github.com/bgiesbrecht/tessera/issues/31)), row and column. The Snowflake mechanism is genuinely different from Databricks; this is more than a port. (The Databricks side, [#30](https://github.com/bgiesbrecht/tessera/issues/30), shipped in 0.6.3.)
 - **Converter v2 — comment preservation** (ADR-004). Round-trip YAML comment retention and `rdfs:comment` mapping. The converter is already comment-preservation-ready (ruamel round-trip parser); the feature is a follow-up, not a refactor.
 
 ---
@@ -98,3 +97,4 @@ Directions that are real but not yet scoped, recorded so the shape of the projec
 
 - **2026-08-04** — Initial roadmap. Consolidated scattered status; recorded change-impact tool as fully shipped (C1–C6, L1/L2) and the decision to fold `impact`/`lint` into the `tessera` CLI.
 - **2026-08-04** — `impact` / `lint` wired into the `tessera` CLI (`tessera impact`, `tessera lint`); the standalone `python -m tools.impact` entry point remains. Added the [Analyzing changes](user-guide/analyzing-changes.md) user-guide page.
+- **2026-08-05** — Correction: UC ABAC `byScope` column-mask emission ([#30](https://github.com/bgiesbrecht/tessera/issues/30)) was listed as near-term but shipped in 0.6.3; moved out of near-term. (The initial roadmap propagated a stale status from the issue-drafts log.) Added `OUTPUT-REFERENCE.md` to the generated demos.

@@ -4,6 +4,40 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.7.0] — 2026-08-05
+
+A tooling release, not an IR change. It adds **change-impact analysis** — a tool that, given a corpus of policies and a proposed change, reports how the change alters what the corpus decides about data, before the change is validated or emitted. No ADR and no `spec/v0/` change accompanies it (the minor bump reflects a meaningful new capability rather than an ADR landing); it grounds in existing decisions (ADR-001 for the scope line, ADR-013–016 and ADR-023 for what each check reasons about).
+
+### Added
+
+**`tools/impact/`** — the change-impact analyzer. Reasons about selector *expressions*, never the populations they denote (the ADR-001 line): it compares selector literals, IRIs, and ontology-typed values, and never resolves group membership or reads ACL-table rows. Every finding is selector-relative and confidence-tagged — `PROVEN` (follows from policy text + ontology) or `CANDIDATE` (would require a platform-tagging fact the tool does not read).
+
+Diff checks (`tessera impact`, comparing two corpus versions):
+
+- **C1** fall-through coverage — a selector that loses its last governing rule, and where its principals now fall through per `defaultStrategy` (ADR-013).
+- **C2** default-net change — `defaultStrategy` / `baselineGroup` / `defaultBranch` edits (ADR-013/014).
+- **C3** reachability — a rule newly *shadowed* (dead code) or newly *un-shadowed* (dormant policy activated) under ordered first-match (ADR-015).
+- **C4** cross-policy overlap — two same-kind policies whose scope and attribute-matches overlap with divergent effects, the ADR-023 MULTIPLE_MASKS situation.
+- **C5** dangling reference — a reference left dangling by the change.
+- **C6** exposure polarity — WIDEN / NARROW / INVERT / NEUTRAL. Transformation swaps (Redact→Hash) are INVERT-with-review, since transforms have no total order (scoping-doc §9.4).
+
+Standing lints (`tessera lint`, auditing one corpus state):
+
+- **L1** dead rules across the corpus; **L2** all current cross-policy overlaps.
+
+**Corpus discovery is git-tracked by default** (committed policies are the corpus; uncommitted drafts excluded until staged), with a `--corpus DIR` filesystem override and an explicit `--baseline`/`--proposed` file mode. Report formats: text / md / json. Advisory by default (exit 0); opt-in CI gating via `--exit-on <POLARITY>`.
+
+- **`tessera impact` / `tessera lint`** wired into the unified CLI (`tools/cli/`), delegating to the tool.
+- **`docs/user-guide/analyzing-changes.md`** — practitioner guide (modes, corpus boundary, reading findings, PROVEN vs CANDIDATE, CI use).
+- **`docs/v1-candidates/change-impact-analysis.md`** — the design/scoping document (reasoning kernel, check catalog, worked exercises, resolved open questions §9.1 corpus boundary and §9.4 transform swaps).
+- **Three generated, drift-tested artifacts** under `tools/impact/demo/`: a dead-rule timeline demo, a cross-policy overlap demo (both in `docs/exercises/`), and `OUTPUT-REFERENCE.md` capturing per-check and per-format output.
+- **`docs/ROADMAP.md`** — consolidated project roadmap (previously scattered across README, scoping docs, and the issue log).
+
+### Notes
+
+- Reasoning is grounded in the published ontology: attribute subsumption reads `spec/v0/ontology.ttl` via rdflib (hierarchical axes subsume declared subclasses; flat axes equality-only).
+- No tracked issues closed (this is tooling); the ABAC emission gap [#31](https://github.com/bgiesbrecht/tessera/issues/31) remains the open adapter item.
+
 ## [0.6.3] — 2026-05-21
 
 A small adapter increment: UC ABAC byScope column-mask emission, closing issue [#30](https://github.com/bgiesbrecht/tessera/issues/30). Parallel to the byScope row-filter emission that has been working since 0.3.0; the hand-derived target SQL has existed in `spec/v0/examples/abac-column-mask.databricks.sql` since the ABAC scoping work landed. This commit makes the UC adapter produce that DDL from the IR.
