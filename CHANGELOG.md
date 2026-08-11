@@ -17,7 +17,7 @@ Diff checks (`tessera impact`, comparing two corpus versions):
 - **C1** fall-through coverage — a selector that loses its last governing rule, and where its principals now fall through per `defaultStrategy` (ADR-013).
 - **C2** default-net change — `defaultStrategy` / `baselineGroup` / `defaultBranch` edits (ADR-013/014).
 - **C3** reachability — a rule newly *shadowed* (dead code) or newly *un-shadowed* (dormant policy activated) under ordered first-match (ADR-015).
-- **C4** cross-policy overlap — two same-kind policies whose scope and attribute-matches overlap with divergent effects, the ADR-023 MULTIPLE_MASKS situation.
+- **C4** cross-policy overlap — two same-kind policies resolving to an overlapping target under a single-policy platform constraint (ADR-023's `single-column-mask-per-column` / `single-row-filter-per-table`); a multiplicity constraint, so it fires whether the effects differ (Redact vs Hash) or duplicate.
 - **C5** dangling reference — a reference left dangling by the change.
 - **C6** exposure polarity — WIDEN / NARROW / INVERT / NEUTRAL. Transformation swaps (Redact→Hash) are INVERT-with-review, since transforms have no total order (scoping-doc §9.4).
 

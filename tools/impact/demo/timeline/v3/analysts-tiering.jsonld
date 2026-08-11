@@ -4,10 +4,10 @@
   "@id": "policy:analysts-tiering",
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
-  "description": "Two distinct analyst tiers \u2014 no overlap, no dead rules.",
+  "description": "Two distinct analyst tiers on a separate table \u2014 no overlap, no dead rules.",
   "appliesTo": {
     "selector": "byIdentity",
-    "resource": "table:acme.tpch.orders"
+    "resource": "table:acme.tpch.customers"
   },
   "action": "Read",
   "defaultStrategy": "none",
@@ -21,11 +21,10 @@
       "condition": {
         "op": "in",
         "operands": [
-          "column:acme.tpch.orders.o_orderpriority"
+          "column:acme.tpch.customers.segment"
         ],
         "values": [
-          "1-URGENT",
-          "2-HIGH"
+          "ENTERPRISE"
         ]
       }
     },
@@ -38,12 +37,10 @@
       "condition": {
         "op": "in",
         "operands": [
-          "column:acme.tpch.orders.o_orderpriority"
+          "column:acme.tpch.customers.segment"
         ],
         "values": [
-          "3-MEDIUM",
-          "4-NOT SPECIFIED",
-          "5-LOW"
+          "SMB"
         ]
       }
     }

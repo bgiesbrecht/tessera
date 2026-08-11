@@ -155,6 +155,11 @@ CHANGE-IMPACT REPORT
      Change introduces a cross-policy overlap: policy:clerk-redact and policy:pii-hash are both ColumnVisibilityConstraint policies whose scopes and attribute-matches may overlap, with divergent effects — the platform 'single-column-mask-per-column' constraint. On a platform declaring this constraint the adapter will refuse to emit the pair; resolve before deployment (ADR-023 γ-with-refinement).
      unknown: whether resource 'column:acme.tpch.orders.o_clerk' carries attribute(s) [sensitivity:PII] is a platform-tagging fact not visible to static analysis
      grounding: ADR-023 (γ-with-refinement) + §4.2 overlap
+
+[C4]  policy:clerk-redact ∩ policy:pii-redact   CANDIDATE
+     Change introduces a cross-policy overlap: policy:clerk-redact and policy:pii-redact are both ColumnVisibilityConstraint policies whose scopes and attribute-matches may overlap, with the same effect (duplicate coverage) — the platform 'single-column-mask-per-column' constraint. On a platform declaring this constraint the adapter will refuse to emit the pair; resolve before deployment (ADR-023 γ-with-refinement).
+     unknown: whether resource 'column:acme.tpch.orders.o_clerk' carries attribute(s) [sensitivity:PII] is a platform-tagging fact not visible to static analysis
+     grounding: ADR-023 (γ-with-refinement) + §4.2 overlap
 ```
 
 ### C5 — dangling reference
@@ -218,6 +223,11 @@ CHANGE-IMPACT REPORT
 
 [L2]  policy:clerk-redact ∩ policy:pii-hash   CANDIDATE
      Cross-policy overlap: policy:clerk-redact and policy:pii-hash are both ColumnVisibilityConstraint policies whose scopes and attribute-matches may overlap, with divergent effects — the platform 'single-column-mask-per-column' constraint. On a platform declaring this constraint the adapter will refuse to emit the pair; resolve before deployment (ADR-023 γ-with-refinement).
+     unknown: whether resource 'column:acme.tpch.orders.o_clerk' carries attribute(s) [sensitivity:PII] is a platform-tagging fact not visible to static analysis
+     grounding: ADR-023 (γ-with-refinement) + §4.2 overlap
+
+[L2]  policy:clerk-redact ∩ policy:pii-redact   CANDIDATE
+     Cross-policy overlap: policy:clerk-redact and policy:pii-redact are both ColumnVisibilityConstraint policies whose scopes and attribute-matches may overlap, with the same effect (duplicate coverage) — the platform 'single-column-mask-per-column' constraint. On a platform declaring this constraint the adapter will refuse to emit the pair; resolve before deployment (ADR-023 γ-with-refinement).
      unknown: whether resource 'column:acme.tpch.orders.o_clerk' carries attribute(s) [sensitivity:PII] is a platform-tagging fact not visible to static analysis
      grounding: ADR-023 (γ-with-refinement) + §4.2 overlap
 ```

@@ -60,7 +60,8 @@ def _keep(group: str, values: list[str] | None = None) -> dict:
     return rule
 
 
-def _policy(pid: str, version: str, description: str, rules: list[dict]) -> dict:
+def _policy(pid: str, version: str, description: str, rules: list[dict],
+            table: str = TABLE) -> dict:
     return {
         "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
         "@type": "Policy",
@@ -68,7 +69,7 @@ def _policy(pid: str, version: str, description: str, rules: list[dict]) -> dict
         "version": version,
         "policyKind": "RowVisibilityConstraint",
         "description": description,
-        "appliesTo": {"selector": "byIdentity", "resource": TABLE},
+        "appliesTo": {"selector": "byIdentity", "resource": table},
         "action": "Read",
         "defaultStrategy": "none",
         "rules": rules,
@@ -141,16 +142,27 @@ def v4() -> dict:
     )
 
 
+COMPANION_TABLE = "table:acme.tpch.customers"
+COMPANION_COL = "column:acme.tpch.customers.segment"
+
+
 def companion() -> dict:
-    # A second, always-clean policy in the corpus, to show the lint flags only
-    # the offending policy and leaves healthy ones silent.
+    # A second, always-clean policy in the corpus, on a DIFFERENT table, to show
+    # the lint flags only the offending policy and leaves healthy ones silent.
+    # It must be on its own table: two row-filter policies on the same table
+    # would themselves conflict (single-row-filter-per-table, ADR-023), which
+    # would distract from the dead-rule story this demo is about.
+    def keep(group: str, values: list[str]) -> dict:
+        return {
+            "principal": {"selector": "byIdentity", "resource": f"group:{group}"},
+            "effect": "keep-matching-rows",
+            "condition": {"op": "in", "operands": [COMPANION_COL], "values": values},
+        }
     return _policy(
         "analysts-tiering", "1.0.0",
-        "Two distinct analyst tiers — no overlap, no dead rules.",
-        [
-            _keep("acme_analysts_tier1", HIGH),
-            _keep("acme_analysts_tier2", LOW),
-        ],
+        "Two distinct analyst tiers on a separate table — no overlap, no dead rules.",
+        [keep("acme_analysts_tier1", ["ENTERPRISE"]), keep("acme_analysts_tier2", ["SMB"])],
+        table=COMPANION_TABLE,
     )
 
 

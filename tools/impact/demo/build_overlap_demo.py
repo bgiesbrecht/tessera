@@ -137,7 +137,13 @@ def _render_markdown(diff: str, lint_after: str, lint_before: str) -> str:
 ## What this demonstrates
 
 ADR-023 records that Databricks rejects **multiple column masks on the same
-column** at query time (`COLUMN_MASKS_FEATURE_NOT_SUPPORTED.MULTIPLE_MASKS`).
+column** at query time (`COLUMN_MASKS_FEATURE_NOT_SUPPORTED.MULTIPLE_MASKS`), and
+the same shape applies to row filters (**one row filter per table**). These are
+*multiplicity* constraints: the platform permits at most one such policy per
+target, so two policies resolving to the same target conflict whether their
+effects disagree (Redact vs Hash) or are identical (a redundant duplicate). This
+demo uses column masks; the row-filter case — "someone added a second filter for
+another team on the same table" — is the same rule and is flagged the same way.
 Under γ-with-refinement, Tessera does not pick a winner — it surfaces the
 conflict at analysis time so the author resolves it before deployment.
 
@@ -177,10 +183,23 @@ Adding `pii-hash` and `clerk-redact` to the single-policy baseline:
 
 {_fence(diff)}
 
-The `pii-redact ∩ pii-hash` conflict is **PROVEN**. The
-`clerk-redact` overlap is **CANDIDATE** — it depends on whether `o_clerk` is
-tagged PII, which static analysis cannot know, so the tool says so rather than
-guessing.
+Three overlaps, and the confidence split is the point:
+
+- **`pii-redact ∩ pii-hash` — PROVEN.** Two attribute predicates on overlapping
+  scope (`catalog:acme` ⊇ `schema:acme.tpch`) with the same axis value; the
+  overlap follows from the policy text alone. Divergent transforms (Redact vs
+  Hash).
+- **`clerk-redact ∩ pii-hash` — CANDIDATE.** A concrete column vs. an attribute
+  predicate: the tool would have to know `o_clerk` is tagged PII to be sure, and
+  that is a platform-tagging fact it does not read — so it flags a possibility
+  and names the unknown rather than guessing.
+- **`clerk-redact ∩ pii-redact` — CANDIDATE, duplicate coverage.** Same shape,
+  but here both policies *redact*. The effects are identical, yet it is still a
+  conflict: the platform's `single-column-mask-per-column` rule is about
+  multiplicity, not disagreement — at most one mask may resolve to a column,
+  even two identical ones. A tool that only flagged *divergent* effects would
+  miss this, and miss the analogous "second row filter on the same table" case
+  entirely.
 
 ## L2 — the standing overlap lint (after)
 

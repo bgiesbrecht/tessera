@@ -935,16 +935,16 @@ def check_c4_cross_policy_overlap(baseline: Corpus, proposed: Corpus) -> list[Fi
 
 
 def _unpack_pair(pair):
-    key, pid_a, pid_b, kind, constraint, confidence, unknown = pair
-    return key, pid_a, pid_b, kind, constraint, confidence, unknown
+    key, pid_a, pid_b, kind, constraint, confidence, unknown, divergent = pair
+    return key, pid_a, pid_b, kind, constraint, confidence, unknown, divergent
 
 
 def lint_cross_policy_overlap(corpus: Corpus) -> list[Finding]:
     """Report every current cross-policy overlap in a corpus (L2).
 
     The standing counterpart to C4: audits the corpus as it stands, flagging
-    all provable same-kind scope+attribute overlaps with divergent effects,
-    regardless of when they were introduced.
+    all same-kind scope+attribute overlaps subject to a single-policy platform
+    constraint, regardless of when they were introduced.
     """
     return [_c4_overlap_finding(pair, introduced=None) for pair in _overlap_pairs(corpus)]
 
@@ -952,11 +952,16 @@ def lint_cross_policy_overlap(corpus: Corpus) -> list[Finding]:
 def _overlap_pairs(corpus: Corpus):
     """Return the sorted list of overlapping policy pairs.
 
-    Each entry is (key, pid_a, pid_b, kind, constraint, confidence, unknown),
-    where key is a stable sorted-id string. Only same-policyKind pairs subject
-    to a single-policy platform constraint, whose scopes and attribute-matches
-    intersect and whose effects diverge, are included. Confidence is PROVEN when
-    the overlap follows from the policy text alone, and CANDIDATE when it would
+    Each entry is (key, pid_a, pid_b, kind, constraint, confidence, unknown,
+    divergent), where key is a stable sorted-id string. A pair is included when
+    two same-policyKind policies (of a kind subject to a single-policy platform
+    constraint) resolve to an overlapping target — because ADR-023's
+    `single-column-mask-per-column` / `single-row-filter-per-table` constraints
+    are about MULTIPLICITY: the platform permits at most one such policy per
+    target, so two overlapping ones conflict whether or not their effects
+    differ. `divergent` records whether the effects differ, for the message
+    (divergent masks vs. a duplicate), not as a gate. Confidence is PROVEN when
+    the overlap follows from the policy text alone, CANDIDATE when it would
     require assuming a concrete resource carries an attribute tag (§4.4).
     """
     pairs = []
@@ -969,7 +974,8 @@ def _overlap_pairs(corpus: Corpus):
                 constraint, confidence, unknown = result
                 key = "||".join(sorted((a.id, b.id)))
                 lo, hi = sorted((a.id, b.id))
-                pairs.append((key, lo, hi, a.policy_kind, constraint, confidence, unknown))
+                pairs.append((key, lo, hi, a.policy_kind, constraint, confidence,
+                              unknown, _effects_diverge(a, b)))
     pairs.sort(key=lambda p: p[0])
     return pairs
 
@@ -977,8 +983,12 @@ def _overlap_pairs(corpus: Corpus):
 def _policies_conflict(a: Policy, b: Policy):
     """Return (constraint, confidence, unknown) if a and b conflict, else None.
 
-    Conflict requires: same conflict-prone policyKind, overlapping scope,
-    overlapping attribute-match, and divergent effects (§4.2 + ADR-023).
+    Conflict requires: same conflict-prone policyKind, overlapping scope, and
+    overlapping attribute-match (§4.2 + ADR-023). Effect divergence is NOT a
+    requirement — the platform constraints are about multiplicity (at most one
+    mask per column / one row filter per table), so two overlapping same-kind
+    policies conflict even with identical effects. Divergence is reported as
+    information by the finding, not used to gate here.
 
     Confidence discipline (the ADR-001 line): overlap between two attribute
     *predicates* (both byScope) or between two *concrete* resources (both
@@ -996,8 +1006,6 @@ def _policies_conflict(a: Policy, b: Policy):
     if not _scopes_overlap(a.applies_to, b.applies_to):
         return None
     if not _attributes_overlap(a.applies_to, b.applies_to):
-        return None
-    if not _effects_diverge(a, b):
         return None
 
     confidence, unknown = _overlap_confidence(a.applies_to, b.applies_to)
@@ -1088,8 +1096,12 @@ def _policy_effect_signature(policy: Policy):
 
 
 def _c4_overlap_finding(pair, *, introduced: bool | None) -> Finding:
-    _key, pid_a, pid_b, kind, constraint, confidence, unknown = _unpack_pair(pair)
+    _key, pid_a, pid_b, kind, constraint, confidence, unknown, divergent = _unpack_pair(pair)
     overlap_word = "provably overlap" if confidence is Confidence.PROVEN else "may overlap"
+    # Divergence is not required for the conflict (multiplicity is), but it
+    # tells the reader whether they are looking at two different masks/filters
+    # or a redundant duplicate — both of which the platform still rejects.
+    effect_note = "with divergent effects" if divergent else "with the same effect (duplicate coverage)"
     if introduced is True:
         lead = "Change introduces a cross-policy overlap:"
         tail = ("On a platform declaring this constraint the adapter will refuse to "
@@ -1107,7 +1119,7 @@ def _c4_overlap_finding(pair, *, introduced: bool | None) -> Finding:
         subject=f"{pid_a} ∩ {pid_b}",
         consequence=(
             f"{lead} {pid_a} and {pid_b} are both {kind} policies whose scopes and "
-            f"attribute-matches {overlap_word}, with divergent effects — the "
+            f"attribute-matches {overlap_word}, {effect_note} — the "
             f"platform '{constraint}' constraint. {tail}"
         ),
         confidence=confidence,

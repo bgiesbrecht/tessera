@@ -82,10 +82,52 @@ def test_predicate_vs_concrete_resource_is_candidate():
     assert l2[0].unknown and "tagging fact" in l2[0].unknown
 
 
-def test_same_transformation_no_conflict():
+def test_same_transformation_still_conflicts_multiplicity():
+    # ADR-023's single-column-mask-per-column is a MULTIPLICITY constraint: two
+    # masks on the same column conflict even when their transformations are
+    # identical (the platform allows at most one mask, period). The tool must
+    # flag this, not clear it as "same effect = fine".
     a = _mask("a", scope="catalog:acme", sensitivity="PII", tf_type="Redact")
     b = _mask("b", scope="table:acme.tpch.orders", sensitivity="PII", tf_type="Redact")
-    assert _l2(lint(_corpus(a, b))) == []
+    l2 = _l2(lint(_corpus(a, b)))
+    assert len(l2) == 1
+    assert l2[0].confidence == Confidence.PROVEN
+    assert "duplicate" in l2[0].consequence.lower()
+
+
+def _rowvis(pid: str, table: str, group: str, values=None) -> dict:
+    rule = {"principal": {"selector": "byIdentity", "resource": f"group:{group}"},
+            "effect": "keep-matching-rows"}
+    if values is not None:
+        rule["condition"] = {"op": "in", "operands": [f"column:{table}.region"], "values": values}
+    return {
+        "@context": "x", "@type": "Policy", "@id": f"policy:{pid}",
+        "policyKind": "RowVisibilityConstraint",
+        "appliesTo": {"selector": "byIdentity", "resource": f"table:{table}"},
+        "action": "Read", "defaultStrategy": "none", "rules": [rule],
+    }
+
+
+def test_two_row_filters_same_table_conflict():
+    # The bug this fix targets: two RowVisibilityConstraint policies on the same
+    # table — an innocent-looking "add a filter for another group" change —
+    # conflict under single-row-filter-per-table, even though both are
+    # keep-matching-rows (same effect). Previously suppressed by an
+    # effects-must-diverge gate; must now be flagged.
+    a = _rowvis("region-us", "acme.tpch.orders", "analysts", ["US"])
+    b = _rowvis("region-eu", "acme.tpch.orders", "auditors", ["EU"])
+    l2 = _l2(lint(_corpus(a, b)))
+    assert len(l2) == 1
+    assert l2[0].confidence == Confidence.PROVEN
+    assert "single-row-filter-per-table" in l2[0].consequence
+
+
+def test_divergent_effects_message_says_divergent():
+    a = _mask("a", scope="catalog:acme", sensitivity="PII", tf_type="Redact")
+    b = _mask("b", scope="table:acme.tpch.orders", sensitivity="PII", tf_type="Hash")
+    l2 = _l2(lint(_corpus(a, b)))
+    assert len(l2) == 1
+    assert "divergent" in l2[0].consequence.lower()
 
 
 def test_disjoint_scopes_no_overlap():
