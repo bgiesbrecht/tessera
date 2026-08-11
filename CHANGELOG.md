@@ -4,6 +4,24 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.8.0] — 2026-08-05
+
+Attribute values become vocabulary IRIs (ADR-028), so the ontology hierarchy can reason over them. A change-impact graph spike found that `sensitivity` was defined `"@type": "@id"` — bare values like `PIIClerk` expanded to document-base junk instead of `vocab#` IRIs, blocking `subClassOf*` subsumption. No external consumer exists (ADR-017), so this is a clean break.
+
+### Changed
+
+- **`spec/v0/context.jsonld`**: `sensitivity` is now `"@type": "@vocab"` (matching the other three axes, which already were), and a top-level `"@vocab"` is declared. Together these default a bare attribute value to the Tessera vocabulary namespace (`sensitivity: PII` ⇒ `tessera:PII`), while an explicit prefix (`acme:PIIClerk`) marks an adopter specialization and is preserved. The authoring rule: **bare = Tessera's vocabulary; a prefix = the adopter's** (ADR-028, reinforcing ADR-018).
+- **`spec/v0/examples/abac-column-mask-policy-{a,b}`**: the bare `PIIClerk` value — described in the examples' own comments as an adopter stand-in — is now `acme:PIIClerk`, honoring the rule. JSON-LD regenerated; worked-example records updated for the namespaced token.
+
+### Fixed
+
+- **UC adapter ABAC column-mask / row-filter alias**: a namespaced attribute value leaked its colon into `AS <alias>` / `ON COLUMN <alias>`, producing invalid Databricks SQL (`AS acme:PIIClerk`). The alias is now sanitized to a legal identifier (`acme_PIIClerk`). Surfaced by the example change; regression test in `adapters/tests/test_parity.py`.
+
+### Notes
+
+- Change-impact tool: no code change (the kernel already strips prefixes). The graph spike's blocked-subsumption finding is resolved — `subClassOf*` now reaches the ontology for Tessera-namespace values. `tools/impact/spikes/FINDINGS.md` updated.
+- Deferred (recorded in ADR-028): tightening SHACL to flag undeclared bare values as non-`Classification` needs ontology inference the current validation pass does not run.
+
 ## [0.7.0] — 2026-08-05
 
 A tooling release, not an IR change. It adds **change-impact analysis** — a tool that, given a corpus of policies and a proposed change, reports how the change alters what the corpus decides about data, before the change is validated or emitted. No ADR and no `spec/v0/` change accompanies it (the minor bump reflects a meaningful new capability rather than an ADR landing); it grounds in existing decisions (ADR-001 for the scope line, ADR-013–016 and ADR-023 for what each check reasons about).

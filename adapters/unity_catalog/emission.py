@@ -326,9 +326,11 @@ def _emit_row_visibility_by_scope(policy: dict[str, Any], config: AdapterConfig)
     tag_clauses, tag_value_for_alias, tag_diags = _render_match_columns(matching, config)
     diagnostics.extend(tag_diags)
 
-    # Use the tag-value-derived alias as the function parameter name. This is
-    # arbitrary but consistent (the hand-derived target uses the value verbatim).
-    alias = tag_value_for_alias or "matched_col"
+    # Use the tag-value-derived alias as the function parameter name. Sanitize
+    # it to a valid SQL identifier: an attribute value may carry a namespace
+    # prefix (e.g. acme:PIIClerk per ADR-028), and a raw colon is not a legal
+    # identifier in `AS <alias>` / `ON COLUMN <alias>`.
+    alias = _sanitize_identifier(tag_value_for_alias or "matched_col")
     param_name = alias
 
     # Build the CASE body. Rules + defaultBranch combine in IR-declared order.
@@ -466,6 +468,17 @@ def _render_match_columns(
     # property; the sugar form is implicit AND.
     body = " AND ".join(predicates)
     return f"MATCH COLUMNS {body}", last_value, diagnostics
+
+
+def _sanitize_identifier(raw: str) -> str:
+    """Reduce a value to a legal SQL identifier for use as a column alias /
+    UDF parameter name. Non-identifier characters (notably the `:` in a
+    namespaced attribute value like `acme:PIIClerk`) become underscores; a
+    leading digit is prefixed with an underscore."""
+    cleaned = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in raw)
+    if cleaned and cleaned[0].isdigit():
+        cleaned = "_" + cleaned
+    return cleaned or "matched_col"
 
 
 def _render_abac_case_branch(
@@ -726,7 +739,9 @@ def _emit_column_visibility_by_scope(
     matching = applies_to.get("matching") or {}
     tag_clauses, tag_value_for_alias, tag_diags = _render_match_columns(matching, config)
     diagnostics.extend(tag_diags)
-    alias = tag_value_for_alias or "matched_col"
+    # Sanitize to a legal SQL identifier (a namespaced value like acme:PIIClerk
+    # carries a colon that is illegal in `AS <alias>` / `ON COLUMN <alias>`).
+    alias = _sanitize_identifier(tag_value_for_alias or "matched_col")
 
     # The transformation is carried in defaultBranch (negated-complement: rule
     # principals are allowed; everyone else is transformed).

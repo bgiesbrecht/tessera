@@ -1,4 +1,4 @@
-# ABAC column-mask Policy A — specific PIIClerk redact.
+# ABAC column-mask Policy A — specific acme:PIIClerk redact.
 #
 # Worked-example artifact for the ABAC Stage 3 exercise (scoping doc §9).
 # Companion files:
@@ -21,11 +21,12 @@
 #     files yet (Stage 4). The artifact therefore will NOT validate against
 #     the current schema.json; that's expected. The artifact's role is to
 #     prefigure what the spec needs to support.
-#   - tessera:PIIClerk is used here as a sensitivity value to keep the
-#     example concrete. In production, an adopter would declare such
-#     specializations under their own namespace per ADR-018; the Tessera
-#     namespace is used here only because no adopter namespace is
-#     established for this exercise.
+#   - acme:PIIClerk is an adopter-specific sensitivity value, namespaced under
+#     the adopter's prefix per ADR-028 (bare terms are Tessera's vocabulary;
+#     a prefix marks an adopter specialization, per ADR-018). Tessera does not
+#     hold the acme ontology, so this value participates in equality matching
+#     but not Tessera-vocabulary subsumption — which is correct for an
+#     organization-specific classification.
 
 "@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
 "@type": Policy
@@ -34,7 +35,7 @@ version: 1.0.0
 policyKind: ColumnVisibilityConstraint
 description: >
   ABAC column-mask policy attached at catalog scope. Matches columns whose
-  sensitivity attribute is PIIClerk; redacts to the literal 'CLERK-REDACTED'
+  sensitivity attribute is acme:PIIClerk; redacts to the literal 'CLERK-REDACTED'
   for principals outside acme_all_priority_ops.
 
 appliesTo:
@@ -42,7 +43,7 @@ appliesTo:
   scope: catalog:acme
   matching:
     attributes:
-      sensitivity: PIIClerk
+      sensitivity: acme:PIIClerk
 
 action: Read
 

@@ -9,7 +9,7 @@
 -- The Databricks Tessera adapter is not yet built; this file represents
 -- what the adapter would emit given these two policies and the
 -- configured tag-taxonomy mapping (ADR-021) that translates
---   sensitivity:PIIClerk ↔ has_tag_value('abac_column', 'clerk')
+--   sensitivity:acme:PIIClerk ↔ has_tag_value('abac_column', 'clerk')
 -- and identity mapping that translates
 --   group:acme_all_priority_ops ↔ `acme_all_priority_ops`.
 --

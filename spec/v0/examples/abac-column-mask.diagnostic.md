@@ -24,7 +24,7 @@ The exercise's substantive output is **not** yet observable — it requires depl
 Three structural findings worth recording from the Phase 2 derivation itself, independent of any Phase 3 observation:
 
 1. The current `spec/v0/schema.json` does not yet support `byScope` or the `matching` shape. The Phase 2 JSON-LD therefore does NOT validate against the current schema. This is expected — the schema update is part of Stage 4. (§4.1)
-2. The `appliesTo.matching` block uses ADR-020's implicit-AND shortcut (`attributes: { sensitivity: PIIClerk }`); a single-attribute case desugars trivially to the canonical `match: and / criteria: [{attribute: ...}]` form. The shortcut is the intended ergonomic shape. (§4.2)
+2. The `appliesTo.matching` block uses ADR-020's implicit-AND shortcut (`attributes: { sensitivity: acme:PIIClerk }`); a single-attribute case desugars trivially to the canonical `match: and / criteria: [{attribute: ...}]` form. The shortcut is the intended ergonomic shape. (§4.2)
 3. The `GRANT EXECUTE` emission pattern from the prior column-mask exercise carries forward here. The IR still does not formally declare grants (v1 candidate issue #10 `policy-execute-grants` remains the right place). The Tessera-derived SQL emits the grants defensively. (§4.3)
 
 ---
@@ -34,7 +34,7 @@ Three structural findings worth recording from the Phase 2 derivation itself, in
 | Policy element | Category | Notes |
 |---|---|---|
 | Scoped attachment (`byScope` at `catalog:acme`) | **Fully enforced** | `CREATE POLICY ... ON CATALOG acme` attaches at the catalog level; Databricks ABAC propagates to all descendants matching the predicate. |
-| Attribute matching (`sensitivity: PIIClerk`) | **Fully enforced via taxonomy mapping** | Translates to `has_tag_value('abac_column', 'clerk')` per the configured tag-taxonomy mapping (ADR-021). The mapping is per-environment adapter configuration, not in the policy file. |
+| Attribute matching (`sensitivity: acme:PIIClerk`) | **Fully enforced via taxonomy mapping** | Translates to `has_tag_value('abac_column', 'clerk')` per the configured tag-taxonomy mapping (ADR-021). The mapping is per-environment adapter configuration, not in the policy file. |
 | Principal binding (`acme_all_priority_ops` privileged) | **Fully enforced** | `TO account users EXCEPT acme_all_priority_ops` in the DDL. Members of the privileged group bypass the mask; everyone else hits it. |
 | `defaultStrategy: negated-complement` | **Fully enforced (structurally)** | The Databricks ABAC `TO account users EXCEPT group` form is structurally negated-complement: the policy applies to the universal set minus the exception. The Tessera `defaultStrategy` declaration matches the emission. |
 | Policy A — Redact with literal 'CLERK-REDACTED' | **Fully enforced** | UDF returns the literal unconditionally; ABAC invokes it for non-privileged principals. |
@@ -73,7 +73,7 @@ Both policies use the single-attribute shorthand:
 ```yaml
 matching:
   attributes:
-    sensitivity: PIIClerk
+    sensitivity: acme:PIIClerk
 ```
 
 ADR-020 specifies this desugars to the canonical:
@@ -84,7 +84,7 @@ matching:
   criteria:
     - attribute:
         axis: sensitivity
-        value: PIIClerk
+        value: acme:PIIClerk
 ```
 
 For a single attribute, the implicit-AND form is equivalent to a one-element `criteria` list. The exercise demonstrates that the shortcut is the intended authoring form for simple cases. The canonical form is used in artifacts when more than one attribute appears, or when explicit `match: or` / `match: not` is needed.
@@ -127,7 +127,7 @@ A secondary observation worth measuring: **policy attachment ordering**. Does it
 |---|---|
 | Use verified ABAC DDL form | ✓ — `CREATE POLICY … ON CATALOG … COLUMN MASK … TO … EXCEPT … FOR TABLES MATCH COLUMNS … AS … ON COLUMN …` matches the Stage 1 verification. |
 | Reference `acme_all_priority_ops` verbatim | ✓ — in both policies' EXCEPT clauses. |
-| Map `sensitivity: PIIClerk` to `has_tag_value('abac_column', 'clerk')` | ✓ — for both policies. |
+| Map `sensitivity: acme:PIIClerk` to `has_tag_value('abac_column', 'clerk')` | ✓ — for both policies. |
 | Attach both at catalog scope `acme` | ✓ — both `ON CATALOG acme`. |
 
 ---

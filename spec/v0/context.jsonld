@@ -2,8 +2,11 @@
   "@context": {
     "@version": 1.1,
     "@protected": true,
+    "@vocab": "https://bgiesbrecht.github.io/tessera/spec/v0/vocab#",
 
     "_comment_header": "Tessera context v0. Immutable once published. Defines the short names used in Tessera policy documents and maps them to their full IRIs. The ontology proper is published separately as Turtle/OWL at https://bgiesbrecht.github.io/tessera/spec/v0/ontology.ttl. See DECISIONS.md ADR-004 and ADR-005 for the rationale behind this document.",
+
+    "_comment_vocab": "@vocab defaults any bare term (property or @vocab-typed value) to the Tessera vocabulary namespace, so a bare attribute value like `sensitivity: PII` means tessera:PII and an undeclared bare value resolves to a well-formed tessera IRI rather than document-base junk. Adopter-specific values carry an explicit prefix (acme:PIIClerk) and are preserved. See ADR-028.",
 
     "tessera": "https://bgiesbrecht.github.io/tessera/spec/v0/vocab#",
     "dpv": "https://w3id.org/dpv#",
@@ -251,8 +254,8 @@
 
     "sensitivity": {
       "@id": "tessera:sensitivity",
-      "@type": "@id",
-      "_comment": "Hierarchical axis. Values are Classification subclasses (PII, PHI, Financial, etc.)."
+      "@type": "@vocab",
+      "_comment": "Hierarchical axis. Values are Classification subclasses (PII, PHI, Financial, etc.). @vocab-typed so a bare value defaults to the Tessera vocabulary (tessera:PII); adopter-specific values carry an explicit prefix (acme:PIIClerk). See ADR-028."
     },
     "dataSubject": {
       "@id": "tessera:dataSubject",

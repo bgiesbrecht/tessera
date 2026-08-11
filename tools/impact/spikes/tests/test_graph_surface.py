@@ -49,14 +49,16 @@ def test_scope_surface_finds_nesting_pair(tmp_path):
     assert "acme" in pairs[0].relation
 
 
-def test_bare_term_attribute_values_do_not_resolve(tmp_path):
-    # The finding: bare terms (no @vocab) don't become vocab IRIs, so the
-    # ontology can't reach them.
-    a = _write(tmp_path, "a.jsonld", _mask("a", "catalog:acme", "PIIClerk", "Redact"))
-    g = build_graph([a])
-    probe = attribute_iri_probe(g)
-    assert probe["subsumption_reachable"] is False
-    assert probe["unresolved"]
+def test_bare_terms_resolve_to_vocab_after_adr028(tmp_path):
+    # Post-ADR-028: with @vocab + sensitivity as @type:@vocab, a bare attribute
+    # value resolves to a vocab# IRI (the spike's original blocked finding is
+    # resolved). A declared bare value (PII) reaches the ontology; an undeclared
+    # bare value (Typo) is still a well-formed vocab IRI, not document-base junk.
+    a = _write(tmp_path, "a.jsonld", _mask("a", "catalog:acme", "PII", "Redact"))
+    b = _write(tmp_path, "b.jsonld", _mask("b", "catalog:acme", "Typo", "Redact"))
+    probe = attribute_iri_probe(build_graph([a, b]))
+    assert probe["subsumption_reachable"] is True
+    assert probe["unresolved"] == []  # no more file:// junk
 
 
 def test_curie_values_unlock_ontology_subsumption(tmp_path):

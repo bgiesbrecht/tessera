@@ -4,6 +4,8 @@
 
 These spikes answer two questions from the design conversation: does querying the corpus as an RDF graph buy us more than the Python checks, and can we detect "unintentional access opened/closed" by enumerating the abstract request space?
 
+> **Update 2026-08-05 — Spike 1's blocker is resolved.** The graph finding below (attribute values don't resolve to `vocab#` IRIs, so ontology subsumption can't reach them) drove **ADR-028**: `sensitivity` is now `"@type": "@vocab"` and the context declares a top-level `@vocab`. Bare values now resolve to the Tessera namespace and the `subClassOf*` property path reaches the ontology; adopter-specific values carry an explicit prefix (`acme:PIIClerk`) and stay outside Tessera subsumption. The Layer-1 recommendation "defer until the corpus adopts CURIE-resolvable values" is thus **discharged** — that corpus/context change has been made. The spike's original text is left below as the record that motivated the ADR.
+
 ---
 
 ## Spike 1 — corpus as a graph (`graph_surface.py`)

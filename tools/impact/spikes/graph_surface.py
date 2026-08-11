@@ -11,14 +11,16 @@ policy's attachment target and attribute matches, and (b) attempt an
 ontology-subsumption query. It also probes whether attribute values in the
 corpus actually resolve to vocabulary IRIs — which turns out to be the crux.
 
-Finding (see the companion spike report): on the current corpus the graph buys
-little. Scope containment is string logic either way; and attribute subsumption
-via property paths is *blocked* because example policies author attribute
-values as bare terms (`PIIClerk`) with no `@vocab` in the context, so they do
-not become `vocab#` IRIs and the ontology hierarchy cannot reach them. The
-Python checks sidestep this by stripping prefixes and comparing against ontology
-local-names. Making the graph pay off would require authoring attribute values
-as CURIEs (or adding `@vocab`) — a corpus/context change, not just tooling.
+Finding (see the companion spike report): the graph's one genuine advantage —
+ontology subsumption via property paths — was originally *blocked* because the
+`sensitivity` term was `"@type": "@id"` and the context had no `@vocab`, so bare
+attribute values expanded to document-base junk instead of `vocab#` IRIs.
+**ADR-028 (2026-08-05) resolved this**: `sensitivity` is now `"@type": "@vocab"`
+and the context declares a top-level `@vocab`, so bare values resolve to the
+Tessera namespace (`PII` ⇒ `tessera:PII`) and the `subClassOf*` property path
+reaches the ontology hierarchy. Scope containment remains string logic either
+way; the subsumption win is now real for Tessera-namespace values, while
+adopter-prefixed values (`acme:PIIClerk`) are correctly outside it.
 """
 
 from __future__ import annotations

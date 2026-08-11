@@ -98,6 +98,20 @@ def test_column_visibility_parity_emits_clean_on_both_adapters():
     assert uc_sql != sf_sql
 
 
+def test_abac_byscope_alias_is_sanitized_for_namespaced_values():
+    """A namespaced attribute value (acme:PIIClerk, per ADR-028) must not leak
+    its colon into the emitted `AS <alias>` / `ON COLUMN <alias>` — that would be
+    invalid Databricks SQL. The alias is sanitized to a legal identifier."""
+    policy = _load("abac-column-mask-policy-a.jsonld")
+    assert policy["appliesTo"]["matching"]["attributes"]["sensitivity"] == "acme:PIIClerk"
+    result = UnityCatalogAdapter().emit(policy)
+    sql = "\n".join(result.statements)
+    # The colon is fine inside the quoted tag value; it must not appear in the
+    # identifier positions (AS / ON COLUMN).
+    assert "AS acme:PIIClerk" not in sql and "ON COLUMN acme:PIIClerk" not in sql
+    assert "AS acme_PIIClerk" in sql and "ON COLUMN acme_PIIClerk" in sql
+
+
 def test_capability_profiles_differ_meaningfully():
     """Both adapters declare profiles, with different platform names."""
     uc = UnityCatalogAdapter()

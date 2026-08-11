@@ -4,7 +4,7 @@
 
 **How to read it.** This is a *living* document, revised by appending dated updates rather than rewriting history (same discipline as the CLAUDE.md handoff). It is not a commitment schedule — ordering reflects current priority, not promised dates. The authoritative decision log remains `DECISIONS.md`; tracked work items remain the GitHub issues. Where an item has an issue or ADR, it is cited.
 
-Current version: **0.7.0** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-05**.
+Current version: **0.8.0** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-05**.
 
 ---
 

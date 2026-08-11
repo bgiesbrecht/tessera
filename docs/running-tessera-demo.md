@@ -231,7 +231,7 @@ Snowflake mechanism: a `ROW ACCESS POLICY` object + `ADD ROW ACCESS POLICY`, pri
 
 ## 5. Breadth check — ABAC column mask on Databricks
 
-To show the pipeline isn't limited to one policy shape, here is an attribute-based (ABAC) column-mask policy emitted for Databricks. It masks columns *by semantic attribute* (`sensitivity: PIIClerk`) rather than by name — meaning over mechanism (ADR-018–021).
+To show the pipeline isn't limited to one policy shape, here is an attribute-based (ABAC) column-mask policy emitted for Databricks. It masks columns *by semantic attribute* (`sensitivity: acme:PIIClerk` — an adopter-namespaced value per ADR-028) rather than by name — meaning over mechanism (ADR-018–021).
 
 ```text
 $ .venv/bin/python -m tools.cli.main emit \
@@ -240,7 +240,7 @@ $ .venv/bin/python -m tools.cli.main emit \
 
 ```text
 Diagnostics:
-  [warning] UNBOUND_TAG_ATTRIBUTE: matching attribute ('sensitivity', 'PIIClerk') has no tag_taxonomy entry; falling back to has_tag_value('sensitivity', 'PIIClerk'). Configure config.tag_taxonomy for production.
+  [warning] UNBOUND_TAG_ATTRIBUTE: matching attribute ('sensitivity', 'acme:PIIClerk') has no tag_taxonomy entry; falling back to has_tag_value('sensitivity', 'acme:PIIClerk'). Configure config.tag_taxonomy for production.
   [info] ABAC_FUNCTION_SCHEMA_INFERRED: Function schema inferred as 'acme.tpch'; override via config.extras['abac_function_schema'] for production deployments.
 ```
 
@@ -259,8 +259,8 @@ CREATE OR REPLACE POLICY tessera__abac_column_mask_clerk_redact
     TO `account users`
     EXCEPT `acme_all_priority_ops`
     FOR TABLES
-    MATCH COLUMNS has_tag_value('sensitivity', 'PIIClerk') AS PIIClerk
-    ON COLUMN PIIClerk;
+    MATCH COLUMNS has_tag_value('sensitivity', 'acme:PIIClerk') AS acme_PIIClerk
+    ON COLUMN acme_PIIClerk;
 ```
 
 This is the modern Databricks ABAC pattern (`CREATE POLICY ... COLUMN MASK ... MATCH COLUMNS`), driven entirely from the semantic attribute carried in the IR.

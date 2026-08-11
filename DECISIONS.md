@@ -1307,6 +1307,44 @@ The framework's job is to be expressive enough that any well-defined policy inte
 
 ---
 
+## ADR-028 — Attribute values are vocabulary IRIs: bare terms are Tessera's, prefixes are the adopter's
+
+**Date:** 2026-08-05
+**Status:** Accepted
+
+### Context
+
+Attribute-axis values (`sensitivity: PII`, `dataSubject: EUResident`) are meant to be terms in a controlled vocabulary — `tessera:PII` is a declared `Classification` subclass; the ontology carries the subsumption hierarchy (`PHI ⊂ PII ⊂ PersonalData`) that lets a policy matching `PII` cover a resource tagged `PHI`. For that reasoning to work, an authored value must resolve to a vocabulary IRI.
+
+A change-impact spike (2026-08-05, `tools/impact/spikes/graph_surface.py`) exposed that it did not, for one axis. Loading the corpus as RDF and querying attribute subsumption via a SPARQL property path returned nothing usable, because the `sensitivity` term was defined in `spec/v0/context.jsonld` as `"@type": "@id"`. An `@id`-typed value resolves against the *document base*, so a bare `sensitivity: PIIClerk` expanded to junk (`file:///…/PIIClerk`) rather than to a `vocab#` IRI — and worse, a `subClassOf*` query then matched only reflexively (identical values), giving the false appearance of subsumption reasoning while the ontology contributed nothing.
+
+The other three axes (`dataSubject`, `regulatoryRegime`, `businessDomain`) were already `"@type": "@vocab"` and resolved bare terms to the vocabulary namespace correctly. `sensitivity` was the lone holdout — an inconsistency, not a design intent.
+
+No external consumer exists (ADR-017's immutability bar is suspended), so this is corrected as a clean break rather than a compatibility-preserving addition.
+
+### Decision
+
+**Attribute-axis values are vocabulary IRIs, and the authoring rule is: a bare term belongs to Tessera's vocabulary; an explicit namespace prefix belongs to the adopter.**
+
+1. **Mechanism.** Two coordinated context changes: (a) all attribute-axis properties are `"@type": "@vocab"` — `sensitivity` is changed from `"@type": "@id"` to match the other three axes, which already were; and (b) a top-level `"@vocab"` set to the Tessera vocabulary namespace. Together these make a bare value default to `tessera:` — `sensitivity: PII` ⇒ `tessera:PII` (a declared term) and `sensitivity: Typo` ⇒ `tessera:Typo` (a well-formed IRI validation can flag, not document-base junk) — "default to the CURIE if none is specified" — while an explicit prefix (`acme:PIIClerk`) or absolute IRI is preserved. (`@type: @vocab` alone resolves *declared* terms like `PII`; the top-level `@vocab` is what catches *undeclared* bare terms.)
+2. **Bare = Tessera.** An unprefixed attribute value is, by definition, a term in Tessera's vocabulary. Well-known values (`PII`, `PHI`, `Financial`, `Confidential`, `GDPR`, …) resolve to declared ontology classes and participate in subsumption. A bare value that is *not* declared resolves to a well-formed `vocab#` IRI that validation can flag as "not a known Classification" — a feature, not junk.
+3. **Prefix = adopter.** Adopter-specific values carry an explicit namespace prefix (`acme:PIIClerk`). This enforces the ADR-018 adopter-extension model at the syntax level: organization-specific specializations live under the organization's namespace, not Tessera's. Prefixed values are IRIs (so structural validation passes) and are correctly excluded from Tessera-vocabulary subsumption (the adopter's ontology, which Tessera does not hold, would carry their hierarchy).
+4. **Readability is preserved.** Authors keep writing `sensitivity: PII` — the rule makes that *mean* `tessera:PII` canonically; it does not force verbose `tessera:` prefixes on well-known values.
+
+### Consequences
+
+- `spec/v0/context.jsonld`: `sensitivity` becomes `"@type": "@vocab"`.
+- `spec/v0/examples/`: the two ABAC column-mask examples used a bare `PIIClerk`, described in their own comments as an adopter stand-in "used only because no adopter namespace is established." They now use `acme:PIIClerk`, matching that stated intent and this rule. Generated JSON-LD regenerated. Worked-example prose that names "PIIClerk" as a *concept* is left intact (it describes the concept, not the namespaced token).
+- The change-impact tool: no code change (the kernel already strips prefixes). Ontology-driven subsumption is now reachable for Tessera-namespace values — the graph spike's blocked finding is resolved, and C4/L2 can flag subsumption-based overlaps (a policy matching `PII` conflicting with one matching `PHI`) that were previously invisible. Demonstrated in `docs/exercises/cross-policy-overlap-demo.md`.
+
+### What this ADR does not do
+
+- **Does not add adopter-context tooling.** `acme:PIIClerk` validates as an IRI without the `acme` prefix being formally resolved to an adopter URL; formalizing adopter context extension (array `@context`, imported adopter ontologies) is a separate, later concern.
+- **Does not tighten SHACL to require declared classes.** Asserting that a bare sensitivity value is a `subClassOf* Classification` needs ontology inference the current SHACL pass does not run (`inference="none"`); flagging undeclared bare values is recorded as a follow-up, not done here.
+- **Does not change the other axes.** They were already `"@type": "@vocab"`; this only brings `sensitivity` into line.
+
+---
+
 ## How to use this document
 
 - Every new technical or stakeholder document begins by reading this file.

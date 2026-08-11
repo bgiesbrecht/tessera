@@ -213,7 +213,7 @@ Three categories will populate after Phase 3 observation.
 
 ### 4.1 v0 spec changes for Stage 4 — proceed as planned
 
-Phase 3 did not surface design problems with the ABAC additions themselves. The four ADRs (018–021) hold up: `byScope` attached cleanly; `matching.attributes` with the implicit-AND shortcut emitted correctly; the tag-taxonomy mapping (sensitivity:PIIClerk ↔ abac_column=clerk) worked as designed; the structured `TransformationInstance` carried the Redact and Hash parameters correctly. Stage 4 can proceed with the scoping doc's design.
+Phase 3 did not surface design problems with the ABAC additions themselves. The four ADRs (018–021) hold up: `byScope` attached cleanly; `matching.attributes` with the implicit-AND shortcut emitted correctly; the tag-taxonomy mapping (sensitivity:acme:PIIClerk ↔ abac_column=clerk) worked as designed; the structured `TransformationInstance` carried the Redact and Hash parameters correctly. Stage 4 can proceed with the scoping doc's design.
 
 ### 4.2 Cross-policy combination — resolved as γ, with refinement
 

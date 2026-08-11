@@ -94,7 +94,7 @@ The **only** relations the tool asserts as `PROVEN`:
    Straight set containment over literal operand values. Applies to `in`/`eq`; range operators (`lt`/`gt`/`time-window`) use interval containment. Operators the tool cannot compare (e.g. `exists-in-dataset`, which reaches into an ACL table) are treated as opaque and force `CANDIDATE`.
 
 4. **Attribute-axis subsumption via the ontology** — the OWL leverage, and the one place the vocabulary does real inferential work:
-   `sensitivity: PII` ⊇ `sensitivity: PIIClerk`, because the *hierarchical* sensitivity axis (ADR-018) declares `PIIClerk ⊂ PII` in `ontology.ttl`.
+   `sensitivity: PII` ⊇ `sensitivity: PHI`, because the *hierarchical* sensitivity axis (ADR-018) declares `PHI ⊂ PII` in `ontology.ttl`. (Only Tessera-namespace values participate; a bare value is Tessera-namespace by default per ADR-028, an adopter-prefixed value like `acme:PIIClerk` is not and matches only by equality.)
    **Only hierarchical axes participate.** Flat axes (`dataSubject`, `regulatoryRegime`, `businessDomain`) admit only equality — `regulatoryRegime: GDPR` neither subsumes nor is subsumed by `regulatoryRegime: HIPAA`, exactly as the ABAC scoping document specifies. The tool reads `axisType` from the ontology to decide which regime applies.
 
 Everything provable is provable by composing these four. Nothing else is asserted as fact.
@@ -117,7 +117,7 @@ The tool maintains an explicit set of things it *cannot* know and must therefore
 
 - **Group membership and inter-group subset relations.** Whether `group:acme_high_priority_ops` ⊆ `group:account-users` is unknown; both are opaque identity selectors. Overlap between them is a `CANDIDATE`, never a `PROVEN` finding.
 - **`byDataset` / `PrincipalSetFromTable` / `ResourceSetFromTable` contents.** The ACL-table customer's effective policy lives in table rows the tool cannot (and by §2 must not) read. Any finding that would depend on those contents degrades to `CANDIDATE`.
-- **`byAttribute` selectors backed by data the adapter tags at runtime.** Whether a given column actually carries `sensitivity: PIIClerk` is a platform-tagging fact, not a policy fact.
+- **`byAttribute` selectors backed by data the adapter tags at runtime.** Whether a given column actually carries `sensitivity: acme:PIIClerk` is a platform-tagging fact, not a policy fact.
 
 The soundness discipline is absolute: **if a finding requires anything in 4.4, it is emitted as `CANDIDATE` with the specific unknown named.** The tool never launders a candidate into a claim.
 
@@ -223,9 +223,12 @@ Contrast case (same policy, different change): *adding* `3-MEDIUM` to A2's value
 
 ### Exercise 2 — Add an overlapping catalog-scoped mask alongside `abac-column-mask-policy-a`
 
-Baseline corpus: `abac-column-mask-policy-a` (catalog-scoped, matches `sensitivity: PIIClerk`, redacts for non-`acme_all_priority_ops`). Change: add a new policy, catalog-scoped, matching `sensitivity: PII`, hashing for a different principal set.
+Two overlap shapes are worth distinguishing, and the committed corpus and the generated overlap demo show both:
 
-Expected headline: `[C4] OVERLAP  scope catalog:acme ∩ catalog:acme; sensitivity PII ⊇ PIIClerk  PROVEN`. Because `PII` subsumes `PIIClerk` on the hierarchical axis (4.2 #4), the two masks provably co-apply to the `PIIClerk` columns with divergent transformations (Redact vs Hash). The report points at ADR-023 γ-with-refinement as the resolution rule and flags the divergence for author review — it does *not* decide which mask wins at runtime.
+- **Equality overlap (committed examples).** `abac-column-mask-policy-a` and `-b` both match `sensitivity: acme:PIIClerk` at `catalog:acme` — one redacts, one hashes. Same adopter-namespaced value ⇒ they provably co-apply to the same columns: `[C4]/[L2] PROVEN`, divergent effects. (Adopter values match by equality, not subsumption — Tessera doesn't hold the `acme` ontology, per ADR-028.)
+- **Subsumption overlap (generated demo).** A policy matching `sensitivity: PII` at `catalog:acme` and one matching `sensitivity: PHI` at `schema:acme.tpch`: because `PHI ⊂ PII` is declared in the ontology and `catalog ⊇ schema`, every PHI column is also a PII column both masks reach ⇒ `PROVEN` via subsumption. This is the case ADR-028 unblocked for the graph path (`docs/exercises/cross-policy-overlap-demo.md`).
+
+In both, the report points at ADR-023 γ-with-refinement as the resolution rule and flags the conflict for author review — it does *not* decide which mask wins at runtime.
 
 ### Exercise 3 — Weaken the Snowflake `byDataset` policy's default
 
