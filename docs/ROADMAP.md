@@ -33,11 +33,11 @@ Work that is scoped and committed in direction, awaiting implementation.
 
 ## In-scope gaps — scoping needed
 
-Governance needs Tessera should express but for which the IR shape is not yet designed. Each needs a scoping document and an ADR before implementation.
+Governance needs Tessera should express but for which the IR shape is not yet designed. Each needs a scoping document and an ADR before implementation. **Scoping document drafted:** [`docs/v1-candidates/governance-gaps-scoping.md`](v1-candidates/governance-gaps-scoping.md) covers all three — its through-line is that current platforms have thin/advisory native enforcement for these, so Tessera's value is portable expression + honest capability reporting. ADRs and spec changes follow the scoping conversation.
 
-- **Audit-logging obligation vocabulary** ([#19](https://github.com/bgiesbrecht/tessera/issues/19)). Refine the obligation vocabulary for who-accessed-what-when. In scope; the current `AuditLog` obligation is coarse.
-- **Retention and deletion** ([#21](https://github.com/bgiesbrecht/tessera/issues/21)). A `RetentionConstraint` policy kind. v0-candidate.
-- **AI-governance attribute axes** ([#25](https://github.com/bgiesbrecht/tessera/issues/25)). Training-eligibility and automated-decision-making restriction axes. v0-candidate, fits the ADR-018 attribute-axis pattern.
+- **AI-governance attribute axes** ([#25](https://github.com/bgiesbrecht/tessera/issues/25)). Training-eligibility and automated-decision axes. v0-candidate, fits the ADR-018 attribute-axis pattern — lowest design risk, suggested first.
+- **Audit-logging obligation vocabulary** ([#19](https://github.com/bgiesbrecht/tessera/issues/19)). Refine the `AuditLog` obligation (fields / sink category / retention). Honest caveat: often "asserted-satisfied" on account-wide-audit platforms, not newly enforced.
+- **Retention and deletion** ([#21](https://github.com/bgiesbrecht/tessera/issues/21)). A `RetentionConstraint` policy kind — highest design risk: retention is lifecycle, not access, and enforcement is operational (a scheduled job), pressing on ADR-001. Scope framing is an open author decision (§6 of the scoping doc).
 
 ---
 
