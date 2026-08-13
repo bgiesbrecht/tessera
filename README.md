@@ -39,9 +39,9 @@ If you run a single platform and that platform's governance meets your needs, Te
 
 ## Status
 
-Current version: **0.8.0** (see `VERSION`, `CHANGELOG.md`).
+Current version: **0.9.0** (see `VERSION`, `CHANGELOG.md`).
 
-Both reference adapters are real and exercise the full ADR-024 cycle — `emit` / `discover` / `extract` / `reconcile` — on Databricks Unity Catalog and on Snowflake. Three policy shapes are implemented across both platforms: `RowVisibilityConstraint` (`byIdentity`, `byScope`, `byDataset`), `ColumnVisibilityConstraint` (`Redact`), and `AccessGrantConstraint` (table, function, schema-fan-out). Bidirectional migration between the two platforms is demonstrated end-to-end in `adapters/tests/live_migration_demo.py` and its reverse-direction sibling, with verification queries confirming the same policy intent enforces the same way on both sides.
+Both reference adapters are real and exercise the full ADR-024 cycle — `emit` / `discover` / `extract` / `reconcile` — on Databricks Unity Catalog and on Snowflake. Three policy shapes are implemented across both platforms: `RowVisibilityConstraint` (`byIdentity`, `byScope`, `byDataset`), `ColumnVisibilityConstraint` (`Redact`), and `AccessGrantConstraint` (table, function, schema-fan-out). ABAC `byScope` (tag-driven) now emits on both platforms — UC via `MATCH COLUMNS has_tag_value(...)`, Snowflake via tag-based masking / row-access policy attachment (#31). Bidirectional migration between the two platforms is demonstrated end-to-end in `adapters/tests/live_migration_demo.py` and its reverse-direction sibling, with verification queries confirming the same policy intent enforces the same way on both sides.
 
 **Change-impact analysis** (`tools/impact/`, `tessera impact` / `tessera lint`) reports how a proposed change to a policy corpus alters what it decides about data — coverage gaps, dead or newly-live rules, cross-policy mask conflicts, and exposure widening/narrowing — before anything is emitted. It is static and advisory: it reasons about the policy text, never connecting to a platform or evaluating who is in which group (the ADR-001 line), and labels each finding as provable or membership-dependent. See [`docs/user-guide/analyzing-changes.md`](docs/user-guide/analyzing-changes.md).
 
@@ -49,9 +49,8 @@ The IR — JSON-LD context, OWL ontology, JSON Schema, SHACL shapes — lives in
 
 For a demo-ready tour of what's working today, read [`docs/showcase.md`](docs/showcase.md). For where the project is going — shipped, in flight, deferred, and out of scope — read [`docs/ROADMAP.md`](docs/ROADMAP.md). For per-version detail, read `CHANGELOG.md`. Twenty of thirty-one tracked issues remain open; the breakdown is in `docs/issue-drafts/README.md`.
 
-Known limitations at 0.8.0:
+Known limitations at 0.9.0:
 
-- Snowflake ABAC `byScope` is queued ([#31](https://github.com/bgiesbrecht/tessera/issues/31)) — different platform mechanism.
 - YAML comment preservation in round-trips is deferred to converter v2.
 - Schema-pattern resource bindings are not yet implemented.
 
@@ -92,7 +91,7 @@ Three forms exist:
 ├── LICENSE                                ← Apache 2.0
 ├── DECISIONS.md                           ← 28 numbered ADRs
 ├── CHANGELOG.md                           ← per-version detail
-├── VERSION                                ← current: 0.8.0
+├── VERSION                                ← current: 0.9.0
 ├── docs/
 │   ├── showcase.md                        ← demo-anchored tour
 │   ├── executive-summary.md               ← one-page leadership brief

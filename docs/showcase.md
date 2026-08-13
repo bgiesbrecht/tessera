@@ -1,4 +1,4 @@
-# Tessera at 0.8.0 — what works, end to end
+# Tessera at 0.9.0 — what works, end to end
 
 This document is for someone who has heard about Tessera and wants to know what it actually does today, before reading the README, the technical design, or any of the ADRs. It is a 5–10 minute read. Pointers throughout to runnable artifacts and supporting docs.
 
@@ -39,11 +39,11 @@ Three policy shapes carry across both platforms. Each shape exists in the IR (`s
 
 ---
 
-## At 0.8.0
+## At 0.9.0
 
 ### The full adapter cycle, on both platforms
 
-Per ADR-024, every adapter implements four responsibilities. At 0.8.0 the four are real (not stubbed) on both Unity Catalog and Snowflake:
+Per ADR-024, every adapter implements four responsibilities. At 0.9.0 the four are real (not stubbed) on both Unity Catalog and Snowflake:
 
 | Responsibility | Unity Catalog | Snowflake | What it does |
 |---|---|---|---|
@@ -59,10 +59,10 @@ The four compose. `reconcile` is the `discover` + `extract` of observed state vs
 | Policy shape | Databricks DDL | Snowflake DDL |
 |---|---|---|
 | **`RowVisibilityConstraint`** (byIdentity multi-rule) | `CREATE FUNCTION ... RETURNS BOOLEAN` + `ALTER TABLE ... SET ROW FILTER` | `CREATE ROW ACCESS POLICY ... -> ...` + `ADD ROW ACCESS POLICY ... ON (col)` |
-| **`RowVisibilityConstraint`** (byScope ABAC) | UC ABAC: `CREATE POLICY ... ROW FILTER ... MATCH COLUMNS has_tag_value(...)` | (queued — see issue [#31](https://github.com/bgiesbrecht/tessera/issues/31)) |
+| **`RowVisibilityConstraint`** (byScope ABAC) | UC ABAC: `CREATE POLICY ... ROW FILTER ... MATCH COLUMNS has_tag_value(...)` | tag-based: `CREATE ROW ACCESS POLICY ... CASE ... END` + `ALTER TAG ... SET ROW ACCESS POLICY ... ON (col)` |
 | **`RowVisibilityConstraint`** (byDataset) | `CREATE FUNCTION ... RETURN EXISTS (SELECT 1 FROM map JOIN acl ...)` | `CREATE ROW ACCESS POLICY ... -> EXISTS (... CURRENT_USER() ...)` |
 | **`ColumnVisibilityConstraint`** (byIdentity, Redact) | `CREATE FUNCTION` + `ALTER TABLE ... SET MASK` | `CREATE MASKING POLICY ... -> CASE ... END` + `ALTER TABLE ... SET MASKING POLICY` |
-| **`ColumnVisibilityConstraint`** (byScope ABAC) | UC ABAC: `CREATE POLICY ... COLUMN MASK ... MATCH COLUMNS has_tag_value(...) ON COLUMN ...` | (queued — see issue [#31](https://github.com/bgiesbrecht/tessera/issues/31)) |
+| **`ColumnVisibilityConstraint`** (byScope ABAC) | UC ABAC: `CREATE POLICY ... COLUMN MASK ... MATCH COLUMNS has_tag_value(...) ON COLUMN ...` | tag-based: `CREATE MASKING POLICY ... SYSTEM$GET_TAG_ON_CURRENT_COLUMN(...) ...` + `ALTER TAG ... SET MASKING POLICY` |
 | **`AccessGrantConstraint`** (byIdentity, table) | `GRANT SELECT ON TABLE ... TO \`group\`` | `GRANT SELECT ON TABLE ... TO ROLE` |
 | **`AccessGrantConstraint`** (byIdentity, function) | `GRANT EXECUTE ON FUNCTION ... TO \`group\`` | `GRANT USAGE ON FUNCTION ... TO ROLE` (signature auto-resolved) |
 | **`AccessGrantConstraint`** (byScope, schema fan-out) | `GRANT USE SCHEMA` + `GRANT SELECT ON SCHEMA` | `GRANT USAGE` + `GRANT SELECT ON ALL TABLES IN SCHEMA` + `GRANT SELECT ON FUTURE TABLES IN SCHEMA` |
@@ -220,7 +220,7 @@ It catches coverage gaps (a group that now matches no rule), dead or newly-live 
 
 ---
 
-## Honest limitations at 0.8.0
+## Honest limitations at 0.9.0
 
 The framing of these matters: not "TODO" items, but documented decisions about what the version does and doesn't cover. Each links to the tracking issue.
 
@@ -268,4 +268,4 @@ The `docs/user-guide/evaluating.md` page expands these into a fuller adopt/don't
 
 ## Version status
 
-The version is 0.8.0 because v0 isn't frozen yet (per ADR-017). Whether it reaches 1.0 depends on external dependency — a real customer corpus, a third adapter, a tooling integration — at which point the spec freezes and the project commits to the surface it has.
+The version is 0.9.0 because v0 isn't frozen yet (per ADR-017). Whether it reaches 1.0 depends on external dependency — a real customer corpus, a third adapter, a tooling integration — at which point the spec freezes and the project commits to the surface it has.

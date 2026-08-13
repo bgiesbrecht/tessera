@@ -54,13 +54,21 @@ SNOWFLAKE_PROFILE = CapabilityProfile(
             "defaultBranch with effect=transform; Redact transformation. Role-discrimination semantics "
             "are Intent B (IS_ROLE_IN_SESSION) per Snowflake's recommendation and the adapter's "
             "convention (see issue #14). Mask and Hash transformations have SQL templates queued. "
-            "ABAC byScope column masking remains a separate emission path, not yet implemented.",
+            "ABAC byScope column masking is emitted via the tag-based path (see ATTRIBUTE_BASED_SCOPING).",
         ),
         Capability.ATTRIBUTE_BASED_SCOPING: (
-            CapabilitySupport.PARTIAL,
-            "Snowflake supports tag-based policies via CREATE TAG and ALTER ... SET TAG, with policies referencing "
-            "SYSTEM$GET_TAG. The IR's `byScope` + `matching` clauses can be lowered to tag references, but the "
-            "scaffold currently emits per-table mechanisms only and routes ABAC paths through a TODO.",
+            CapabilitySupport.SUPPORTED,
+            "byScope + matching is lowered to Snowflake's tag-based-attachment mechanism (#31), verified against "
+            "docs.snowflake.com/en/user-guide/tag-based-{masking,row-access}-policies. Column masking: "
+            "CREATE MASKING POLICY whose body reads SYSTEM$GET_TAG_ON_CURRENT_COLUMN('<schema.tag>') to scope to "
+            "the matched value, then ALTER TAG ... SET MASKING POLICY. Row filtering: CREATE ROW ACCESS POLICY "
+            "with a CASE ladder over IS_ROLE_IN_SESSION + a predicate on the matched discriminator column (the "
+            "IR's `column:$matched` sentinel binds to the policy parameter), then ALTER TAG ... SET ROW ACCESS "
+            "POLICY ... ON (<col> VARCHAR). The (axis, value) → (tag_key, tag_value) mapping is per-environment "
+            "config.tag_taxonomy (ADR-021); the tag key should be schema-qualified. Because both attach by tag, "
+            "the scope (which objects carry the tag) is a tagging concern, not part of emission. Platform "
+            "constraints surface as diagnostics where relevant: a tag holds at most one row-access policy, and "
+            "masking vs row-access policies are mutually exclusive on the same tag (per Snowflake docs).",
         ),
         Capability.DATASET_DRIVEN_PRINCIPALS: (
             CapabilitySupport.PARTIAL,

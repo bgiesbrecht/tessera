@@ -426,6 +426,8 @@ The same policy IR, two different platform emissions. The semantic content — "
 
 Confirming this sketch concretely would require building a Snowflake adapter, which is future work. The point here is that the policy file does not change between Databricks and Snowflake emission; only the adapter and its configuration do.
 
+> **Update (2026-08-13, #31):** this is now implemented in `adapters/snowflake/emission.py` (`_emit_column_visibility_by_scope`, `_emit_row_visibility_by_scope`). The concrete emission stays faithful to this sketch's shape — a masking policy attached via `ALTER TAG ... SET MASKING POLICY` — with two refinements verified against Snowflake's docs: the policy body reads `SYSTEM$GET_TAG_ON_CURRENT_COLUMN` to scope to the matched *value* (the tag attaches by key), and role discrimination uses `IS_ROLE_IN_SESSION` per the adapter's Intent-B convention (issue #14). Row-ABAC uses the parallel `ALTER TAG ... SET ROW ACCESS POLICY` mechanism, which Snowflake also supports.
+
 ---
 
 ## §7. v0 disposition

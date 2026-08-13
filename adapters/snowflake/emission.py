@@ -54,6 +54,13 @@ def _emit_row_visibility(policy: dict[str, Any], config: AdapterConfig) -> Emiss
     diagnostics: list[Diagnostic] = []
     policy_id = policy.get("@id")
     applies_to = policy.get("appliesTo") or {}
+
+    # ABAC byScope row visibility (#31): attach a row-access policy to a tag via
+    # ALTER TAG ... SET ROW ACCESS POLICY, per Snowflake's tag-based row-access
+    # mechanism. Distinct from the byIdentity per-table path below.
+    if applies_to.get("selector") == "byScope":
+        return _emit_row_visibility_by_scope(policy, config)
+
     raw_resource = applies_to.get("resource") or ""
     target_table = config.bind_resource(raw_resource) or _strip_iri(raw_resource)
     rules = policy.get("rules") or []
@@ -285,6 +292,13 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
     diagnostics: list[Diagnostic] = []
     policy_id = policy.get("@id")
     applies_to = policy.get("appliesTo") or {}
+
+    # ABAC byScope column masking (#31): attach a masking policy to a tag via
+    # ALTER TAG ... SET MASKING POLICY, per Snowflake's tag-based masking
+    # mechanism. Distinct from the byIdentity per-column path below.
+    if applies_to.get("selector") == "byScope":
+        return _emit_column_visibility_by_scope(policy, config)
+
     raw_resource = applies_to.get("resource") or ""
     bound_resource = config.bind_resource(raw_resource) or _strip_iri(raw_resource)
     rules = policy.get("rules") or []
@@ -296,7 +310,7 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
             code="UNIMPLEMENTED_SELECTOR_FOR_COLUMN_VISIBILITY",
             message=(
                 "scaffold currently emits masking policies only for byIdentity column targets. "
-                f"Got selector={applies_to.get('selector')!r}. ABAC byScope column masking is queued."
+                f"Got selector={applies_to.get('selector')!r}."
             ),
             location="appliesTo.selector",
         ))
@@ -388,6 +402,328 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
         target_artifacts=[target_table],
         statements=statements,
         diagnostics=diagnostics,
+    )
+
+
+# ============================================================================
+# ABAC byScope emission (#31) — Snowflake tag-based policy attachment
+# ============================================================================
+#
+# Snowflake's tag-based-attachment mechanism (verified against
+# docs.snowflake.com/en/user-guide/tag-based-{masking,row-access}-policies):
+#   * Column: CREATE MASKING POLICY, then ALTER TAG <tag> SET MASKING POLICY.
+#     The policy body reads the matched value via
+#     SYSTEM$GET_TAG_ON_CURRENT_COLUMN('<schema.tag>').
+#   * Row:    CREATE ROW ACCESS POLICY, then ALTER TAG <tag> SET ROW ACCESS
+#     POLICY ... ON (<matched_col> <type>). The bound column is the row
+#     discriminator the IR references via the `column:$matched` sentinel.
+#
+# Both attach by *tag*, so the byScope scope (which columns/tables carry the
+# tag) is a per-environment tagging concern, not part of emission — the adapter
+# emits the policy + the tag attachment; the adopter's tagging places it.
+
+_MATCHED_SENTINEL = "column:$matched"
+
+
+def _split_scope_iri(raw_scope: str) -> tuple[str, str]:
+    """`catalog:acme` -> ('catalog', 'acme'); `schema:acme.tpch` -> ('schema',
+    'acme.tpch'). Returns ('', '') when malformed."""
+    if ":" not in raw_scope:
+        return "", ""
+    kind, ident = raw_scope.split(":", 1)
+    return kind, ident
+
+
+def _resolve_scope_tag(
+    matching: dict[str, Any], config: AdapterConfig, diagnostics: list[Diagnostic],
+) -> tuple[str | None, str | None]:
+    """Resolve the single matching attribute to a Snowflake (tag_key, tag_value)
+    via config.tag_taxonomy (ADR-021), mirroring the UC adapter. The tag_key
+    should be schema-qualified (e.g. governance.tags.data_class) for
+    SYSTEM$GET_TAG_ON_CURRENT_COLUMN and ALTER TAG to resolve."""
+    attributes = (matching or {}).get("attributes") or {}
+    if len(attributes) != 1:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="ABAC_MATCHING_SHAPE",
+            message=(
+                "byScope emission supports a single matching attribute; "
+                f"got {len(attributes)}. Emitting for the first."
+            ),
+            location="appliesTo.matching.attributes",
+        ))
+    if not attributes:
+        return None, None
+    axis, value = next(iter(attributes.items()))
+    binding = config.tag_taxonomy.get((axis, str(value)))
+    if binding:
+        tag_key, tag_value = binding
+    else:
+        tag_key = axis.split(":")[-1] if ":" in axis else axis
+        tag_value = str(value)
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="UNBOUND_TAG_ATTRIBUTE",
+            message=(
+                f"matching attribute ({axis!r}, {value!r}) has no tag_taxonomy entry; "
+                f"falling back to tag {tag_key!r} = {tag_value!r}. Configure config.tag_taxonomy "
+                "with a schema-qualified tag key for production."
+            ),
+            location="appliesTo.matching.attributes",
+        ))
+    if "." not in tag_key:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.INFO,
+            code="TAG_KEY_NOT_SCHEMA_QUALIFIED",
+            message=(
+                f"tag key {tag_key!r} is not schema-qualified; Snowflake resolves tags by "
+                "<schema>.<tag> and SYSTEM$GET_TAG_ON_CURRENT_COLUMN requires it. Bind a "
+                "qualified tag key via config.tag_taxonomy for production."
+            ),
+        ))
+    return tag_key, tag_value
+
+
+def _abac_policy_schema(
+    scope_kind: str, scope_id: str, config: AdapterConfig, diagnostics: list[Diagnostic],
+) -> str:
+    """Where the masking / row-access policy object lives. A schema-scoped
+    policy lives in that schema; a catalog-scoped policy needs a schema, taken
+    from config.extras['abac_policy_schema'] or inferred as <db>.PUBLIC."""
+    if scope_kind == "schema" and scope_id.count(".") >= 1:
+        return scope_id
+    override = config.extras.get("abac_policy_schema")
+    if override:
+        return override
+    inferred = f"{scope_id.split('.')[0]}.PUBLIC"
+    diagnostics.append(Diagnostic(
+        severity=DiagnosticSeverity.INFO,
+        code="ABAC_POLICY_SCHEMA_INFERRED",
+        message=(
+            f"policy object schema inferred as {inferred!r}; override via "
+            "config.extras['abac_policy_schema'] for production deployments."
+        ),
+    ))
+    return inferred
+
+
+def _emit_column_visibility_by_scope(
+    policy: dict[str, Any], config: AdapterConfig,
+) -> EmissionResult:
+    """Lower a byScope+matching ColumnVisibilityConstraint to a Snowflake
+    tag-based masking policy (#31).
+
+        CREATE OR REPLACE MASKING POLICY <schema>.<slug>_mask
+          AS (val VARCHAR) RETURNS VARCHAR ->
+            CASE
+              WHEN IS_ROLE_IN_SESSION('<allow-role>') THEN val
+              WHEN SYSTEM$GET_TAG_ON_CURRENT_COLUMN('<tag_key>') = '<tag_value>'
+                THEN <transform>
+              ELSE val
+            END;
+        ALTER TAG <tag_key> SET MASKING POLICY <schema>.<slug>_mask;
+
+    Expected shape (negated-complement): rules with effect=allow name the
+    privileged roles (pass-through); defaultBranch carries the transformation
+    applied to everyone else on matched columns. The SYSTEM$GET_TAG check scopes
+    the mask to the matched value even though the tag attaches by key.
+    """
+    diagnostics: list[Diagnostic] = []
+    policy_id = policy.get("@id")
+    applies_to = policy.get("appliesTo") or {}
+    scope_kind, scope_id = _split_scope_iri(applies_to.get("scope") or "")
+    if not scope_kind or not scope_id:
+        return _malformed_scope_result(policy_id, applies_to.get("scope"))
+
+    tag_key, tag_value = _resolve_scope_tag(applies_to.get("matching") or {}, config, diagnostics)
+    if not tag_key:
+        return EmissionResult(
+            policy_id=policy_id, target_artifacts=[], statements=[],
+            diagnostics=diagnostics + [Diagnostic(
+                severity=DiagnosticSeverity.ERROR, code="ABAC_NO_MATCHING_ATTRIBUTE",
+                message="byScope column masking requires a matching attribute to resolve to a tag.",
+                location="appliesTo.matching",
+            )],
+        )
+
+    schema = _abac_policy_schema(scope_kind, scope_id, config, diagnostics)
+    when_clauses: list[str] = []
+    for idx, rule in enumerate(policy.get("rules") or []):
+        principal = rule.get("principal") or {}
+        if principal.get("selector") != "byIdentity" or rule.get("effect") != "allow":
+            continue
+        bound = config.bind_principal(principal.get("resource") or "") \
+            or _strip_iri(principal.get("resource") or "").upper()
+        when_clauses.append(f"WHEN IS_ROLE_IN_SESSION('{bound}') THEN val")
+
+    default_branch = policy.get("defaultBranch") or {}
+    if default_branch.get("effect") != "transform":
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING,
+            code="ABAC_COLUMN_MASK_MISSING_TRANSFORMATION",
+            message=(
+                "byScope column-mask emission expects defaultBranch.effect='transform'; "
+                f"got {default_branch.get('effect')!r}. Falling through to pass-through."
+            ),
+            location="defaultBranch.effect",
+        ))
+        transform_expr: str | None = "val"
+    else:
+        transform_expr, t_diags = _render_transformation_expression(
+            default_branch.get("transformation") or {}, "val", "default",
+        )
+        diagnostics.extend(t_diags)
+        transform_expr = transform_expr or "val"
+
+    tag_check = (
+        f"WHEN SYSTEM$GET_TAG_ON_CURRENT_COLUMN('{tag_key}') = '{tag_value}' "
+        f"THEN {transform_expr}"
+    )
+    case_body = "\n    ".join(when_clauses + [tag_check, "ELSE val"])
+    slug = (policy_id or "policy").split(":")[-1].replace("-", "_")
+    policy_name = f"{schema}.{slug}_mask"
+
+    statements = [
+        f"CREATE OR REPLACE MASKING POLICY {policy_name}\n"
+        f"AS (val VARCHAR) RETURNS VARCHAR ->\n"
+        f"  CASE\n"
+        f"    {case_body}\n"
+        f"  END;",
+        f"ALTER TAG {tag_key} SET MASKING POLICY {policy_name};",
+    ]
+    return EmissionResult(
+        policy_id=policy_id, target_artifacts=[f"tag:{tag_key}"],
+        statements=statements, diagnostics=diagnostics,
+    )
+
+
+def _emit_row_visibility_by_scope(
+    policy: dict[str, Any], config: AdapterConfig,
+) -> EmissionResult:
+    """Lower a byScope+matching RowVisibilityConstraint to a Snowflake tag-based
+    row-access policy (#31).
+
+        CREATE OR REPLACE ROW ACCESS POLICY <schema>.<slug>_rap
+          AS (matched VARCHAR) RETURNS BOOLEAN ->
+            CASE
+              WHEN IS_ROLE_IN_SESSION('<role-A>') THEN TRUE
+              WHEN IS_ROLE_IN_SESSION('<role-B>') THEN matched IN (...)
+              ELSE matched IN (...)
+            END;
+        ALTER TAG <tag_key> SET ROW ACCESS POLICY <schema>.<slug>_rap
+          ON (matched VARCHAR);
+
+    The matching attribute identifies the row-discriminator column via the tag;
+    the IR references that column with the `column:$matched` sentinel, which
+    binds to the policy's `matched` parameter. Ordered first-match (ADR-015) is
+    a CASE ladder; the defaultBranch (negated-complement) is the ELSE.
+    """
+    diagnostics: list[Diagnostic] = []
+    policy_id = policy.get("@id")
+    applies_to = policy.get("appliesTo") or {}
+    scope_kind, scope_id = _split_scope_iri(applies_to.get("scope") or "")
+    if not scope_kind or not scope_id:
+        return _malformed_scope_result(policy_id, applies_to.get("scope"))
+
+    tag_key, _tag_value = _resolve_scope_tag(applies_to.get("matching") or {}, config, diagnostics)
+    if not tag_key:
+        return EmissionResult(
+            policy_id=policy_id, target_artifacts=[], statements=[],
+            diagnostics=diagnostics + [Diagnostic(
+                severity=DiagnosticSeverity.ERROR, code="ABAC_NO_MATCHING_ATTRIBUTE",
+                message="byScope row filtering requires a matching attribute to resolve to a tag.",
+                location="appliesTo.matching",
+            )],
+        )
+
+    param = "matched"
+    branches: list[str] = []
+    for idx, rule in enumerate(policy.get("rules") or []):
+        principal = rule.get("principal") or {}
+        if principal.get("selector") != "byIdentity":
+            diagnostics.append(Diagnostic(
+                severity=DiagnosticSeverity.WARNING, code="UNSUPPORTED_PRINCIPAL_SELECTOR",
+                message=f"rule {idx}: byScope row filter supports byIdentity principals.",
+                location=f"rules[{idx}].principal.selector",
+            ))
+            continue
+        bound = config.bind_principal(principal.get("resource") or "") \
+            or _strip_iri(principal.get("resource") or "").upper()
+        predicate = _render_matched_condition(rule.get("condition") or {}, param, idx, diagnostics)
+        result = predicate if predicate else "TRUE"
+        branches.append(f"WHEN IS_ROLE_IN_SESSION('{bound}') THEN {result}")
+
+    default_branch = policy.get("defaultBranch") or {}
+    if default_branch:
+        db_predicate = _render_matched_condition(
+            default_branch.get("condition") or {}, param, "default", diagnostics)
+        else_result = db_predicate if db_predicate else "TRUE"
+    else:
+        # No default branch under negated-complement ⇒ unmatched principals see
+        # nothing. Fail closed.
+        else_result = "FALSE"
+
+    case_body = "\n    ".join(branches + [f"ELSE {else_result}"]) if branches \
+        else f"ELSE {else_result}"
+    schema = _abac_policy_schema(scope_kind, scope_id, config, diagnostics)
+    slug = (policy_id or "policy").split(":")[-1].replace("-", "_")
+    policy_name = f"{schema}.{slug}_rap"
+
+    statements = [
+        f"CREATE OR REPLACE ROW ACCESS POLICY {policy_name}\n"
+        f"AS ({param} VARCHAR) RETURNS BOOLEAN ->\n"
+        f"  CASE\n"
+        f"    {case_body}\n"
+        f"  END;",
+        f"ALTER TAG {tag_key} SET ROW ACCESS POLICY {policy_name}\n  ON ({param} VARCHAR);",
+    ]
+    return EmissionResult(
+        policy_id=policy_id, target_artifacts=[f"tag:{tag_key}"],
+        statements=statements, diagnostics=diagnostics,
+    )
+
+
+def _render_matched_condition(
+    condition: dict[str, Any], param: str, idx: Any, diagnostics: list[Diagnostic],
+) -> str:
+    """Render an `in` condition on the `column:$matched` sentinel as a predicate
+    over the row-access policy's bound parameter. Returns '' for no condition
+    (the branch matches all rows)."""
+    if not condition:
+        return ""
+    if condition.get("op") != "in":
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.WARNING, code="UNIMPLEMENTED_CONDITION_OP",
+            message=f"rule {idx}: byScope row filter emits only op=in; got {condition.get('op')!r}.",
+            location=f"rules[{idx}].condition.op",
+        ))
+        return ""
+    operands = condition.get("operands") or []
+    if operands and operands[0] != _MATCHED_SENTINEL:
+        diagnostics.append(Diagnostic(
+            severity=DiagnosticSeverity.INFO, code="ABAC_ROW_OPERAND_NOT_MATCHED_SENTINEL",
+            message=(
+                f"rule {idx}: byScope row condition operand {operands[0]!r} is not the "
+                f"{_MATCHED_SENTINEL!r} sentinel; binding it to the policy parameter anyway."
+            ),
+            location=f"rules[{idx}].condition.operands",
+        ))
+    values = condition.get("values") or []
+    rendered = ", ".join(f"'{str(v)}'" for v in values)
+    return f"{param} IN ({rendered})"
+
+
+def _malformed_scope_result(policy_id: Any, raw_scope: Any) -> EmissionResult:
+    return EmissionResult(
+        policy_id=policy_id, target_artifacts=[], statements=[],
+        diagnostics=[Diagnostic(
+            severity=DiagnosticSeverity.ERROR, code="MALFORMED_SCOPE",
+            message=(
+                "byScope appliesTo.scope must be <kind>:<id> (catalog: / schema: / "
+                f"table:); got {raw_scope!r}."
+            ),
+            location="appliesTo.scope",
+        )],
     )
 
 

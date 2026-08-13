@@ -45,7 +45,7 @@ Staging area for issues queued to be filed against `bgiesbrecht/tessera`. Keepin
 | 2026-05-20 | [#28](https://github.com/bgiesbrecht/tessera/issues/28) | udf-parameter-name-collision-convention — document the row-filter/column-mask UDF parameter naming rule | closed by contributing.md addition (2026-05-20) |
 | 2026-05-20 | [#29](https://github.com/bgiesbrecht/tessera/issues/29) | extracted-ir-identifier-provenance — should extracted IR carry source-platform identifier case? | closed by operating.md addition (2026-05-20) |
 | 2026-05-20 | [#30](https://github.com/bgiesbrecht/tessera/issues/30) | uc-abac-byscope-column-mask — UC adapter byScope column-mask emission not implemented | closed by 0.6.3 (`_emit_column_visibility_by_scope`, 2026-05-21) |
-| 2026-05-20 | [#31](https://github.com/bgiesbrecht/tessera/issues/31) | snowflake-abac-byscope — Snowflake adapter byScope ABAC emission not implemented (row + column) | open (v0-candidate; Snowflake mechanism is genuinely different from Databricks) |
+| 2026-05-20 | [#31](https://github.com/bgiesbrecht/tessera/issues/31) | snowflake-abac-byscope — Snowflake adapter byScope ABAC emission (row + column) | closed by 0.9.0 (tag-based masking / row-access attachment, 2026-08-13) |
 
 ## Queued
 

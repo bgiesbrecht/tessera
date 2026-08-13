@@ -112,6 +112,57 @@ def test_abac_byscope_alias_is_sanitized_for_namespaced_values():
     assert "AS acme_PIIClerk" in sql and "ON COLUMN acme_PIIClerk" in sql
 
 
+def test_snowflake_abac_byscope_column_mask_is_tag_based():
+    """#31: byScope ColumnVisibility lowers to Snowflake tag-based masking —
+    CREATE MASKING POLICY reading SYSTEM$GET_TAG_ON_CURRENT_COLUMN, attached via
+    ALTER TAG ... SET MASKING POLICY."""
+    policy = _load("abac-column-mask-policy-a.jsonld")
+    assert policy["appliesTo"]["selector"] == "byScope"
+    result = SnowflakeAdapter().emit(policy)
+    sql = "\n".join(result.statements)
+    assert not result.has_errors
+    assert "CREATE OR REPLACE MASKING POLICY" in sql
+    assert "SYSTEM$GET_TAG_ON_CURRENT_COLUMN(" in sql
+    assert "SET MASKING POLICY" in sql
+    assert "IS_ROLE_IN_SESSION('ACME_ALL_PRIORITY_OPS')" in sql  # allow-role pass-through
+    assert "'CLERK-REDACTED'" in sql                             # the Redact transform
+
+
+def test_snowflake_abac_byscope_row_filter_is_tag_based():
+    """#31: byScope RowVisibility lowers to Snowflake tag-based row access —
+    CREATE ROW ACCESS POLICY as a CASE ladder over IS_ROLE_IN_SESSION + a
+    predicate on the matched column, attached via ALTER TAG ... SET ROW ACCESS
+    POLICY ... ON (col)."""
+    policy = _load("abac-row-filter-priority.jsonld")
+    assert policy["appliesTo"]["selector"] == "byScope"
+    result = SnowflakeAdapter().emit(policy)
+    sql = "\n".join(result.statements)
+    assert not result.has_errors
+    assert "CREATE OR REPLACE ROW ACCESS POLICY" in sql
+    assert "RETURNS BOOLEAN" in sql
+    assert "SET ROW ACCESS POLICY" in sql and "ON (matched VARCHAR)" in sql
+    # Three-branch first-match: all-ops → all rows; high-ops → 1/2; else → 3/4/5.
+    assert "IS_ROLE_IN_SESSION('ACME_ALL_PRIORITY_OPS') THEN TRUE" in sql
+    assert "matched IN ('1-URGENT', '2-HIGH')" in sql
+    assert "ELSE matched IN ('3-MEDIUM', '4-NOT SPECIFIED', '5-LOW')" in sql
+    # The $matched sentinel must not leak into the emitted SQL.
+    assert "$matched" not in sql
+
+
+def test_snowflake_abac_byscope_uses_configured_tag_taxonomy():
+    """With a schema-qualified tag_taxonomy binding, the emitted tag key is the
+    configured one (no UNBOUND_TAG_ATTRIBUTE warning), and it is schema-qualified."""
+    policy = _load("abac-column-mask-policy-a.jsonld")
+    config = AdapterConfig(
+        tag_taxonomy={("sensitivity", "acme:PIIClerk"): ("governance.tags.data_class", "clerk")},
+    )
+    result = SnowflakeAdapter(config=config).emit(policy)
+    sql = "\n".join(result.statements)
+    assert "SYSTEM$GET_TAG_ON_CURRENT_COLUMN('governance.tags.data_class') = 'clerk'" in sql
+    assert "ALTER TAG governance.tags.data_class SET MASKING POLICY" in sql
+    assert not any(d.code == "UNBOUND_TAG_ATTRIBUTE" for d in result.diagnostics)
+
+
 def test_capability_profiles_differ_meaningfully():
     """Both adapters declare profiles, with different platform names."""
     uc = UnityCatalogAdapter()

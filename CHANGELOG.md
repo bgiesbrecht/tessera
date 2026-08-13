@@ -4,6 +4,23 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.9.0] — 2026-08-13
+
+Snowflake ABAC `byScope` emission — row and column ([#31](https://github.com/bgiesbrecht/tessera/issues/31)). The last open adapter coverage gap; a tooling/adapter release, no IR change. The mechanism was verified against Snowflake's docs (per ADR-027): Snowflake attaches both masking *and* row-access policies via tags, so both halves of #31 have a clean tag-based path — correcting an earlier assumption that row-ABAC had no tag mechanism.
+
+### Added
+
+- **`adapters/snowflake/emission.py`** — `_emit_column_visibility_by_scope` and `_emit_row_visibility_by_scope`, dispatched when a `ColumnVisibilityConstraint` / `RowVisibilityConstraint` uses `selector: byScope`:
+  - **Column:** `CREATE MASKING POLICY` whose body reads `SYSTEM$GET_TAG_ON_CURRENT_COLUMN('<schema.tag>')` to scope the mask to the matched value, allow-roles passing through via `IS_ROLE_IN_SESSION`; attached with `ALTER TAG ... SET MASKING POLICY`.
+  - **Row:** `CREATE ROW ACCESS POLICY` as an ordered-first-match `CASE` ladder over `IS_ROLE_IN_SESSION` + a predicate on the matched discriminator column (the IR's `column:$matched` sentinel binds to the policy parameter); attached with `ALTER TAG ... SET ROW ACCESS POLICY ... ON (<col> VARCHAR)`.
+  - The `(axis, value) → (tag_key, tag_value)` mapping is per-environment `config.tag_taxonomy` (ADR-021); an unbound attribute or a non-schema-qualified tag key surfaces a diagnostic. The policy object schema is the scope's schema, or `config.extras['abac_policy_schema']`, or an inferred `<db>.PUBLIC`.
+- Regression tests in `adapters/tests/test_parity.py` for both paths and the configured-taxonomy case.
+
+### Changed
+
+- **Snowflake `CapabilityProfile.ATTRIBUTE_BASED_SCOPING`**: `PARTIAL` → `SUPPORTED`, documenting the tag-based mechanism and its Snowflake constraints (one row-access policy per tag; masking vs row-access mutually exclusive on a tag). `COLUMN_VISIBILITY` prose updated (byScope no longer "queued").
+- `docs/showcase.md` policy-shape table: the two Snowflake ABAC-byScope cells now show real DDL instead of "queued (#31)".
+
 ## [0.8.0] — 2026-08-05
 
 Attribute values become vocabulary IRIs (ADR-028), so the ontology hierarchy can reason over them. A change-impact graph spike found that `sensitivity` was defined `"@type": "@id"` — bare values like `PIIClerk` expanded to document-base junk instead of `vocab#` IRIs, blocking `subClassOf*` subsumption. No external consumer exists (ADR-017), so this is a clean break.
