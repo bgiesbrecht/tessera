@@ -66,9 +66,9 @@ This is the crux: retention is **data-lifecycle governance, not access-decision 
 
 ---
 
-## §4. AI governance — new attribute axes (#25)
+## §4. AI governance — new attribute axes (#25) — _implemented (ADR-029, 2026-08-13)_
 
-This is the cleanest fit: it extends the ADR-018 attribute-axis framework, no new policy kind.
+This is the cleanest fit: it extends the ADR-018 attribute-axis framework, no new policy kind. **Shipped** in v0 per ADR-029: axes `trainingEligibility` and `automatedDecision` in `ontology.ttl` / `context.jsonld` / `shapes.ttl`, worked example `spec/v0/examples/ai-governance-training-mask-policy.*` (validates and emits masking DDL on both adapters, keyed off the axis). The design below stands as the record.
 
 **The axes.** AI-use restrictions are *properties of the data* (the §1 three-category test in `abac-and-attribute-axes.md`: data attribute vs request condition vs principal property → these are data attributes), so they are attribute axes:
 

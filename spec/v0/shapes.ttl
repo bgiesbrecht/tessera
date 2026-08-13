@@ -378,6 +378,23 @@ tessera:BusinessDomainAxisShape a sh:NodeShape ;
         sh:message "businessDomain values must be IRIs (typically: CRM, Finance, HR, Engineering, MarketingDomain, or adopter extensions)."@en ;
     ] .
 
+# AI-governance flat axes (ADR-029).
+tessera:TrainingEligibilityAxisShape a sh:NodeShape ;
+    sh:targetSubjectsOf tessera:trainingEligibility ;
+    sh:property [
+        sh:path tessera:trainingEligibility ;
+        sh:nodeKind sh:IRI ;
+        sh:message "trainingEligibility values must be IRIs (typically: NoTraining, TrainingWithConsent, TrainingAllowed, or adopter extensions)."@en ;
+    ] .
+
+tessera:AutomatedDecisionAxisShape a sh:NodeShape ;
+    sh:targetSubjectsOf tessera:automatedDecision ;
+    sh:property [
+        sh:path tessera:automatedDecision ;
+        sh:nodeKind sh:IRI ;
+        sh:message "automatedDecision values must be IRIs (typically: NoAutomatedDecision, ADMWithHumanReview, AutomatedDecisionAllowed, or adopter extensions)."@en ;
+    ] .
+
 
 #
 # ============================================================================

@@ -4,6 +4,21 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.10.0] — 2026-08-13
+
+AI-governance attribute axes (ADR-029, closing [#25](https://github.com/bgiesbrecht/tessera/issues/25)) — the first of the three scoped governance gaps to land. An additive IR change extending the ADR-018 attribute-axis framework; no new policy kind, no new emission path.
+
+### Added
+
+- **Two flat attribute axes** in `spec/v0/`: `trainingEligibility` (`NoTraining`, `TrainingWithConsent`, `TrainingAllowed`) and `automatedDecision` (`NoAutomatedDecision`, `ADMWithHumanReview`, `AutomatedDecisionAllowed`). Declared like the other flat axes — `AttributeAxis` individual + `axisType flat`, an object property on `Resource`, well-known `NamedIndividual` values (`ontology.ttl`); `@type: @vocab` context terms (`context.jsonld`); per-axis value shapes (`shapes.ttl`). `schema.json` unchanged (the attributes map is open on axis keys by design).
+- **Worked example** `spec/v0/examples/ai-governance-training-mask-policy.{tessera.yaml,jsonld}` — a `byScope` `ColumnVisibilityConstraint` keyed off `trainingEligibility: NoTraining` that masks matching columns to all but a consented group. Validates clean; emits real masking DDL on **both** adapters via the existing byScope emitters (`has_tag_value(...)` on UC, `SYSTEM$GET_TAG_ON_CURRENT_COLUMN(...)` on Snowflake). Regression test in `adapters/tests/test_parity.py`.
+
+### Notes
+
+- **Honest scope (ADR-029):** no data platform natively enforces an AI-use restriction. The axes are portable classifications; their enforcement leverage is *by composition* with the access machinery (the worked example is the pattern). Capability profiles must not claim the platform enforces the AI restriction itself.
+- The change-impact kernel picks the new axes up automatically as flat (equality-only) from the ontology; no tool change needed.
+- Design surface for all three gaps: `docs/v1-candidates/governance-gaps-scoping.md`. #19 (audit) and #21 (retention) remain scoped-not-built.
+
 ## [0.9.1] — 2026-08-13
 
 Live verification of the 0.9.0 Snowflake ABAC `byScope` emission, and the one emitter fix it surfaced.

@@ -1,0 +1,43 @@
+{
+  "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
+  "@type": "Policy",
+  "@id": "policy:ai-governance-training-mask",
+  "version": "1.0.0",
+  "policyKind": "ColumnVisibilityConstraint",
+  "description": "Columns whose trainingEligibility attribute is NoTraining are redacted to the literal 'NOT-FOR-TRAINING' for principals outside acme_consented_ml — the group operating under a recorded training-consent regime. NoTraining is a Tessera-vocabulary value (ADR-028/029); adopters may substitute their own namespaced value.",
+  "appliesTo": {
+    "selector": "byScope",
+    "scope": "catalog:acme",
+    "matching": {
+      "attributes": {
+        "trainingEligibility": "NoTraining"
+      }
+    }
+  },
+  "action": "Read",
+  "defaultStrategy": "negated-complement",
+  "rules": [
+    {
+      "principal": {
+        "selector": "byIdentity",
+        "resource": "group:acme_consented_ml"
+      },
+      "effect": "allow"
+    }
+  ],
+  "defaultBranch": {
+    "effect": "transform",
+    "transformation": {
+      "type": "Redact",
+      "replacement": "NOT-FOR-TRAINING"
+    }
+  },
+  "capabilityRequirements": [
+    "scoped-policy-attachment",
+    "attribute-axis-matching",
+    "tag-taxonomy-mapping"
+  ],
+  "provenance": {
+    "notes": "Worked example for ADR-029 (AI-governance attribute axes). Shows the\ntraining-eligibility axis composing with the existing column-mask machinery;\nno new emission path is required — the byScope column-mask emitters on both\nadapters lower it unchanged."
+  }
+}

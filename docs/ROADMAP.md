@@ -4,7 +4,7 @@
 
 **How to read it.** This is a *living* document, revised by appending dated updates rather than rewriting history (same discipline as the CLAUDE.md handoff). It is not a commitment schedule — ordering reflects current priority, not promised dates. The authoritative decision log remains `DECISIONS.md`; tracked work items remain the GitHub issues. Where an item has an issue or ADR, it is cited.
 
-Current version: **0.9.1** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-13**.
+Current version: **0.10.0** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-13**.
 
 ---
 
@@ -17,7 +17,8 @@ The spine of the project is real and exercised end-to-end.
 - **The converter** (`tools/converter/`) — YAML → JSON-LD, both authoring shapes.
 - **The unified CLI** (`tools/cli/`, `python -m tools.cli`) — `validate`, `convert`, `emit`, `discover`, `extract`, `reconcile`, and `impact` / `lint` (change-impact analysis).
 - **Change-impact analysis** (`tools/impact/`) — given a policy corpus and a proposed change, reports how the change alters what the corpus decides about data, *before* it is emitted. All planned checks are built: C1 (fall-through coverage), C2 (default-net removal), C3 (reachability/shadowing), C4 (cross-policy overlap, ADR-023), C5 (dangling reference), C6 (exposure polarity), plus standing lints L1 (dead rules) and L2 (cross-policy overlap). Reasons only about selector *expressions*, never populations (the ADR-001 line); findings are PROVEN or CANDIDATE. Design in [`docs/v1-candidates/change-impact-analysis.md`](v1-candidates/change-impact-analysis.md); worked demos in `docs/exercises/`.
-- **Eight worked examples** (`spec/v0/examples/`) — seven Databricks, one Snowflake — each with diagnostic and comparison records.
+- **AI-governance attribute axes** ([#25](https://github.com/bgiesbrecht/tessera/issues/25), ADR-029) — `trainingEligibility` / `automatedDecision` flat axes extending the ADR-018 framework. Advisory on their own (no platform enforces "no training"); they get teeth by composing with the access machinery — the worked example masks `NoTraining` columns to all but a consented group, emitting on both adapters unchanged.
+- **Worked examples** (`spec/v0/examples/`) — Databricks, Snowflake, and cross-cutting, each with diagnostic/comparison records.
 
 For a demo-ready tour, read [`docs/showcase.md`](showcase.md).
 
@@ -35,7 +36,6 @@ Work that is scoped and committed in direction, awaiting implementation.
 
 Governance needs Tessera should express but for which the IR shape is not yet designed. Each needs a scoping document and an ADR before implementation. **Scoping document drafted:** [`docs/v1-candidates/governance-gaps-scoping.md`](v1-candidates/governance-gaps-scoping.md) covers all three — its through-line is that current platforms have thin/advisory native enforcement for these, so Tessera's value is portable expression + honest capability reporting. ADRs and spec changes follow the scoping conversation.
 
-- **AI-governance attribute axes** ([#25](https://github.com/bgiesbrecht/tessera/issues/25)). Training-eligibility and automated-decision axes. v0-candidate, fits the ADR-018 attribute-axis pattern — lowest design risk, suggested first.
 - **Audit-logging obligation vocabulary** ([#19](https://github.com/bgiesbrecht/tessera/issues/19)). Refine the `AuditLog` obligation (fields / sink category / retention). Honest caveat: often "asserted-satisfied" on account-wide-audit platforms, not newly enforced.
 - **Retention and deletion** ([#21](https://github.com/bgiesbrecht/tessera/issues/21)). A `RetentionConstraint` policy kind — highest design risk: retention is lifecycle, not access, and enforcement is operational (a scheduled job), pressing on ADR-001. Scope framing is an open author decision (§6 of the scoping doc).
 
@@ -100,3 +100,4 @@ Directions that are real but not yet scoped, recorded so the shape of the projec
 - **2026-08-05** — ADR-028: attribute values are vocabulary IRIs (bare = Tessera, prefix = adopter); 0.8.0.
 - **2026-08-13** — Snowflake ABAC `byScope` emission (row + column) shipped ([#31](https://github.com/bgiesbrecht/tessera/issues/31)); 0.9.0. Both adapters now emit ABAC `byScope`. Moved out of near-term.
 - **2026-08-13** — Live-verified the Snowflake ABAC `byScope` emission end-to-end on a real account; 0.9.1. Fixed the row-filter `ON` clause (must name the real discriminator column) and recorded the column-tag-vs-table-tag distinction. Both paths enforce as designed.
+- **2026-08-13** — Scoping doc for the three governance gaps (#19/#21/#25) drafted; then #25 (AI-governance axes) implemented (ADR-029, 0.10.0) — `trainingEligibility` / `automatedDecision`, with a worked example that composes with the column-mask machinery. #19 and #21 remain scoped-not-built (#21 pending the author's scope-framing decision).

@@ -1345,6 +1345,41 @@ No external consumer exists (ADR-017's immutability bar is suspended), so this i
 
 ---
 
+## ADR-029 — AI-governance attribute axes: `trainingEligibility` and `automatedDecision`
+
+**Date:** 2026-08-13
+**Status:** Accepted
+
+### Context
+
+The 2026-05-19 governance-gap survey identified AI-specific governance ([#25](https://github.com/bgiesbrecht/tessera/issues/25)) as an in-scope gap: organizations increasingly need to mark data with AI-use restrictions — "may not be used to train models," "may not drive automated decisions" (cf. GDPR Article 22). The scoping document (`docs/v1-candidates/governance-gaps-scoping.md` §4) analyzed the fit and found it clean: these are *properties of the data* (the three-category test from `abac-and-attribute-axes.md` — data attribute vs. request condition vs. principal property places them as data attributes), so they extend the ADR-018 attribute-axis framework rather than introducing a new mechanism.
+
+### Decision
+
+Add two flat attribute axes to v0:
+
+- **`trainingEligibility`** — well-known values `NoTraining`, `TrainingWithConsent`, `TrainingAllowed`. Whether the data may be used to train models.
+- **`automatedDecision`** — well-known values `NoAutomatedDecision`, `ADMWithHumanReview`, `AutomatedDecisionAllowed`. Whether the data may drive automated decision-making.
+
+Both are flat axes in the ADR-018 sense (independent enumeration members, no subsumption hierarchy), declared exactly like `dataSubject` / `regulatoryRegime` / `businessDomain`: an `AttributeAxis` individual with `axisType flat`, an object property on `Resource`, and a starter set of well-known `NamedIndividual` values. Values follow ADR-028: a bare value is Tessera's vocabulary; adopters extend with their own namespaced values.
+
+### What this means
+
+- **No new policy kind, no new emission path.** The axes compose with the existing selector/matching machinery. The worked example (`spec/v0/examples/ai-governance-training-mask-policy.*`) is an ordinary `byScope` `ColumnVisibilityConstraint` keyed off `trainingEligibility: NoTraining`; it lowers unchanged through both adapters' byScope column-mask emitters (`has_tag_value(...)` on UC, `SYSTEM$GET_TAG_ON_CURRENT_COLUMN(...)` on Snowflake).
+- **Spec changes:** `spec/v0/ontology.ttl` (two axes, two properties, six value individuals), `spec/v0/context.jsonld` (two `@type: @vocab` terms), `spec/v0/shapes.ttl` (two per-axis value shapes). `schema.json` needed no change — the attributes map is open on axis keys by design (SHACL handles axis-value discipline).
+
+### The honest limitation
+
+**No data platform natively enforces an AI-use restriction.** A governed tag records the classification; a data platform cannot stop a downstream ML job from reading and training on the column. The enforcement leverage is *indirect and by composition*: `trainingEligibility: NoTraining` becomes enforceable when it drives an access policy — e.g. masking NoTraining columns to the general ML/analytics population, as the worked example does. So on its own the axis is a portable, adapter-mappable *classification* (advisory); its teeth come from the access machinery it composes with. Capability profiles must not claim the platform enforces the AI restriction itself. This matches the scoping document's §1 framing (these gaps press the edge of "compiles to platform-native enforcement"; Tessera's value is portable expression + honest capability reporting).
+
+### What this ADR does not do
+
+- **Does not add enforcement Tessera doesn't have.** It classifies; it does not intercept model training.
+- **Does not model consent records.** `TrainingWithConsent` names the disposition; how consent is recorded and checked is a separate concern ([#24](https://github.com/bgiesbrecht/tessera/issues/24)).
+- **Does not settle retention (#21) or audit (#19).** Those are separately scoped in the same document.
+
+---
+
 ## How to use this document
 
 - Every new technical or stakeholder document begins by reading this file.

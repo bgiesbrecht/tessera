@@ -287,6 +287,23 @@ tessera:businessDomainAxis a tessera:AttributeAxis ;
     rdfs:comment
         """Organizational classification (CRM, Finance, HR, Engineering, Marketing). v0 declares this axis flat; adopters who model org hierarchies may declare a hierarchical extension under their own namespace."""@en .
 
+# AI-governance axes (ADR-029). Properties of the data about how it may be used
+# by AI systems — distinct from who may see it. Flat axes. Note: current data
+# platforms do not natively enforce these; they are classifications a downstream
+# ML pipeline honors, and they get enforcement leverage by composing with the
+# access machinery (e.g. mask NoTraining columns to the ML-service principal).
+tessera:trainingEligibilityAxis a tessera:AttributeAxis ;
+    rdfs:label "training eligibility axis"@en ;
+    tessera:axisType tessera:flat ;
+    rdfs:comment
+        """Whether the data may be used to train models (NoTraining, TrainingWithConsent, TrainingAllowed). A property of the data, not of the access request. Adopters extend under their own namespace."""@en .
+
+tessera:automatedDecisionAxis a tessera:AttributeAxis ;
+    rdfs:label "automated decision axis"@en ;
+    tessera:axisType tessera:flat ;
+    rdfs:comment
+        """Whether the data may drive automated decision-making (NoAutomatedDecision, ADMWithHumanReview, AutomatedDecisionAllowed). Aligned with the concern of GDPR Article 22. A property of the data."""@en .
+
 # Per-axis properties on Resource. Each axis is its own property; values are
 # either classes (hierarchical axis) or named individuals (flat axis).
 tessera:sensitivity a owl:ObjectProperty ;
@@ -311,6 +328,16 @@ tessera:businessDomain a owl:ObjectProperty ;
     rdfs:comment "Relates a Resource to its business domain (flat axis)."@en ;
     rdfs:domain tessera:Resource .
 
+tessera:trainingEligibility a owl:ObjectProperty ;
+    rdfs:label "training eligibility"@en ;
+    rdfs:comment "Relates a Resource to its model-training eligibility (flat axis, ADR-029)."@en ;
+    rdfs:domain tessera:Resource .
+
+tessera:automatedDecision a owl:ObjectProperty ;
+    rdfs:label "automated decision"@en ;
+    rdfs:comment "Relates a Resource to its automated-decision-making disposition (flat axis, ADR-029)."@en ;
+    rdfs:domain tessera:Resource .
+
 # Well-known values for the flat axes (starter set). Adopters extend.
 tessera:EUResident a owl:NamedIndividual ; rdfs:label "EU resident"@en .
 tessera:USResident a owl:NamedIndividual ; rdfs:label "US resident"@en .
@@ -330,6 +357,20 @@ tessera:HR          a owl:NamedIndividual ; rdfs:label "HR"@en .
 tessera:Engineering a owl:NamedIndividual ; rdfs:label "Engineering"@en .
 tessera:MarketingDomain a owl:NamedIndividual ; rdfs:label "Marketing domain"@en ;
     rdfs:comment "Disambiguated from tessera:Marketing (a Purpose) by the 'Domain' suffix."@en .
+
+# AI-governance axis values (ADR-029). Well-known starter set; adopters extend
+# under their own namespace (bare = Tessera vocabulary, per ADR-028).
+tessera:NoTraining          a owl:NamedIndividual ; rdfs:label "No training"@en ;
+    rdfs:comment "The data must not be used to train models."@en .
+tessera:TrainingWithConsent a owl:NamedIndividual ; rdfs:label "Training with consent"@en ;
+    rdfs:comment "The data may be used for training only where consent is recorded."@en .
+tessera:TrainingAllowed     a owl:NamedIndividual ; rdfs:label "Training allowed"@en .
+
+tessera:NoAutomatedDecision   a owl:NamedIndividual ; rdfs:label "No automated decision"@en ;
+    rdfs:comment "The data must not drive solely-automated decisions (cf. GDPR Art. 22)."@en .
+tessera:ADMWithHumanReview    a owl:NamedIndividual ; rdfs:label "ADM with human review"@en ;
+    rdfs:comment "Automated decisioning is permitted only with meaningful human review."@en .
+tessera:AutomatedDecisionAllowed a owl:NamedIndividual ; rdfs:label "Automated decision allowed"@en .
 
 
 #

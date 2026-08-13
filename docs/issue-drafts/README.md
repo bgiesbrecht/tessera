@@ -39,7 +39,7 @@ Staging area for issues queued to be filed against `bgiesbrecht/tessera`. Keepin
 | 2026-05-19 | [#22](https://github.com/bgiesbrecht/tessera/issues/22) | Coverage check: purpose limitation | open (governance-gap survey; coverage-confirmed) |
 | 2026-05-19 | [#23](https://github.com/bgiesbrecht/tessera/issues/23) | Cross-border data transfer controls — covered but unexercised | open (governance-gap survey; underexercised) |
 | 2026-05-19 | [#24](https://github.com/bgiesbrecht/tessera/issues/24) | Consent management — partially covered, integration with consent records undefined | open (governance-gap survey; integration question) |
-| 2026-05-19 | [#25](https://github.com/bgiesbrecht/tessera/issues/25) | AI governance — training-eligibility and ADM-restriction attribute axes | open (governance-gap survey; in-scope gap; v0-candidate; scoping-needed) |
+| 2026-05-19 | [#25](https://github.com/bgiesbrecht/tessera/issues/25) | AI governance — training-eligibility and ADM-restriction attribute axes | closed by ADR-029 (0.10.0, 2026-08-13) |
 | 2026-05-20 | [#26](https://github.com/bgiesbrecht/tessera/issues/26) | adapter-reconcile-stub — `Adapter.reconcile()` still stubbed on both adapters | closed by contract reconcile() implementation (2026-05-20) |
 | 2026-05-20 | [#27](https://github.com/bgiesbrecht/tessera/issues/27) | uc-adapter-discover-extract — UC adapter discover() and extract() not implemented | closed by UC discovery.py implementation (2026-05-20) |
 | 2026-05-20 | [#28](https://github.com/bgiesbrecht/tessera/issues/28) | udf-parameter-name-collision-convention — document the row-filter/column-mask UDF parameter naming rule | closed by contributing.md addition (2026-05-20) |

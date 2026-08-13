@@ -1,0 +1,65 @@
+# AI-governance worked example — training-eligibility axis composed with a column mask.
+#
+# Demonstrates ADR-029: an AI-governance attribute axis (trainingEligibility)
+# driving an ordinary ColumnVisibilityConstraint. This is where the axis gets
+# teeth on today's platforms — the data platform can't stop a model training on
+# a column, but it CAN mask a column tagged `NoTraining` to everyone outside an
+# explicitly-allowed group, so the general ML/analytics population sees a
+# redaction rather than raw values.
+#
+# Shape: byScope + matching on the AI axis, negated-complement — exactly the
+# ABAC column-mask shape (abac-column-mask-policy-a), but keyed off
+# trainingEligibility instead of sensitivity. Emits on both adapters via the
+# same byScope machinery.
+#
+# Companion files:
+#   ai-governance-training-mask-policy.jsonld   — canonical (JSON-LD) form
+
+"@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
+"@type": Policy
+"@id": policy:ai-governance-training-mask
+version: 1.0.0
+policyKind: ColumnVisibilityConstraint
+description: >
+  Columns whose trainingEligibility attribute is NoTraining are redacted to the
+  literal 'NOT-FOR-TRAINING' for principals outside acme_consented_ml — the
+  group operating under a recorded training-consent regime. NoTraining is a
+  Tessera-vocabulary value (ADR-028/029); adopters may substitute their own
+  namespaced value.
+
+appliesTo:
+  selector: byScope
+  scope: catalog:acme
+  matching:
+    attributes:
+      trainingEligibility: NoTraining
+
+action: Read
+
+defaultStrategy: negated-complement
+
+# Members of acme_consented_ml pass through (they operate under recorded
+# consent); under negated-complement the default branch masks everyone else.
+rules:
+  - principal:
+      selector: byIdentity
+      resource: group:acme_consented_ml
+    effect: allow
+
+defaultBranch:
+  effect: transform
+  transformation:
+    type: Redact
+    replacement: 'NOT-FOR-TRAINING'
+
+capabilityRequirements:
+  - scoped-policy-attachment
+  - attribute-axis-matching
+  - tag-taxonomy-mapping
+
+provenance:
+  notes: |
+    Worked example for ADR-029 (AI-governance attribute axes). Shows the
+    training-eligibility axis composing with the existing column-mask machinery;
+    no new emission path is required — the byScope column-mask emitters on both
+    adapters lower it unchanged.

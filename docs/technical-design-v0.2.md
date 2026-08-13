@@ -120,6 +120,8 @@ Resources carry zero or more **attribute assignments**, each on an independent s
 | `dataSubject` | Flat | `EUResident`, `USResident`, `Employee`, `Customer`, `Minor` |
 | `regulatoryRegime` | Flat | `GDPR`, `HIPAA`, `PCI-DSS`, `SOX`, `CCPA` |
 | `businessDomain` | Flat | `CRM`, `Finance`, `HR`, `Engineering`, `MarketingDomain` |
+| `trainingEligibility` | Flat | `NoTraining`, `TrainingWithConsent`, `TrainingAllowed` (AI governance, ADR-029) |
+| `automatedDecision` | Flat | `NoAutomatedDecision`, `ADMWithHumanReview`, `AutomatedDecisionAllowed` (AI governance, ADR-029) |
 
 Each axis declares its structural type. Hierarchical axes' values participate in `rdfs:subClassOf` subsumption — `sensitivity: PIIEmail` implies `sensitivity: PII`. Flat axes' values are independent enumeration members; no subsumption is inferred.
 
@@ -369,7 +371,7 @@ This desugars to the canonical form with `match: and`. The schema accepts both s
 **Per-axis value semantics:**
 
 - On a **hierarchical axis** (`sensitivity` in v0), `axisValue` is a class reference; subsumption applies. `attribute: { axis: sensitivity, value: PII }` matches resources tagged with `PII` or any subclass (`PIIEmail`, `PHI`).
-- On a **flat axis** (`dataSubject`, `regulatoryRegime`, `businessDomain` in v0), `axisValue` is a named individual; exact match only.
+- On a **flat axis** (`dataSubject`, `regulatoryRegime`, `businessDomain`, `trainingEligibility`, `automatedDecision` in v0), `axisValue` is a named individual; exact match only.
 
 **Adapter responsibility:** the per-environment tag-taxonomy mapping (ADR-021; see §5.7) translates `attribute: { axis: X, value: Y }` into the platform's native predicate (e.g., `has_tag_value('classification', 'pii')` on Databricks; `SYSTEM$GET_TAG_ON_CURRENT_COLUMN(...)` on Snowflake). The policy IR remains platform-neutral.
 

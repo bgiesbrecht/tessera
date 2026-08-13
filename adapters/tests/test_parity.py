@@ -166,6 +166,22 @@ def test_snowflake_abac_byscope_uses_configured_tag_taxonomy():
     assert not any(d.code == "UNBOUND_TAG_ATTRIBUTE" for d in result.diagnostics)
 
 
+def test_ai_governance_axis_composes_with_column_mask_on_both_adapters():
+    """ADR-029: an AI-governance axis (trainingEligibility) drives an ordinary
+    byScope column mask — no new emission path. Both adapters lower it to real
+    masking DDL keyed off the axis, which is where the axis gets teeth."""
+    policy = _load("ai-governance-training-mask-policy.jsonld")
+    assert policy["appliesTo"]["matching"]["attributes"]["trainingEligibility"] == "NoTraining"
+
+    uc = "\n".join(UnityCatalogAdapter().emit(policy).statements)
+    assert "COLUMN MASK" in uc and "has_tag_value('trainingEligibility', 'NoTraining')" in uc
+
+    sf = "\n".join(SnowflakeAdapter().emit(policy).statements)
+    assert "MASKING POLICY" in sf
+    assert "SYSTEM$GET_TAG_ON_CURRENT_COLUMN('trainingEligibility') = 'NoTraining'" in sf
+    assert "'NOT-FOR-TRAINING'" in uc and "'NOT-FOR-TRAINING'" in sf  # the mask value on both
+
+
 def test_capability_profiles_differ_meaningfully():
     """Both adapters declare profiles, with different platform names."""
     uc = UnityCatalogAdapter()

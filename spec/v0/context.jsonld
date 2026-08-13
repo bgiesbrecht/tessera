@@ -269,6 +269,14 @@
       "@id": "tessera:businessDomain",
       "@type": "@vocab"
     },
+    "trainingEligibility": {
+      "@id": "tessera:trainingEligibility",
+      "@type": "@vocab"
+    },
+    "automatedDecision": {
+      "@id": "tessera:automatedDecision",
+      "@type": "@vocab"
+    },
     "axis": {
       "@id": "tessera:axis",
       "@type": "@vocab"
