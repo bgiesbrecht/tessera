@@ -4,6 +4,24 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.9.1] — 2026-08-13
+
+Live verification of the 0.9.0 Snowflake ABAC `byScope` emission, and the one emitter fix it surfaced.
+
+### Fixed
+
+- **Snowflake ABAC row-filter `ON` clause**: the `ALTER TAG ... SET ROW ACCESS POLICY ... ON (...)` clause now names the real discriminator column (derived from the matching attribute value), not the abstract `matched` parameter. Live testing showed the abstract name doesn't bind, so no rows were filtered; with the real column the per-role slices enforce correctly.
+
+### Added / Changed
+
+- **`ABAC_ROW_ACCESS_TABLE_TAG` diagnostic**: row-access emission now notes that the driving tag must be set on the **table** (masking tags the column), and names the discriminator column that must exist — both facts discovered in live verification.
+- **`adapters/tests/live_snowflake_abac_byscope.py`**: self-contained live-verification script (creates roles/db/table/tags, applies, verifies per-role enforcement, cleans up).
+- Snowflake `CapabilityProfile.ATTRIBUTE_BASED_SCOPING` prose records the 2026-08-13 live-verification result and the column-tag-vs-table-tag distinction.
+
+### Verification
+
+Run on a fresh Enterprise account (`TESSERA_VERIFY.ABAC`): column mask redacted `O_CLERK` for `PUBLIC` while `ACME_ALL_PRIORITY_OPS` saw real values; row filter returned all rows for `ACME_ALL_PRIORITY_OPS`, 1-URGENT/2-HIGH only for `ACME_HIGH_PRIORITY_OPS`, and 3-MEDIUM/4/5 for `PUBLIC`. Both paths enforce as designed.
+
 ## [0.9.0] — 2026-08-13
 
 Snowflake ABAC `byScope` emission — row and column ([#31](https://github.com/bgiesbrecht/tessera/issues/31)). The last open adapter coverage gap; a tooling/adapter release, no IR change. The mechanism was verified against Snowflake's docs (per ADR-027): Snowflake attaches both masking *and* row-access policies via tags, so both halves of #31 have a clean tag-based path — correcting an earlier assumption that row-ABAC had no tag mechanism.

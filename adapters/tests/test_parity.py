@@ -140,7 +140,10 @@ def test_snowflake_abac_byscope_row_filter_is_tag_based():
     assert not result.has_errors
     assert "CREATE OR REPLACE ROW ACCESS POLICY" in sql
     assert "RETURNS BOOLEAN" in sql
-    assert "SET ROW ACCESS POLICY" in sql and "ON (matched VARCHAR)" in sql
+    # The ON clause names the real discriminator column (from the matching value),
+    # not the abstract policy param — required for tag-based row access to bind
+    # (live-verified 2026-08-13).
+    assert "SET ROW ACCESS POLICY" in sql and "ON (orderpriority VARCHAR)" in sql
     # Three-branch first-match: all-ops → all rows; high-ops → 1/2; else → 3/4/5.
     assert "IS_ROLE_IN_SESSION('ACME_ALL_PRIORITY_OPS') THEN TRUE" in sql
     assert "matched IN ('1-URGENT', '2-HIGH')" in sql

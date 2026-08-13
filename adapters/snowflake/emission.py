@@ -611,12 +611,14 @@ def _emit_row_visibility_by_scope(
               ELSE matched IN (...)
             END;
         ALTER TAG <tag_key> SET ROW ACCESS POLICY <schema>.<slug>_rap
-          ON (matched VARCHAR);
+          ON (<discriminator_column> VARCHAR);
 
-    The matching attribute identifies the row-discriminator column via the tag;
-    the IR references that column with the `column:$matched` sentinel, which
-    binds to the policy's `matched` parameter. Ordered first-match (ADR-015) is
-    a CASE ladder; the defaultBranch (negated-complement) is the ELSE.
+    The matching attribute value names the row-discriminator column; the IR
+    references its value with the `column:$matched` sentinel, and Snowflake
+    binds the actual column to the policy predicate positionally via the ON
+    clause (live-verified 2026-08-13 — the ON clause needs the real column name
+    and type, and the driving tag is set on the TABLE, not the column). Ordered
+    first-match (ADR-015) is a CASE ladder; the defaultBranch is the ELSE.
     """
     diagnostics: list[Diagnostic] = []
     policy_id = policy.get("@id")
@@ -635,6 +637,23 @@ def _emit_row_visibility_by_scope(
                 location="appliesTo.matching",
             )],
         )
+
+    # The row-access policy's argument binds to the discriminator column via the
+    # ALTER TAG ... ON (<col> <type>) clause — Snowflake requires the *actual*
+    # column name there, not an abstract parameter (live-verified 2026-08-13).
+    # The matching attribute value names that discriminator column.
+    attrs = (applies_to.get("matching") or {}).get("attributes") or {}
+    discriminator = _strip_iri(str(next(iter(attrs.values())))) if attrs else "matched"
+    diagnostics.append(Diagnostic(
+        severity=DiagnosticSeverity.INFO,
+        code="ABAC_ROW_ACCESS_TABLE_TAG",
+        message=(
+            f"tag-based row access attaches at the TABLE level: set tag {tag_key!r} on the "
+            f"target table(s) (not the column), and ensure column {discriminator!r} exists — "
+            "it binds positionally to the policy predicate. (Masking, by contrast, tags the "
+            "column.)"
+        ),
+    ))
 
     param = "matched"
     branches: list[str] = []
@@ -675,7 +694,7 @@ def _emit_row_visibility_by_scope(
         f"  CASE\n"
         f"    {case_body}\n"
         f"  END;",
-        f"ALTER TAG {tag_key} SET ROW ACCESS POLICY {policy_name}\n  ON ({param} VARCHAR);",
+        f"ALTER TAG {tag_key} SET ROW ACCESS POLICY {policy_name}\n  ON ({discriminator} VARCHAR);",
     ]
     return EmissionResult(
         policy_id=policy_id, target_artifacts=[f"tag:{tag_key}"],

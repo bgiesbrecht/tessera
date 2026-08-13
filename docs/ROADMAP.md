@@ -4,7 +4,7 @@
 
 **How to read it.** This is a *living* document, revised by appending dated updates rather than rewriting history (same discipline as the CLAUDE.md handoff). It is not a commitment schedule — ordering reflects current priority, not promised dates. The authoritative decision log remains `DECISIONS.md`; tracked work items remain the GitHub issues. Where an item has an issue or ADR, it is cited.
 
-Current version: **0.9.0** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-13**.
+Current version: **0.9.1** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-13**.
 
 ---
 
@@ -99,3 +99,4 @@ Directions that are real but not yet scoped, recorded so the shape of the projec
 - **2026-08-05** — Correction: UC ABAC `byScope` column-mask emission ([#30](https://github.com/bgiesbrecht/tessera/issues/30)) was listed as near-term but shipped in 0.6.3; moved out of near-term. (The initial roadmap propagated a stale status from the issue-drafts log.) Added `OUTPUT-REFERENCE.md` to the generated demos.
 - **2026-08-05** — ADR-028: attribute values are vocabulary IRIs (bare = Tessera, prefix = adopter); 0.8.0.
 - **2026-08-13** — Snowflake ABAC `byScope` emission (row + column) shipped ([#31](https://github.com/bgiesbrecht/tessera/issues/31)); 0.9.0. Both adapters now emit ABAC `byScope`. Moved out of near-term.
+- **2026-08-13** — Live-verified the Snowflake ABAC `byScope` emission end-to-end on a real account; 0.9.1. Fixed the row-filter `ON` clause (must name the real discriminator column) and recorded the column-tag-vs-table-tag distinction. Both paths enforce as designed.

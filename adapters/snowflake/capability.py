@@ -58,17 +58,19 @@ SNOWFLAKE_PROFILE = CapabilityProfile(
         ),
         Capability.ATTRIBUTE_BASED_SCOPING: (
             CapabilitySupport.SUPPORTED,
-            "byScope + matching is lowered to Snowflake's tag-based-attachment mechanism (#31), verified against "
-            "docs.snowflake.com/en/user-guide/tag-based-{masking,row-access}-policies. Column masking: "
-            "CREATE MASKING POLICY whose body reads SYSTEM$GET_TAG_ON_CURRENT_COLUMN('<schema.tag>') to scope to "
-            "the matched value, then ALTER TAG ... SET MASKING POLICY. Row filtering: CREATE ROW ACCESS POLICY "
-            "with a CASE ladder over IS_ROLE_IN_SESSION + a predicate on the matched discriminator column (the "
-            "IR's `column:$matched` sentinel binds to the policy parameter), then ALTER TAG ... SET ROW ACCESS "
-            "POLICY ... ON (<col> VARCHAR). The (axis, value) → (tag_key, tag_value) mapping is per-environment "
-            "config.tag_taxonomy (ADR-021); the tag key should be schema-qualified. Because both attach by tag, "
-            "the scope (which objects carry the tag) is a tagging concern, not part of emission. Platform "
-            "constraints surface as diagnostics where relevant: a tag holds at most one row-access policy, and "
-            "masking vs row-access policies are mutually exclusive on the same tag (per Snowflake docs).",
+            "byScope + matching is lowered to Snowflake's tag-based-attachment mechanism (#31). "
+            "Live-verified 2026-08-13 (TESSERA_VERIFY.ABAC on a fresh Enterprise account): the column mask "
+            "redacted O_CLERK for non-privileged roles while ACME_ALL_PRIORITY_OPS saw real values, and the "
+            "row filter showed the per-role priority slices (all / 1-URGENT+2-HIGH / 3-MEDIUM+4+5). "
+            "Column masking: CREATE MASKING POLICY whose body reads SYSTEM$GET_TAG_ON_CURRENT_COLUMN('<schema.tag>') "
+            "to scope to the matched value, then ALTER TAG ... SET MASKING POLICY; the tag is set on the COLUMN. "
+            "Row filtering: CREATE ROW ACCESS POLICY with a CASE ladder over IS_ROLE_IN_SESSION + a predicate on "
+            "the discriminator column, then ALTER TAG ... SET ROW ACCESS POLICY ... ON (<discriminator> VARCHAR); "
+            "the tag is set on the TABLE, and the ON clause must name the real column (the emitter derives it from "
+            "the matching attribute value) — both facts discovered in live verification. The (axis, value) → "
+            "(tag_key, tag_value) mapping is per-environment config.tag_taxonomy (ADR-021); the tag key should be "
+            "schema-qualified. Platform constraints surface as diagnostics: a tag holds at most one row-access "
+            "policy, and masking vs row-access are mutually exclusive on the same tag.",
         ),
         Capability.DATASET_DRIVEN_PRINCIPALS: (
             CapabilitySupport.PARTIAL,
