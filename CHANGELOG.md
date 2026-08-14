@@ -4,6 +4,21 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.11.0] — 2026-08-14
+
+Audit-logging obligation refinement (ADR-030, closing [#19](https://github.com/bgiesbrecht/tessera/issues/19)) — the second of the three scoped governance gaps. An obligation-vocabulary refinement; no new policy kind, expression-first.
+
+### Added
+
+- **`AuditLog` obligation parameters** in `spec/v0/`: `auditFields` (the semantic fields to capture — `AccessPrincipal` / `AccessResource` / `AccessAction` / `AccessTimestamp` / `AccessPurpose` / `AccessOutcome`), `auditSink` (destination category — `PlatformNative` / `ExternalSIEM` / `ImmutableStore`), and `auditRetention` (ISO-8601 duration). Value classes + individuals + properties in `ontology.ttl`; `@type: @vocab` context terms; `auditFields`/`auditSink` value shapes in `shapes.ttl`; three optional properties on the obligation in `schema.json`.
+- **Worked example** `spec/v0/examples/audit-obligation-sensitive-read.{tessera.yaml,jsonld}` — a freestanding `AccessConstraint` where fraud-investigator reads carry a rich audit obligation (who/what/action/when/purpose/outcome → immutable store, retained P7Y). Validates clean; audit values resolve to `vocab#` IRIs.
+
+### Notes
+
+- **Honest scope (ADR-030):** platforms audit access account-wide by default (Databricks `system.access.audit`, Snowflake `ACCESS_HISTORY`), so the obligation is typically *satisfied-by-assertion* — a portable, checkable requirement rather than a newly-enforced mechanism. No adapter emission is claimed; an emit-time coverage diagnostic (and an `asserted-satisfied` capability level) is a tracked follow-up.
+- Obligations attach to the freestanding `PolicyConstraint` shape (unchanged); extending them to Policy-container rules is a separate item.
+- Two of the three governance gaps now shipped (#25, #19); #21 (retention) remains, pending its scope-framing decision.
+
 ## [0.10.0] — 2026-08-13
 
 AI-governance attribute axes (ADR-029, closing [#25](https://github.com/bgiesbrecht/tessera/issues/25)) — the first of the three scoped governance gaps to land. An additive IR change extending the ADR-018 attribute-axis framework; no new policy kind, no new emission path.

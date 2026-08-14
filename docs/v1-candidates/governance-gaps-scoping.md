@@ -22,9 +22,11 @@ None of the three requires Tessera to *run* anything (the ADR-001 line holds): i
 
 ---
 
-## §2. Audit logging — refine the `AuditLog` obligation (#19)
+## §2. Audit logging — refine the `AuditLog` obligation (#19) — _implemented (ADR-030, 2026-08-14)_
 
-**Today.** `tessera:AuditLog` is a bare `Obligation` subclass: "record the access event to a named audit destination." No structure — it can't say *what* to record or *to what category of sink*.
+**Shipped** in v0 per ADR-030: `auditFields` / `auditSink` / `auditRetention` on the `AuditLog` obligation, with worked example `spec/v0/examples/audit-obligation-sensitive-read.*`. Expression-first (no adapter emission yet — see the honest-limitation note below, which the ADR carries forward). The design below stands as the record.
+
+**Today (pre-ADR-030).** `tessera:AuditLog` is a bare `Obligation` subclass: "record the access event to a named audit destination." No structure — it can't say *what* to record or *to what category of sink*.
 
 **The refinement.** Give the audit obligation a small, semantic parameter set — the *content and character* of the required record, not a log format:
 

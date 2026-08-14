@@ -342,6 +342,19 @@
       "@id": "tessera:obligationTarget",
       "@type": "xsd:string"
     },
+    "auditFields": {
+      "@id": "tessera:auditFields",
+      "@type": "@vocab",
+      "@container": "@set"
+    },
+    "auditSink": {
+      "@id": "tessera:auditSink",
+      "@type": "@vocab"
+    },
+    "auditRetention": {
+      "@id": "tessera:auditRetention",
+      "@type": "xsd:string"
+    },
 
     "_comment_provenance_properties": "Provenance metadata, especially important for extracted policies",
 

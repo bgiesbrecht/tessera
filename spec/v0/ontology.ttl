@@ -612,7 +612,8 @@ tessera:Obligation a owl:Class ;
 tessera:AuditLog a owl:Class ;
     rdfs:subClassOf tessera:Obligation ;
     rdfs:label "Audit log obligation"@en ;
-    rdfs:comment "Record the access event to a named audit destination."@en .
+    rdfs:comment
+        """Record the access event. Refined in ADR-030 with structured, semantic parameters: `auditFields` (what must be captured), `auditSink` (the category of destination), and `auditRetention` (how long the record must persist). These express the requirement portably; the concrete destination binds via `obligationTarget` / adapter configuration. On platforms that audit account-wide by default, this obligation is often satisfied-by-assertion rather than newly enforced (see ADR-030)."""@en .
 
 tessera:Notify a owl:Class ;
     rdfs:subClassOf tessera:Obligation ;
@@ -623,6 +624,38 @@ tessera:Watermark a owl:Class ;
     rdfs:subClassOf tessera:Obligation ;
     rdfs:label "Watermark obligation"@en ;
     rdfs:comment "Embed a watermark identifying the accessing principal in the returned data."@en .
+
+# Audit-obligation vocabulary (ADR-030). Semantic — the content and character of
+# the required record, not a log format.
+tessera:AuditField a owl:Class ;
+    rdfs:subClassOf tessera:Entity ;
+    rdfs:label "Audit field"@en ;
+    rdfs:comment "A semantic field an audit record must capture (meaning, not a column name)."@en .
+
+tessera:AccessPrincipal a owl:NamedIndividual ; rdfs:label "access principal"@en ;
+    rdfs:comment "Who performed the access."@en .
+tessera:AccessResource  a owl:NamedIndividual ; rdfs:label "accessed resource"@en ;
+    rdfs:comment "What was accessed."@en .
+tessera:AccessAction    a owl:NamedIndividual ; rdfs:label "access action"@en ;
+    rdfs:comment "The action taken (read, write, …)."@en .
+tessera:AccessTimestamp a owl:NamedIndividual ; rdfs:label "access timestamp"@en ;
+    rdfs:comment "When the access occurred."@en .
+tessera:AccessPurpose   a owl:NamedIndividual ; rdfs:label "access purpose"@en ;
+    rdfs:comment "The declared purpose of the access."@en .
+tessera:AccessOutcome   a owl:NamedIndividual ; rdfs:label "access outcome"@en ;
+    rdfs:comment "Whether the access was allowed or denied."@en .
+
+tessera:AuditSink a owl:Class ;
+    rdfs:subClassOf tessera:Entity ;
+    rdfs:label "Audit sink"@en ;
+    rdfs:comment "A category of audit destination; the concrete target binds via adapter configuration."@en .
+
+tessera:PlatformNative a owl:NamedIndividual ; rdfs:label "platform-native audit"@en ;
+    rdfs:comment "The platform's built-in access audit (Databricks system.access.audit, Snowflake ACCESS_HISTORY)."@en .
+tessera:ExternalSIEM   a owl:NamedIndividual ; rdfs:label "external SIEM"@en ;
+    rdfs:comment "An external security-information-and-event-management system."@en .
+tessera:ImmutableStore a owl:NamedIndividual ; rdfs:label "immutable store"@en ;
+    rdfs:comment "A tamper-evident, append-only audit store."@en .
 
 
 #
@@ -933,6 +966,25 @@ tessera:obligationTarget a owl:DatatypeProperty ;
     rdfs:label "obligation target"@en ;
     rdfs:comment "URI or name identifying the destination of an obligation (audit log topic, notification target, etc.)."@en ;
     rdfs:domain tessera:Obligation ;
+    rdfs:range xsd:string .
+
+# Audit-obligation parameters (ADR-030).
+tessera:auditFields a owl:ObjectProperty ;
+    rdfs:label "audit fields"@en ;
+    rdfs:comment "The semantic fields an AuditLog obligation must capture (AuditField individuals)."@en ;
+    rdfs:domain tessera:AuditLog ;
+    rdfs:range tessera:AuditField .
+
+tessera:auditSink a owl:ObjectProperty ;
+    rdfs:label "audit sink"@en ;
+    rdfs:comment "The category of audit destination (AuditSink individual); the concrete target binds via obligationTarget / adapter config."@en ;
+    rdfs:domain tessera:AuditLog ;
+    rdfs:range tessera:AuditSink .
+
+tessera:auditRetention a owl:DatatypeProperty ;
+    rdfs:label "audit retention"@en ;
+    rdfs:comment "How long the audit record itself must persist, as an ISO-8601 duration (e.g. P7Y). Retention of the log is itself a retention concern; see issue #21."@en ;
+    rdfs:domain tessera:AuditLog ;
     rdfs:range xsd:string .
 
 # --- Provenance ---

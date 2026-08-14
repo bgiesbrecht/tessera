@@ -4,7 +4,7 @@
 
 **How to read it.** This is a *living* document, revised by appending dated updates rather than rewriting history (same discipline as the CLAUDE.md handoff). It is not a commitment schedule — ordering reflects current priority, not promised dates. The authoritative decision log remains `DECISIONS.md`; tracked work items remain the GitHub issues. Where an item has an issue or ADR, it is cited.
 
-Current version: **0.10.0** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-13**.
+Current version: **0.11.0** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-14**.
 
 ---
 
@@ -18,6 +18,7 @@ The spine of the project is real and exercised end-to-end.
 - **The unified CLI** (`tools/cli/`, `python -m tools.cli`) — `validate`, `convert`, `emit`, `discover`, `extract`, `reconcile`, and `impact` / `lint` (change-impact analysis).
 - **Change-impact analysis** (`tools/impact/`) — given a policy corpus and a proposed change, reports how the change alters what the corpus decides about data, *before* it is emitted. All planned checks are built: C1 (fall-through coverage), C2 (default-net removal), C3 (reachability/shadowing), C4 (cross-policy overlap, ADR-023), C5 (dangling reference), C6 (exposure polarity), plus standing lints L1 (dead rules) and L2 (cross-policy overlap). Reasons only about selector *expressions*, never populations (the ADR-001 line); findings are PROVEN or CANDIDATE. Design in [`docs/v1-candidates/change-impact-analysis.md`](v1-candidates/change-impact-analysis.md); worked demos in `docs/exercises/`.
 - **AI-governance attribute axes** ([#25](https://github.com/bgiesbrecht/tessera/issues/25), ADR-029) — `trainingEligibility` / `automatedDecision` flat axes extending the ADR-018 framework. Advisory on their own (no platform enforces "no training"); they get teeth by composing with the access machinery — the worked example masks `NoTraining` columns to all but a consented group, emitting on both adapters unchanged.
+- **Audit-logging obligation refinement** ([#19](https://github.com/bgiesbrecht/tessera/issues/19), ADR-030) — the `AuditLog` obligation gains `auditFields` / `auditSink` / `auditRetention`. Expression-first: on account-wide-audit platforms it's satisfied-by-assertion, so it's a portable, checkable requirement rather than a newly-enforced mechanism (adapter coverage-diagnostic is a follow-up).
 - **Worked examples** (`spec/v0/examples/`) — Databricks, Snowflake, and cross-cutting, each with diagnostic/comparison records.
 
 For a demo-ready tour, read [`docs/showcase.md`](showcase.md).
@@ -34,10 +35,9 @@ Work that is scoped and committed in direction, awaiting implementation.
 
 ## In-scope gaps — scoping needed
 
-Governance needs Tessera should express but for which the IR shape is not yet designed. Each needs a scoping document and an ADR before implementation. **Scoping document drafted:** [`docs/v1-candidates/governance-gaps-scoping.md`](v1-candidates/governance-gaps-scoping.md) covers all three — its through-line is that current platforms have thin/advisory native enforcement for these, so Tessera's value is portable expression + honest capability reporting. ADRs and spec changes follow the scoping conversation.
+Governance needs Tessera should express but for which the IR shape is not yet designed. Each needs a scoping document and an ADR before implementation. **Scoping document:** [`docs/v1-candidates/governance-gaps-scoping.md`](v1-candidates/governance-gaps-scoping.md) covers all three — its through-line is that current platforms have thin/advisory native enforcement for these, so Tessera's value is portable expression + honest capability reporting. Two of the three (#25 AI axes, #19 audit) have shipped; #21 remains.
 
-- **Audit-logging obligation vocabulary** ([#19](https://github.com/bgiesbrecht/tessera/issues/19)). Refine the `AuditLog` obligation (fields / sink category / retention). Honest caveat: often "asserted-satisfied" on account-wide-audit platforms, not newly enforced.
-- **Retention and deletion** ([#21](https://github.com/bgiesbrecht/tessera/issues/21)). A `RetentionConstraint` policy kind — highest design risk: retention is lifecycle, not access, and enforcement is operational (a scheduled job), pressing on ADR-001. Scope framing is an open author decision (§6 of the scoping doc).
+- **Retention and deletion** ([#21](https://github.com/bgiesbrecht/tessera/issues/21)). A `RetentionConstraint` policy kind — highest design risk: retention is lifecycle, not access, and enforcement is operational (a scheduled job), pressing on ADR-001. Scope framing is an open author decision (§6 of the scoping doc) — the one remaining gap of the three.
 
 ---
 
@@ -101,3 +101,4 @@ Directions that are real but not yet scoped, recorded so the shape of the projec
 - **2026-08-13** — Snowflake ABAC `byScope` emission (row + column) shipped ([#31](https://github.com/bgiesbrecht/tessera/issues/31)); 0.9.0. Both adapters now emit ABAC `byScope`. Moved out of near-term.
 - **2026-08-13** — Live-verified the Snowflake ABAC `byScope` emission end-to-end on a real account; 0.9.1. Fixed the row-filter `ON` clause (must name the real discriminator column) and recorded the column-tag-vs-table-tag distinction. Both paths enforce as designed.
 - **2026-08-13** — Scoping doc for the three governance gaps (#19/#21/#25) drafted; then #25 (AI-governance axes) implemented (ADR-029, 0.10.0) — `trainingEligibility` / `automatedDecision`, with a worked example that composes with the column-mask machinery. #19 and #21 remain scoped-not-built (#21 pending the author's scope-framing decision).
+- **2026-08-14** — #19 (audit-logging obligation refinement) implemented (ADR-030, 0.11.0) — `auditFields` / `auditSink` / `auditRetention` on the `AuditLog` obligation, expression-first, with a worked example. Only #21 (retention) of the three remains, pending its scope-framing decision.

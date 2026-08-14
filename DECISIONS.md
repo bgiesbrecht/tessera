@@ -1380,6 +1380,37 @@ Both are flat axes in the ADR-018 sense (independent enumeration members, no sub
 
 ---
 
+## ADR-030 — Audit-logging obligation refinement: `auditFields`, `auditSink`, `auditRetention`
+
+**Date:** 2026-08-14
+**Status:** Accepted
+
+### Context
+
+The 2026-05-19 survey flagged audit logging ([#19](https://github.com/bgiesbrecht/tessera/issues/19)) as an in-scope gap. The v0 `AuditLog` obligation was a bare `Obligation` subclass with only a free-string `obligationTarget` — it could name a destination but could not say *what* to capture or *what character of sink* is required. The scoping document (`governance-gaps-scoping.md` §2) rated this the architecturally simplest of the three gaps: an obligation-vocabulary refinement, no new policy kind.
+
+### Decision
+
+Give the `AuditLog` obligation three semantic parameters — the *content and character* of the required record, not a log format:
+
+- **`auditFields`** — the semantic fields that must be captured, as `AuditField` individuals: `AccessPrincipal`, `AccessResource`, `AccessAction`, `AccessTimestamp`, `AccessPurpose`, `AccessOutcome`. Meaning, not column names.
+- **`auditSink`** — the *category* of destination, an `AuditSink` individual: `PlatformNative`, `ExternalSIEM`, `ImmutableStore`. The concrete target still binds via `obligationTarget` / adapter configuration (ADR-021), never a platform table name in the policy.
+- **`auditRetention`** — how long the audit record itself must persist, as an ISO-8601 duration (e.g. `P7Y`). Retention of the log is itself a retention concern; this cross-references, and does not pre-empt, #21.
+
+Values follow ADR-028 (bare = Tessera vocabulary, adopter values namespaced) via `@type: @vocab` context terms. Spec changes: `ontology.ttl` (the two value classes + six/three individuals + three properties), `context.jsonld` (three terms), `shapes.ttl` (`auditFields`/`auditSink` value shapes via `sh:targetSubjectsOf`). `schema.json` gains the three optional properties on the obligation object. Worked example: `spec/v0/examples/audit-obligation-sensitive-read.*`.
+
+### The honest limitation
+
+**Most platforms audit access account-wide and by default** — Databricks `system.access.audit`, Snowflake `ACCESS_HISTORY` record access without a per-object policy. So a per-policy audit obligation is frequently *satisfied-by-assertion*: the value is a portable, checkable statement of the requirement, and the adapter's job (when emission lands) is to map it to — or confirm coverage against — the platform's audit facility, not to enable a new mechanism. The obligation must not be reported as newly *enforced* where the platform already audits by default. This is the §1 framing of the scoping document (these gaps press the edge of "compiles to platform-native enforcement"; Tessera's value is portable expression + honest capability reporting).
+
+### What this ADR does not do
+
+- **Does not emit or enforce audit configuration.** This is an expression-first refinement. Adapter emission — an emit-time coverage/assertion diagnostic per platform — is a tracked follow-up; a new capability level (e.g. `asserted-satisfied`) belongs with it (scoping doc §6.4).
+- **Does not attach obligations to Policy-container rules.** Obligations attach to the freestanding `PolicyConstraint` shape (as they did before). Extending obligation attachment to Policy-container rules is a separate structural change, out of scope here.
+- **Does not settle audit-log retention semantics.** `auditRetention` names the duration; the mechanics of enforcing log retention ride on #21.
+
+---
+
 ## How to use this document
 
 - Every new technical or stakeholder document begins by reading this file.

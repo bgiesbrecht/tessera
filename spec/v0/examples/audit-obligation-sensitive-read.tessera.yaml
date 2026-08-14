@@ -1,0 +1,56 @@
+# Audit-obligation worked example — refined AuditLog obligation (ADR-030, #19).
+#
+# A freestanding AccessConstraint (single-rule shape, ADR-014): fraud
+# investigators may read the orders table, and every such access carries an
+# audit obligation that names — semantically, not as a log format — what must be
+# captured, to what category of sink, and for how long the record must persist.
+#
+# Honest scope (ADR-030): platforms audit access account-wide by default
+# (Databricks system.access.audit, Snowflake ACCESS_HISTORY), so this obligation
+# is typically satisfied-by-assertion — the adapter maps it to (or confirms
+# coverage against) the platform's audit facility rather than enabling a new
+# mechanism. Its value is a portable, checkable statement of the requirement.
+#
+# Companion files:
+#   audit-obligation-sensitive-read.jsonld   — canonical (JSON-LD) form
+
+"@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
+"@type": AccessConstraint
+"@id": policy:audit-obligation-sensitive-read
+version: 1.0.0
+description: >
+  Fraud investigators may read acme.tpch.orders; each access must be recorded —
+  who, what, action, when, purpose, and outcome — to an immutable audit store
+  and retained seven years. The audit fields and sink are semantic (meaning, not
+  a log format); the concrete destination binds via `target` / adapter config.
+
+appliesTo:
+  selector: byIdentity
+  resource: table:acme.tpch.orders
+
+principal:
+  selector: byIdentity
+  resource: group:acme_fraud_investigators
+
+action: Read
+effect: allow
+
+obligations:
+  - type: AuditLog
+    auditSink: ImmutableStore
+    auditFields:
+      - AccessPrincipal
+      - AccessResource
+      - AccessAction
+      - AccessTimestamp
+      - AccessPurpose
+      - AccessOutcome
+    auditRetention: P7Y
+    target: acme.audit.access_log
+
+provenance:
+  notes: |
+    Worked example for ADR-030 (audit-logging obligation refinement). Expresses
+    the audit requirement portably; no adapter emission is claimed — on
+    account-wide-audit platforms the obligation is satisfied-by-assertion, and
+    an emit-time coverage diagnostic is a follow-up.

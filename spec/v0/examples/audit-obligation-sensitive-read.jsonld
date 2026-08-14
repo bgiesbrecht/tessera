@@ -1,0 +1,36 @@
+{
+  "@context": "https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld",
+  "@type": "AccessConstraint",
+  "@id": "policy:audit-obligation-sensitive-read",
+  "version": "1.0.0",
+  "description": "Fraud investigators may read acme.tpch.orders; each access must be recorded — who, what, action, when, purpose, and outcome — to an immutable audit store and retained seven years. The audit fields and sink are semantic (meaning, not a log format); the concrete destination binds via `target` / adapter config.",
+  "appliesTo": {
+    "selector": "byIdentity",
+    "resource": "table:acme.tpch.orders"
+  },
+  "principal": {
+    "selector": "byIdentity",
+    "resource": "group:acme_fraud_investigators"
+  },
+  "action": "Read",
+  "effect": "allow",
+  "obligations": [
+    {
+      "@type": "AuditLog",
+      "auditSink": "ImmutableStore",
+      "auditFields": [
+        "AccessPrincipal",
+        "AccessResource",
+        "AccessAction",
+        "AccessTimestamp",
+        "AccessPurpose",
+        "AccessOutcome"
+      ],
+      "auditRetention": "P7Y",
+      "target": "acme.audit.access_log"
+    }
+  ],
+  "provenance": {
+    "notes": "Worked example for ADR-030 (audit-logging obligation refinement). Expresses\nthe audit requirement portably; no adapter emission is claimed — on\naccount-wide-audit platforms the obligation is satisfied-by-assertion, and\nan emit-time coverage diagnostic is a follow-up."
+  }
+}

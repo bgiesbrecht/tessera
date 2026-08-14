@@ -539,7 +539,20 @@
             "tessera:AuditLog", "tessera:Notify", "tessera:Watermark"
           ]
         },
-        "target": { "type": "string" }
+        "target": { "type": "string" },
+        "auditFields": {
+          "type": "array",
+          "description": "AuditLog only (ADR-030). Semantic fields the record must capture: AccessPrincipal, AccessResource, AccessAction, AccessTimestamp, AccessPurpose, AccessOutcome (or adopter-namespaced). Short-name or CURIE strings; SHACL checks IRI-hood.",
+          "items": { "type": "string" }
+        },
+        "auditSink": {
+          "type": "string",
+          "description": "AuditLog only (ADR-030). Category of destination: PlatformNative, ExternalSIEM, ImmutableStore (or CURIE). The concrete target binds via `target` / adapter config."
+        },
+        "auditRetention": {
+          "type": "string",
+          "description": "AuditLog only (ADR-030). How long the audit record must persist, as an ISO-8601 duration (e.g. P7Y)."
+        }
       }
     },
 

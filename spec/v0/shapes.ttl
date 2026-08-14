@@ -501,6 +501,26 @@ tessera:ObligationShape a sh:NodeShape ;
         sh:message "Obligation type must be AuditLog, Notify, or Watermark."@en ;
     ] .
 
+# Audit-obligation parameter value shapes (ADR-030). Targeted via
+# sh:targetSubjectsOf (JSON-LD does not assert @type on obligation blank nodes,
+# so sh:targetClass is unreliable — same rationale as the selector/axis shapes).
+tessera:AuditFieldsShape a sh:NodeShape ;
+    sh:targetSubjectsOf tessera:auditFields ;
+    sh:property [
+        sh:path tessera:auditFields ;
+        sh:nodeKind sh:IRI ;
+        sh:message "auditFields values must be IRIs (AccessPrincipal, AccessResource, AccessAction, AccessTimestamp, AccessPurpose, AccessOutcome, or adopter extensions)."@en ;
+    ] .
+
+tessera:AuditSinkShape a sh:NodeShape ;
+    sh:targetSubjectsOf tessera:auditSink ;
+    sh:property [
+        sh:path tessera:auditSink ;
+        sh:nodeKind sh:IRI ;
+        sh:maxCount 1 ;
+        sh:message "auditSink must be a single IRI (PlatformNative, ExternalSIEM, ImmutableStore, or adopter extension)."@en ;
+    ] .
+
 
 #
 # ============================================================================
