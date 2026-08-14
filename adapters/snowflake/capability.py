@@ -106,5 +106,12 @@ SNOWFLAKE_PROFILE = CapabilityProfile(
             CapabilitySupport.PARTIAL,
             "Modeled via Snowflake object tags per ADR-021's tag taxonomy mapping. Per-environment binding required.",
         ),
+        Capability.RETENTION: (
+            CapabilitySupport.UNSUPPORTED,
+            "RetentionConstraint (ADR-031) is expressed and validated in the IR but not emitted. "
+            "DATA_RETENTION_TIME_IN_DAYS is Time-Travel retention, not delete-after; real retention is an "
+            "operational scheduled DELETE task, which Tessera does not emit in v0. Emission reports "
+            "RETENTION_EXPRESSION_ONLY. Emitted enforcement is a deferred, opt-in, driver-led increment.",
+        ),
     },
 )

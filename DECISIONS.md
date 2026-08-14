@@ -1411,6 +1411,38 @@ Values follow ADR-028 (bare = Tessera vocabulary, adopter values namespaced) via
 
 ---
 
+## ADR-031 — `RetentionConstraint`: retention as a first-class, expression-first policy kind
+
+**Date:** 2026-08-14
+**Status:** Accepted
+
+### Context
+
+Retention/deletion ([#21](https://github.com/bgiesbrecht/tessera/issues/21)) was the last and hardest of the three governance gaps (`governance-gaps-scoping.md` §3): the survey called it the most urgent (GDPR Art. 5(1)(e), CCPA, HIPAA all cite retention), but it is data-*lifecycle* governance, not access governance, and it presses on ADR-001 harder than anything to date. Two facts drove the decision:
+
+1. **No platform has a declarative retention primitive.** Snowflake `DATA_RETENTION_TIME_IN_DAYS` is Time-Travel retention (how far back you can query), not delete-after; Databricks Delta `VACUUM` is history cleanup, not record expiry. Real retention/deletion is an operational scheduled job (`DELETE WHERE basis < now − period`).
+2. **Retention is a standing property of the data, not a consequence of access.** So it is neither an access/visibility constraint nor an obligation (obligations fire *on access*). The scoping doc's "reframe as an obligation" option is semantically wrong.
+
+### Decision
+
+Add **`RetentionConstraint`** as a first-class `PolicyConstraint` subclass, **expression-first**: v0 expresses and validates the retention requirement portably but does **not** emit destructive enforcement.
+
+- **Shape.** Unlike the access-shaped kinds, a `RetentionConstraint` has no `principal`, `action`, `effect`, or `rules` — it carries `appliesTo` (the resource) and a `retention` spec: `direction` (`DeleteAfter` = minimization vs `RetainFor` = preservation — the two opposite drivers, which a single "period" cannot capture), `period` (ISO-8601 duration), `basis` (the timestamp column / lifecycle event the clock runs from), and `disposition` (`Purge` / `Anonymize` / `Archive`). `Purge` is deliberately distinct from the `Delete` *action* — this is the lifecycle terminal, not an access verb.
+- **Expression-first, not enforced.** Both adapters report `RETENTION_EXPRESSION_ONLY` (INFO) and emit no DDL. The capability profiles mark `RETENTION` `UNSUPPORTED` with the reason. This keeps ADR-001 clean and matches how #25 and #19 landed: on gaps where the platform has no native enforcement, Tessera's value is portable, checkable expression + honest capability reporting.
+- **Spec.** New `oneOf` branch `retentionDocument` in `schema.json` (retention has its own document shape); `RetentionConstraint` + retention vocabulary in `ontology.ttl`; `retention`/`direction`/`period`/`basis`/`disposition` context terms; `RetentionConstraintShape` + direction/disposition value shapes in `shapes.ttl`. `PolicyConstraintShape`'s target narrowed from the abstract `PolicyConstraint` to the five access-shaped subclasses, so its `principal`/`action`/`effect` requirements do not wrongly apply to retention. Worked example: `spec/v0/examples/retention-delete-after-policy.*`.
+
+### Why not emit the scheduled job (the deferred option)
+
+Retention is the one gap with a *genuinely emittable* enforcement path (a scheduled `DELETE`). It was deliberately **not** taken in v0: emitting `CREATE TASK … DELETE` is a category shift — Tessera would generate destructive, procedural, operational jobs rather than compile governance to declarative native primitives — and given the fragile skunkworks posture (ADR-002), that overreach is exactly what to avoid without a concrete customer driver. Emitted enforcement (narrow delete-after) remains a deferred, **opt-in**, driver-led increment.
+
+### What this ADR does not do
+
+- **Does not emit or enforce retention.** Expression-first by decision, not by omission.
+- **Does not attach retention to Policy-container rules.** It is a standalone document shape; it has no rules.
+- **Does not settle archive/anonymize mechanics.** The `disposition` vocabulary names the terminal; how archive/anonymize are carried out is out of v0 scope.
+
+---
+
 ## How to use this document
 
 - Every new technical or stakeholder document begins by reading this file.

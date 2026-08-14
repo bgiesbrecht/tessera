@@ -26,7 +26,9 @@ from adapters.contract.types import (
 
 def emit_policy(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult:
     policy_id = policy.get("@id")
-    policy_kind = policy.get("policyKind")
+    # Policy containers carry the kind in `policyKind`; freestanding constraints
+    # (e.g. RetentionConstraint, ADR-031) carry it in `@type`.
+    policy_kind = policy.get("policyKind") or policy.get("@type")
     applies_to = policy.get("appliesTo") or {}
     target_table = applies_to.get("resource") or applies_to.get("scope") or ""
 
@@ -36,6 +38,8 @@ def emit_policy(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult
         return _emit_column_visibility(policy, config)
     if policy_kind == "AccessGrantConstraint":
         return _emit_access_grant(policy, config)
+    if policy_kind == "RetentionConstraint":
+        return _emit_retention_expression_only(policy_id)
 
     return EmissionResult(
         policy_id=policy_id,
@@ -45,6 +49,27 @@ def emit_policy(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult
             severity=DiagnosticSeverity.WARNING,
             code="UNIMPLEMENTED_POLICY_KIND",
             message=f"snowflake adapter has not implemented emission for policyKind={policy_kind!r}.",
+            location="policyKind",
+        )],
+    )
+
+
+def _emit_retention_expression_only(policy_id: Any) -> EmissionResult:
+    """RetentionConstraint is expression-first (ADR-031): Snowflake has no
+    declarative retention primitive (DATA_RETENTION_TIME_IN_DAYS is Time-Travel,
+    not delete-after), and Tessera does not emit destructive scheduled jobs in
+    v0. Emit no DDL; report the requirement honestly."""
+    return EmissionResult(
+        policy_id=policy_id, target_artifacts=[], statements=[],
+        diagnostics=[Diagnostic(
+            severity=DiagnosticSeverity.INFO,
+            code="RETENTION_EXPRESSION_ONLY",
+            message=(
+                "RetentionConstraint is expressed and validated but not emitted (ADR-031). "
+                "Snowflake has no declarative retention/deletion primitive; enforcement would "
+                "be an operational scheduled DELETE task, which Tessera does not emit in v0. "
+                "Treat this as a portable, checkable requirement."
+            ),
             location="policyKind",
         )],
     )

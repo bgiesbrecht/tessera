@@ -29,6 +29,7 @@ class Capability(str, Enum):
     CONDITIONAL_OBLIGATIONS = "conditional-obligations"
     PURPOSE_BINDING = "purpose-binding"
     REGULATORY_REGIME_ATTRIBUTE = "regulatory-regime-attribute"
+    RETENTION = "retention"                                    # RetentionConstraint (ADR-031)
 
 
 class CapabilitySupport(str, Enum):

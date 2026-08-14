@@ -452,6 +452,66 @@ tessera:AccessGrantConstraint a owl:Class ;
     rdfs:comment
         """Affirmative-grant constraint: declares that a Principal is authorized to take an Action on a Resource. Distinct from RowVisibilityConstraint and ColumnVisibilityConstraint, both of which are restriction-shaped (they limit what is seen). An AccessGrantConstraint carries `effect: allow` on its rules; the policy reads as "the named principals are granted the named action on the named resource." Typical enforcement mechanisms: GRANT statements on Databricks (GRANT SELECT/EXECUTE/...) and Snowflake (GRANT USAGE/SELECT/...). Added 2026-05-20 by ADR-026, grounded in the table-grants worked exercise."""@en .
 
+tessera:RetentionConstraint a owl:Class ;
+    rdfs:subClassOf tessera:PolicyConstraint ;
+    rdfs:label "Retention constraint"@en ;
+    rdfs:comment
+        """A standing data-lifecycle governance statement: how long a Resource's data must be retained, or after how long it must be removed. Unlike the access/visibility constraints it is not access-triggered and carries no principal or rules — it is a property of the data, expressed via a `retention` spec (direction, period, basis, disposition). Added 2026-08-14 by ADR-031, EXPRESSION-FIRST: no data platform offers a declarative retention primitive (Snowflake DATA_RETENTION_TIME_IN_DAYS is Time-Travel, not delete-after; real retention is an operational job), so v0 expresses and validates the requirement portably but does NOT emit destructive enforcement. See ADR-031 for the scope decision."""@en .
+
+# Retention vocabulary (ADR-031).
+tessera:RetentionSpec a owl:Class ;
+    rdfs:subClassOf tessera:Entity ;
+    rdfs:label "Retention spec"@en ;
+    rdfs:comment "The parameters of a RetentionConstraint: direction, period, basis, disposition."@en .
+
+tessera:RetentionDirection a owl:Class ;
+    rdfs:subClassOf tessera:Entity ;
+    rdfs:label "Retention direction"@en .
+tessera:DeleteAfter a owl:NamedIndividual ; rdfs:label "delete after"@en ;
+    rdfs:comment "Data must be removed once the period elapses from the basis (minimization; e.g. GDPR Art. 5(1)(e))."@en .
+tessera:RetainFor a owl:NamedIndividual ; rdfs:label "retain for"@en ;
+    rdfs:comment "Data must be kept at least the period from the basis (preservation; e.g. SOX/HIPAA retention)."@en .
+
+tessera:RetentionDisposition a owl:Class ;
+    rdfs:subClassOf tessera:Entity ;
+    rdfs:label "Retention disposition"@en .
+tessera:Purge     a owl:NamedIndividual ; rdfs:label "purge"@en ;
+    rdfs:comment "Delete the data (distinct from the Delete *action*; this is the lifecycle terminal)."@en .
+tessera:Anonymize a owl:NamedIndividual ; rdfs:label "anonymize"@en ;
+    rdfs:comment "Irreversibly de-identify the data in place."@en .
+tessera:Archive   a owl:NamedIndividual ; rdfs:label "archive"@en ;
+    rdfs:comment "Move the data to cold/archival storage."@en .
+
+tessera:retention a owl:ObjectProperty ;
+    rdfs:label "retention"@en ;
+    rdfs:comment "Relates a RetentionConstraint to its RetentionSpec."@en ;
+    rdfs:domain tessera:RetentionConstraint ;
+    rdfs:range tessera:RetentionSpec .
+
+tessera:retentionDirection a owl:ObjectProperty ;
+    rdfs:label "retention direction"@en ;
+    rdfs:comment "DeleteAfter (minimization) or RetainFor (preservation) — the two opposite retention drivers."@en ;
+    rdfs:domain tessera:RetentionSpec ;
+    rdfs:range tessera:RetentionDirection .
+
+tessera:retentionPeriod a owl:DatatypeProperty ;
+    rdfs:label "retention period"@en ;
+    rdfs:comment "The duration, as an ISO-8601 duration (e.g. P30D, P7Y)."@en ;
+    rdfs:domain tessera:RetentionSpec ;
+    rdfs:range xsd:string .
+
+tessera:retentionBasis a owl:DatatypeProperty ;
+    rdfs:label "retention basis"@en ;
+    rdfs:comment "The event the clock starts from — typically a timestamp column reference (e.g. column:acme.tpch.orders.o_orderdate) or a named lifecycle event."@en ;
+    rdfs:domain tessera:RetentionSpec ;
+    rdfs:range xsd:string .
+
+tessera:retentionDisposition a owl:ObjectProperty ;
+    rdfs:label "retention disposition"@en ;
+    rdfs:comment "What happens to the data at the terminal: Purge, Anonymize, or Archive."@en ;
+    rdfs:domain tessera:RetentionSpec ;
+    rdfs:range tessera:RetentionDisposition .
+
 
 #
 # ============================================================================

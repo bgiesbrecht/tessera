@@ -35,7 +35,7 @@ Staging area for issues queued to be filed against `bgiesbrecht/tessera`. Keepin
 | 2026-05-19 | [#18](https://github.com/bgiesbrecht/tessera/issues/18) | Coverage check: sensitive data classification (PII/PHI/PCI) | open (governance-gap survey; coverage-confirmed) |
 | 2026-05-19 | [#19](https://github.com/bgiesbrecht/tessera/issues/19) | Audit logging — refine obligation vocabulary for who-accessed-what-when | closed by ADR-030 (0.11.0, 2026-08-14) |
 | 2026-05-19 | [#20](https://github.com/bgiesbrecht/tessera/issues/20) | Out-of-scope confirmation: data lineage tracking | open (governance-gap survey; out-of-scope per ADR-001) |
-| 2026-05-19 | [#21](https://github.com/bgiesbrecht/tessera/issues/21) | Retention and deletion policies — RetentionConstraint policy kind needed | open (governance-gap survey; in-scope gap; v0-candidate; scoping-needed) |
+| 2026-05-19 | [#21](https://github.com/bgiesbrecht/tessera/issues/21) | Retention and deletion policies — RetentionConstraint policy kind needed | closed by ADR-031 (0.12.0, 2026-08-14) |
 | 2026-05-19 | [#22](https://github.com/bgiesbrecht/tessera/issues/22) | Coverage check: purpose limitation | open (governance-gap survey; coverage-confirmed) |
 | 2026-05-19 | [#23](https://github.com/bgiesbrecht/tessera/issues/23) | Cross-border data transfer controls — covered but unexercised | open (governance-gap survey; underexercised) |
 | 2026-05-19 | [#24](https://github.com/bgiesbrecht/tessera/issues/24) | Consent management — partially covered, integration with consent records undefined | open (governance-gap survey; integration question) |

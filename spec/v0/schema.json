@@ -2,12 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://bgiesbrecht.github.io/tessera/spec/v0/schema.json",
   "title": "Tessera v0 Policy Schema",
-  "description": "Structural validation for Tessera policy documents in JSON-LD form. Validates document shape: required fields, type enums, conditional dependencies. Semantic validation (CURIE resolution, classification existence, references to known purposes, etc.) is the job of SHACL shapes in spec/v0/shapes.ttl — this schema does not duplicate that territory. See technical-design-v0.2.md §4.2 and §7.2 for how this layer fits in the validation pipeline. Three top-level document shapes are accepted: a Policy container (canonical multi-branch form, ADR-014); a single PolicyConstraint (backward-compat single-rule form); and a @graph of PolicyConstraints (legacy multi-branch form, deprecated by ADR-014 but accepted during the v0 lifecycle).",
+  "description": "Structural validation for Tessera policy documents in JSON-LD form. Validates document shape: required fields, type enums, conditional dependencies. Semantic validation (CURIE resolution, classification existence, references to known purposes, etc.) is the job of SHACL shapes in spec/v0/shapes.ttl — this schema does not duplicate that territory. See technical-design-v0.2.md §4.2 and §7.2 for how this layer fits in the validation pipeline. Four top-level document shapes are accepted: a Policy container (canonical multi-branch form, ADR-014); a single PolicyConstraint (backward-compat single-rule form); a @graph of PolicyConstraints (legacy multi-branch form, deprecated by ADR-014 but accepted during the v0 lifecycle); and a freestanding RetentionConstraint (ADR-031).",
 
   "oneOf": [
     { "$ref": "#/$defs/policyDocument" },
     { "$ref": "#/$defs/constraintDocument" },
-    { "$ref": "#/$defs/graphDocument" }
+    { "$ref": "#/$defs/graphDocument" },
+    { "$ref": "#/$defs/retentionDocument" }
   ],
 
   "$defs": {
@@ -93,6 +94,50 @@
           "items": { "$ref": "#/$defs/policyConstraint" }
         }
       }
+    },
+
+    "retentionDocument": {
+      "title": "Retention document (ADR-031)",
+      "description": "A JSON-LD document whose root node is a freestanding RetentionConstraint — a data-lifecycle policy (delete-after / retain-for) that carries intent but does not emit (no platform declarative-retention primitive; see ADR-031).",
+      "type": "object",
+      "required": ["@context", "@type", "appliesTo", "retention"],
+      "properties": {
+        "@context": { "$ref": "#/$defs/contextRef" },
+        "@type": { "enum": ["RetentionConstraint", "tessera:RetentionConstraint"] },
+        "@id": { "type": "string", "minLength": 1 },
+        "version": { "type": "string" },
+        "description": { "type": "string" },
+        "appliesTo": { "$ref": "#/$defs/resourceSelector" },
+        "retention": { "$ref": "#/$defs/retentionSpec" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+
+    "retentionSpec": {
+      "title": "Retention specification (ADR-031)",
+      "description": "The direction/period/basis/disposition of a RetentionConstraint. direction and period are required; direction distinguishes the two opposite obligations (DeleteAfter = minimization, RetainFor = preservation).",
+      "type": "object",
+      "required": ["direction", "period"],
+      "properties": {
+        "direction": {
+          "description": "DeleteAfter (privacy minimization — delete N after the basis event) or RetainFor (legal preservation — keep at least N).",
+          "enum": ["DeleteAfter", "RetainFor", "tessera:DeleteAfter", "tessera:RetainFor"]
+        },
+        "period": {
+          "type": "string",
+          "description": "ISO-8601 duration measured from the basis event (e.g. P30D, P7Y).",
+          "pattern": "^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$"
+        },
+        "basis": {
+          "type": "string",
+          "description": "The event the retention clock starts from — a timestamp column (column: IRI) or a named lifecycle event. Meaning, not mechanism."
+        },
+        "disposition": {
+          "description": "Terminal action once the period elapses: Purge (delete), Anonymize (irreversibly de-identify), or Archive (move to cold/immutable store).",
+          "enum": ["Purge", "Anonymize", "Archive", "tessera:Purge", "tessera:Anonymize", "tessera:Archive"]
+        }
+      },
+      "additionalProperties": false
     },
 
     "contextRef": {

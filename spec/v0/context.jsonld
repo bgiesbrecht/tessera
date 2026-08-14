@@ -356,6 +356,14 @@
       "@type": "xsd:string"
     },
 
+    "_comment_retention_properties": "Retention constraint parameters (ADR-031)",
+
+    "retention":  { "@id": "tessera:retention", "@type": "@id" },
+    "direction":  { "@id": "tessera:retentionDirection", "@type": "@vocab" },
+    "period":     { "@id": "tessera:retentionPeriod", "@type": "xsd:string" },
+    "basis":      { "@id": "tessera:retentionBasis", "@type": "xsd:string" },
+    "disposition": { "@id": "tessera:retentionDisposition", "@type": "@vocab" },
+
     "_comment_provenance_properties": "Provenance metadata, especially important for extracted policies",
 
     "extractedFrom": {

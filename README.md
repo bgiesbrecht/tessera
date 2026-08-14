@@ -39,7 +39,7 @@ If you run a single platform and that platform's governance meets your needs, Te
 
 ## Status
 
-Current version: **0.11.0** (see `VERSION`, `CHANGELOG.md`).
+Current version: **0.12.0** (see `VERSION`, `CHANGELOG.md`).
 
 Both reference adapters are real and exercise the full ADR-024 cycle — `emit` / `discover` / `extract` / `reconcile` — on Databricks Unity Catalog and on Snowflake. Three policy shapes are implemented across both platforms: `RowVisibilityConstraint` (`byIdentity`, `byScope`, `byDataset`), `ColumnVisibilityConstraint` (`Redact`), and `AccessGrantConstraint` (table, function, schema-fan-out). ABAC `byScope` (tag-driven) now emits on both platforms — UC via `MATCH COLUMNS has_tag_value(...)`, Snowflake via tag-based masking / row-access policy attachment (#31). Bidirectional migration between the two platforms is demonstrated end-to-end in `adapters/tests/live_migration_demo.py` and its reverse-direction sibling, with verification queries confirming the same policy intent enforces the same way on both sides.
 
@@ -49,7 +49,7 @@ The IR — JSON-LD context, OWL ontology, JSON Schema, SHACL shapes — lives in
 
 For a demo-ready tour of what's working today, read [`docs/showcase.md`](docs/showcase.md). For where the project is going — shipped, in flight, deferred, and out of scope — read [`docs/ROADMAP.md`](docs/ROADMAP.md). For per-version detail, read `CHANGELOG.md`. Twenty of thirty-one tracked issues remain open; the breakdown is in `docs/issue-drafts/README.md`.
 
-Known limitations at 0.11.0:
+Known limitations at 0.12.0:
 
 - YAML comment preservation in round-trips is deferred to converter v2.
 - Schema-pattern resource bindings are not yet implemented.
@@ -89,9 +89,9 @@ Three forms exist:
 .
 ├── README.md                              ← this file
 ├── LICENSE                                ← Apache 2.0
-├── DECISIONS.md                           ← 30 numbered ADRs
+├── DECISIONS.md                           ← 31 numbered ADRs
 ├── CHANGELOG.md                           ← per-version detail
-├── VERSION                                ← current: 0.11.0
+├── VERSION                                ← current: 0.12.0
 ├── docs/
 │   ├── showcase.md                        ← demo-anchored tour
 │   ├── executive-summary.md               ← one-page leadership brief

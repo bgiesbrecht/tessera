@@ -204,8 +204,17 @@ tessera:PolicyRuleShape a sh:NodeShape ;
 # constraint as PolicyRuleShape.
 #
 
+# Targets the access-shaped constraint kinds explicitly rather than the abstract
+# PolicyConstraint superclass: RetentionConstraint (ADR-031) is also a
+# PolicyConstraint but has a different shape (no principal/action/effect — it
+# carries a retention spec), so it must not be caught by this shape. It has its
+# own RetentionConstraintShape below.
 tessera:PolicyConstraintShape a sh:NodeShape ;
-    sh:targetClass tessera:PolicyConstraint ;
+    sh:targetClass tessera:AccessConstraint ;
+    sh:targetClass tessera:RowVisibilityConstraint ;
+    sh:targetClass tessera:ColumnVisibilityConstraint ;
+    sh:targetClass tessera:DistributionConstraint ;
+    sh:targetClass tessera:AccessGrantConstraint ;
     rdfs:label "Freestanding PolicyConstraint shape"@en ;
 
     sh:property [
@@ -571,6 +580,54 @@ tessera:ResourceSetFromTableShape a sh:NodeShape ;
         sh:maxCount 1 ;
         sh:datatype xsd:string ;
         sh:message "ResourceSetFromTable requires a table reference."@en ;
+    ] .
+
+
+#
+# ============================================================================
+# RetentionConstraint shape (ADR-031)
+# ============================================================================
+# A standing data-lifecycle constraint: appliesTo + a retention spec, no rules.
+# The document root asserts @type RetentionConstraint, so sh:targetClass is
+# reliable here (unlike the blank-node selectors).
+#
+
+tessera:RetentionConstraintShape a sh:NodeShape ;
+    sh:targetClass tessera:RetentionConstraint ;
+    rdfs:label "Retention constraint shape"@en ;
+    sh:property [
+        sh:path tessera:appliesTo ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:node tessera:ResourceSelectorShape ;
+        sh:message "RetentionConstraint requires an appliesTo resource selector."@en ;
+    ] ;
+    sh:property [
+        sh:path tessera:retention ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "RetentionConstraint requires a retention spec (direction, period, basis, disposition)."@en ;
+    ] .
+
+# Retention spec value shapes — closed vocabularies for direction / disposition,
+# targeted via sh:targetSubjectsOf (the spec is a blank node without @type).
+tessera:RetentionDirectionShape a sh:NodeShape ;
+    sh:targetSubjectsOf tessera:retentionDirection ;
+    sh:property [
+        sh:path tessera:retentionDirection ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in ( tessera:DeleteAfter tessera:RetainFor ) ;
+        sh:message "retention direction must be DeleteAfter or RetainFor."@en ;
+    ] .
+
+tessera:RetentionDispositionShape a sh:NodeShape ;
+    sh:targetSubjectsOf tessera:retentionDisposition ;
+    sh:property [
+        sh:path tessera:retentionDisposition ;
+        sh:maxCount 1 ;
+        sh:in ( tessera:Purge tessera:Anonymize tessera:Archive ) ;
+        sh:message "retention disposition must be Purge, Anonymize, or Archive."@en ;
     ] .
 
 

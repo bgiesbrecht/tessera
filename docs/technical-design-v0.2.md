@@ -92,6 +92,8 @@ Policies are named by what they constrain, not by how they are enforced:
 | `RowVisibilityConstraint` | Which rows a Principal may see | Row-level security, row access policies, view filters |
 | `ColumnVisibilityConstraint` | Whether a Principal sees a Column's true value, transformed value, or no value | Column masking, dynamic data masking, view projections |
 | `DistributionConstraint` | Whether and how a Resource may be shared beyond its origin | Secure shares, listings, Delta Sharing, replication controls |
+| `AccessGrantConstraint` | That a Principal is affirmatively granted an Action on a Resource (ADR-026) | `GRANT` statements |
+| `RetentionConstraint` | How long a Resource's data must be retained / after how long removed (ADR-031) | Expression-first — no declarative platform primitive; not emitted in v0 |
 
 ### 3.3 Selectors
 

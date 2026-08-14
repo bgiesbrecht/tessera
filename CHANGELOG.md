@@ -4,6 +4,25 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.12.0] — 2026-08-14
+
+Retention / deletion (ADR-031, closing [#21](https://github.com/bgiesbrecht/tessera/issues/21)) — the last of the three scoped governance gaps. A new expression-first policy kind; no adapter emission (no platform declarative-retention primitive).
+
+### Added
+
+- **`RetentionConstraint` policy kind** in `spec/v0/`: a `PolicyConstraint` subclass carrying `retention` → a `RetentionSpec` with `direction` (`DeleteAfter` for minimization / `RetainFor` for preservation — the two are opposite obligations and must be distinguished), `period` (ISO-8601 duration), `basis` (the event the clock starts from — a timestamp column or lifecycle event), and `disposition` (`Purge` / `Anonymize` / `Archive`). Classes + individuals + properties in `ontology.ttl`; `@vocab`/`@type` context terms; `retentionSpec` + `retentionDocument` in `schema.json`; `RetentionConstraintShape` + direction/disposition value shapes in `shapes.ttl`.
+- **Worked example** `spec/v0/examples/retention-delete-after-policy.{tessera.yaml,jsonld}` — a freestanding `RetentionConstraint` on `acme.tpch.orders`: `DeleteAfter` P30D from `o_orderdate`, disposition `Purge`. Validates clean.
+- **`Capability.RETENTION`** (UNSUPPORTED) on both adapters; a `RETENTION_EXPRESSION_ONLY` INFO diagnostic and zero statements on emit; parity test `test_retention_constraint_is_expression_only_on_both_adapters`.
+
+### Notes
+
+- **Honest scope (ADR-031):** neither Databricks nor Snowflake has a declarative "delete after N" primitive (Snowflake `DATA_RETENTION_TIME_IN_DAYS` is Time-Travel; Delta `VACUUM` is history cleanup — neither is record expiry). Real retention is an operational scheduled job. Tessera carries the full intent as a first-class, portable, checkable policy but emits nothing; a scheduled-`DELETE` emitter is a deferred, opt-in increment. This keeps the ADR-001 line (Tessera does not run or emit destructive jobs in v0).
+- **All three governance gaps (#25 / #19 / #21) now shipped.** The "in-scope gaps — scoping needed" track is retired.
+
+### Fixed
+
+- **`PolicyConstraintShape` over-broad target.** The shape's `sh:targetClass tessera:PolicyConstraint` was catching `RetentionConstraint` via subclass reasoning and wrongly demanding `principal`/`action`/`effect`. Narrowed to the five access-shaped subclasses (`AccessConstraint`, `RowVisibilityConstraint`, `ColumnVisibilityConstraint`, `DistributionConstraint`, `AccessGrantConstraint`).
+
 ## [0.11.0] — 2026-08-14
 
 Audit-logging obligation refinement (ADR-030, closing [#19](https://github.com/bgiesbrecht/tessera/issues/19)) — the second of the three scoped governance gaps. An obligation-vocabulary refinement; no new policy kind, expression-first.

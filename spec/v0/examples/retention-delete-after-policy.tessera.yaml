@@ -1,0 +1,44 @@
+# Retention worked example — RetentionConstraint, delete-after (ADR-031, #21).
+#
+# A standing data-lifecycle statement: order rows must be deleted 30 days after
+# their order date (data minimization; cf. GDPR Art. 5(1)(e)). No principal, no
+# rules — retention is a property of the data, not access-triggered.
+#
+# EXPRESSION-FIRST (ADR-031): v0 expresses and validates this requirement
+# portably. It is NOT emitted as a destructive job — no data platform offers a
+# declarative retention primitive (Snowflake DATA_RETENTION_TIME_IN_DAYS is
+# Time-Travel, not delete-after), and Tessera does not compile to scheduled
+# DELETE jobs in v0. Adapters report RetentionConstraint as expression-only.
+#
+# Companion files:
+#   retention-delete-after-policy.jsonld   — canonical (JSON-LD) form
+
+"@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
+"@type": RetentionConstraint
+"@id": policy:retention-orders-delete-after-30d
+version: 1.0.0
+description: >
+  Rows of acme.tpch.orders must be purged 30 days after o_orderdate (data
+  minimization). Direction delete-after; basis the o_orderdate column;
+  disposition Purge. Expressed and validated in v0; not emitted as enforcement.
+
+appliesTo:
+  selector: byIdentity
+  resource: table:acme.tpch.orders
+
+retention:
+  direction: DeleteAfter
+  period: P30D
+  basis: column:acme.tpch.orders.o_orderdate
+  disposition: Purge
+
+capabilityRequirements:
+  - retention-expression
+
+provenance:
+  notes: |
+    Worked example for ADR-031 (RetentionConstraint, expression-first). Shows the
+    two-directional model (delete-after here; retain-for is the mirror) and the
+    basis/disposition parameters. No adapter emission — retention has no
+    declarative platform primitive; emitted enforcement (a scheduled job) is a
+    deferred, opt-in, driver-led increment.

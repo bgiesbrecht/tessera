@@ -182,6 +182,20 @@ def test_ai_governance_axis_composes_with_column_mask_on_both_adapters():
     assert "'NOT-FOR-TRAINING'" in uc and "'NOT-FOR-TRAINING'" in sf  # the mask value on both
 
 
+def test_retention_constraint_is_expression_only_on_both_adapters():
+    """ADR-031: RetentionConstraint is expressed + validated but not emitted —
+    no platform declarative retention primitive, and Tessera does not emit
+    destructive scheduled jobs in v0. Both adapters emit zero statements and a
+    RETENTION_EXPRESSION_ONLY diagnostic (not the generic UNIMPLEMENTED TODO)."""
+    policy = _load("retention-delete-after-policy.jsonld")
+    assert policy["@type"] == "RetentionConstraint"
+    for adapter in (UnityCatalogAdapter(), SnowflakeAdapter()):
+        result = adapter.emit(policy)
+        assert result.statements == [], f"{adapter} should emit no DDL for retention"
+        assert not result.has_errors
+        assert any(d.code == "RETENTION_EXPRESSION_ONLY" for d in result.diagnostics)
+
+
 def test_capability_profiles_differ_meaningfully():
     """Both adapters declare profiles, with different platform names."""
     uc = UnityCatalogAdapter()

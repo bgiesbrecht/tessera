@@ -44,6 +44,8 @@ None of the three requires Tessera to *run* anything (the ADR-001 line holds): i
 
 ## §3. Retention & deletion — a `RetentionConstraint` policy kind (#21)
 
+_Implemented (ADR-031, 2026-08-14): `RetentionConstraint`, expression-first — option 2/3 hybrid (first-class policy kind carrying the full intent, but not emitted; the emittable delete-after job is a deferred, opt-in increment). Worked example `spec/v0/examples/retention-delete-after-policy.*`. §6.1 resolved. The analysis below stands as the record._
+
 The survey flagged this as the most urgent (GDPR Art. 5(1)(e), CCPA, HIPAA all cite it) — and it is also the one with the most design tension. Two decisions are genuinely the author's to make (§6).
 
 **The two-directional core.** Retention pulls two opposite ways, and the IR must distinguish them because they are different obligations:

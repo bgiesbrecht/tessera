@@ -26,7 +26,9 @@ from adapters.contract.types import (
 
 def emit_policy(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult:
     policy_id = policy.get("@id")
-    policy_kind = policy.get("policyKind")
+    # Policy containers carry the kind in `policyKind`; freestanding constraints
+    # (e.g. RetentionConstraint, ADR-031) carry it in `@type`.
+    policy_kind = policy.get("policyKind") or policy.get("@type")
     applies_to = policy.get("appliesTo") or {}
     target_table = applies_to.get("resource") or applies_to.get("scope") or ""
 
@@ -39,6 +41,25 @@ def emit_policy(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult
         return _emit_column_visibility(policy, config)
     if policy_kind == "AccessGrantConstraint":
         return _emit_access_grant(policy, config)
+    if policy_kind == "RetentionConstraint":
+        # Expression-first (ADR-031): Databricks has no declarative retention/
+        # deletion primitive (Delta VACUUM is history cleanup, not record
+        # expiry); real retention is an operational job. Emit no DDL; report the
+        # requirement honestly rather than falling through to the generic TODO.
+        return EmissionResult(
+            policy_id=policy_id, target_artifacts=[], statements=[],
+            diagnostics=[Diagnostic(
+                severity=DiagnosticSeverity.INFO,
+                code="RETENTION_EXPRESSION_ONLY",
+                message=(
+                    "RetentionConstraint is expressed and validated but not emitted (ADR-031). "
+                    "Databricks has no declarative retention/deletion primitive; enforcement would "
+                    "be an operational scheduled DELETE job, which Tessera does not emit in v0. "
+                    "Treat this as a portable, checkable requirement."
+                ),
+                location="policyKind",
+            )],
+        )
 
     diagnostics.append(Diagnostic(
         severity=DiagnosticSeverity.WARNING,
