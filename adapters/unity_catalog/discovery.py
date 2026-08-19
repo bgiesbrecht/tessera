@@ -1,4 +1,4 @@
-"""Unity Catalog adapter — discovery and extraction.
+"""Unity Catalog adapter: discovery and extraction.
 
 Parallel to `adapters/snowflake/discovery.py`. Inventory row-filter UDFs and
 column-mask UDFs attached to tables in a target schema; lift them back into
@@ -6,21 +6,21 @@ Tessera IR.
 
 Recognized Databricks UC body shapes (matching what the UC adapter emits):
 
-    1. **byDataset row filter** — `EXISTS (SELECT 1 FROM <map> m JOIN <acl> p
+    1. **byDataset row filter.** `EXISTS (SELECT 1 FROM <map> m JOIN <acl> p
        ON ... WHERE m.<user_col> = current_user() AND p.<resource_col> = <param>)`.
        Lifts to `RowVisibilityConstraint` with `byDataset` principal selector
        and `exists-in-dataset` condition.
 
-    2. **byIdentity multi-rule row filter** — OR-joined branches:
+    2. **byIdentity multi-rule row filter.** OR-joined branches:
        `is_account_group_member('A') OR (is_account_group_member('B') AND col IN (...))`.
        Lifts to `RowVisibilityConstraint` with multiple `byIdentity` rules.
 
-    3. **byIdentity column mask** — `CASE WHEN is_account_group_member('A')
+    3. **byIdentity column mask.** `CASE WHEN is_account_group_member('A')
        THEN <col> ELSE 'literal' END`. Lifts to `ColumnVisibilityConstraint`
        with one allow-rule and a Redact defaultBranch.
 
 ABAC byScope shapes (those that emit `CREATE POLICY ... ON CATALOG`) are not
-yet covered here — extraction for those would query the catalog's policy
+yet covered here. Extraction for those would query the catalog's policy
 metadata surface rather than per-table `DESCRIBE` output, which is a separate
 implementation path.
 """
@@ -111,7 +111,7 @@ def discover_schema(run_sql, catalog: str, schema: str) -> DiscoveryResult:
     return DiscoveryResult(artifacts=artifacts, diagnostics=diagnostics)
 
 
-# Privileges to skip during grant discovery — platform-mechanism / ownership /
+# Privileges to skip during grant discovery: platform-mechanism / ownership /
 # implicit grants that aren't policy intent.
 _GRANT_PRIVILEGES_SKIP = {"OWN", "ALL PRIVILEGES", "ALL_PRIVILEGES", "MANAGE", "APPLY_TAG"}
 # Pseudo-principals that are platform built-ins (kept for visibility but
@@ -310,7 +310,7 @@ def _extract_access_grant(artifact: dict[str, Any]) -> ExtractionResult:
     source_kind = artifact.get("source_kind") or object_kind
     source_object = artifact.get("source_object") or object_name
 
-    # Skip inherited grants — the source object's grant will produce its own
+    # Skip inherited grants: the source object's grant will produce its own
     # IR. This avoids N copies of the same logical schema-level grant showing
     # up once per child table.
     if source_kind and source_kind.upper() != object_kind.upper():

@@ -2,13 +2,13 @@
 
 Four primitives, each decidable from the corpus or explicitly unknown:
 
-    §4.1 selector normalization    — canonical comparable form
-    §4.2 the subsumption lattice   — the only PROVEN relations
-    §4.3 effect polarity           — expose / restrict / partial-restrict
-    §4.4 the unknown boundary      — what forces CANDIDATE, never a claim
+    §4.1 selector normalization: canonical comparable form
+    §4.2 the subsumption lattice: the only PROVEN relations
+    §4.3 effect polarity: expose / restrict / partial-restrict
+    §4.4 the unknown boundary: what forces CANDIDATE, never a claim
 
 The bright line (scoping doc §2): every relation here is computed over selector
-*expressions* — literals, IRIs, typed values — never over the populations those
+*expressions* (literals, IRIs, typed values), never over the populations those
 selectors denote. Nothing in this module resolves group membership or reads an
 ACL table. Doing so would be policy evaluation (ADR-001).
 
@@ -183,7 +183,7 @@ def scope_contains(outer: str, inner: str) -> bool:
     """True if `outer` scope-IRI contains (or equals) `inner` (§4.2 #2).
 
     Containment is a dotted-path prefix relation on the identifier path,
-    regardless of the `kind:` prefix — `catalog:acme` contains
+    regardless of the `kind:` prefix; `catalog:acme` contains
     `table:acme.tpch.orders` because ["acme"] is a prefix of
     ["acme","tpch","orders"]. Equal IRIs contain each other.
     """
@@ -261,7 +261,7 @@ def selector_opaque(sel: Selector | None) -> bool:
 def selector_subsumes(outer: Selector | None, inner: Selector | None) -> bool:
     """True if `outer` provably matches every resource/principal `inner` does
     (§4.2). Provable only for identity equality, scope-IRI containment, and
-    attribute-axis subsumption. Opaque selectors (§4.4) are never subsumed —
+    attribute-axis subsumption. Opaque selectors (§4.4) are never subsumed:
     that would require reading the population.
     """
     if outer is None or inner is None:

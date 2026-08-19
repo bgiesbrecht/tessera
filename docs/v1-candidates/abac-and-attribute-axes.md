@@ -24,11 +24,11 @@ The policy is *about PII*. The platform's mechanism for identifying PII columns 
 
 Working through the ABAC design surfaces a related distinction that the IR needs to keep clean. Policies reference three structurally different kinds of property:
 
-- **Properties of the data.** Sensitivity, data subject, regulatory regime, business domain. These are facts *about the data* — they hold regardless of who is reading, why, or when. Tessera models these as **attribute axes** on resources (§2).
-- **Properties of the access request.** Purpose of access, time of request, jurisdiction the request originates from. These are facts *about a specific invocation* — they vary per query. Tessera models these as **conditions** in the existing condition algebra (`purpose-in`, `located-in`, `time-window`).
+- **Properties of the data.** Sensitivity, data subject, regulatory regime, business domain. These are facts *about the data*: they hold regardless of who is reading, why, or when. Tessera models these as **attribute axes** on resources (§2).
+- **Properties of the access request.** Purpose of access, time of request, jurisdiction the request originates from. These are facts *about a specific invocation*: they vary per query. Tessera models these as **conditions** in the existing condition algebra (`purpose-in`, `located-in`, `time-window`).
 - **Properties of the principal.** Group membership, identity, role assignments. Tessera models these via **principal selectors** (`byIdentity`, `byComposition`, etc.).
 
-This distinction matters because it determines where new vocabulary lands when policy needs grow. Purpose is a property of an access request, not a property of the data — the same data can be accessed for different purposes by different requests. Forcing purpose into an attribute axis on data would conflate "what this data is" with "what this access is for." Conversely, sensitivity is a property of the data, not of the request — every access to a PII column is to PII regardless of who asks or why. Forcing sensitivity into the condition algebra would lose the static-property nature.
+This distinction matters because it determines where new vocabulary lands when policy needs grow. Purpose is a property of an access request, not a property of the data: the same data can be accessed for different purposes by different requests. Forcing purpose into an attribute axis on data would conflate "what this data is" with "what this access is for." Conversely, sensitivity is a property of the data, not of the request: every access to a PII column is to PII regardless of who asks or why. Forcing sensitivity into the condition algebra would lose the static-property nature.
 
 The existing `purpose-in` condition operator therefore stays as a condition, not promoted to an axis. The four ABAC additions in §2–§5 concern only properties of the first category.
 
@@ -36,7 +36,7 @@ The existing `purpose-in` condition operator therefore stays as a condition, not
 
 The framework does *not* introduce a `Tag` class into the IR. A `Tag` class would model the platform mechanism, not the meaning. The timing-disclosure conversation applied the same logic (timing categories were rejected because they were per-mechanism vocabulary); this applies symmetrically here.
 
-The framework does *not* model coordination labels — `team: fraud-ops`, `cost-center: 12345`, `environment: production` — as data attributes. These are operational metadata about ownership and accounting. They may correspond to principal attributes (a user's team) or to scope attributes (a catalog's environment), but they are not properties of the data the policy protects. Policies that gate on team membership do so via principal selectors, not via data-attribute selectors.
+The framework does *not* model coordination labels (`team: fraud-ops`, `cost-center: 12345`, `environment: production`) as data attributes. These are operational metadata about ownership and accounting. They may correspond to principal attributes (a user's team) or to scope attributes (a catalog's environment), but they are not properties of the data the policy protects. Policies that gate on team membership do so via principal selectors, not via data-attribute selectors.
 
 ### What this enables
 
@@ -45,7 +45,7 @@ If Tessera models meaning rather than mechanism:
 - The same policy file is portable across Databricks (governed tags), Snowflake (object tags), and custom-pattern adapters (classification tables).
 - The Databricks adapter's tag taxonomy is a *configuration* concern, not a policy concern.
 - A policy author writing for Tessera does not need to know which platform will enforce the policy.
-- Platforms that change their tag mechanisms (Databricks ABAC is recent; it may evolve) do not invalidate existing policies — only the adapter's emission needs to keep up.
+- Platforms that change their tag mechanisms (Databricks ABAC is recent; it may evolve) do not invalidate existing policies; only the adapter's emission needs to keep up.
 
 ---
 
@@ -98,7 +98,7 @@ attributes:
   businessDomain: CRM
 ```
 
-Hierarchical inference applies only within hierarchical axes: if `sensitivity: PIIEmail` is asserted, the resource is also `sensitivity: PII` by subsumption. On flat axes, no such inference holds — `dataSubject: EUResident` does not imply any other `dataSubject` value.
+Hierarchical inference applies only within hierarchical axes: if `sensitivity: PIIEmail` is asserted, the resource is also `sensitivity: PII` by subsumption. On flat axes, no such inference holds: `dataSubject: EUResident` does not imply any other `dataSubject` value.
 
 ### Why these axes are right
 
@@ -108,7 +108,7 @@ The four axes above correspond to the four most common policy distinctions acros
 - Snowflake tag examples follow the same pattern (the documented use case in the Snowflake quickstart uses `PII`, `FINANCIAL` as values).
 - W3C DPV models these dimensions as separate vocabularies, not as one hierarchy.
 
-The framework recognizes a structure that already exists in practice. The axes are *adopter-extensible* — a v0 with four named axes is a starting point, not a closed set.
+The framework recognizes a structure that already exists in practice. The axes are *adopter-extensible*: a v0 with four named axes is a starting point, not a closed set.
 
 ---
 
@@ -143,14 +143,14 @@ Scope kinds for v0 are inferred from the resource IRI's namespace prefix:
 
 Inferring the kind from the resource prefix avoids redundancy. The Tessera context defines these prefixes; adapters use them consistently for emission and extraction. If an adapter needs the kind explicit for downstream tooling, it can synthesize it from the resource IRI without help from the policy file.
 
-Inheritance through scope is *implicit and downward*. A policy at catalog scope applies to schemas, tables, and columns within. The adapter handles platform-specific inheritance details (Databricks does not propagate tags from table to column by default; Snowflake does propagate tags from table to columns — but these are mechanism differences, not policy differences).
+Inheritance through scope is *implicit and downward*. A policy at catalog scope applies to schemas, tables, and columns within. The adapter handles platform-specific inheritance details (Databricks does not propagate tags from table to column by default; Snowflake does propagate tags from table to columns, but these are mechanism differences, not policy differences).
 
 ### Scope exclusion is distinct from principal exclusion
 
 Two kinds of "exclusion" appear in ABAC patterns, and they are structurally different. The IR keeps them separate:
 
-- **Scope exclusion** — *what resources the policy applies to.* "Attach at catalog scope, except for one schema and one table within it." The exclusion narrows the resource set.
-- **Principal exclusion** — *who the policy affects.* "Apply to `account users` except `data-stewards`." The exclusion narrows the principal set; the policy still applies to the same resources.
+- **Scope exclusion**: *what resources the policy applies to.* "Attach at catalog scope, except for one schema and one table within it." The exclusion narrows the resource set.
+- **Principal exclusion**: *who the policy affects.* "Apply to `account users` except `data-stewards`." The exclusion narrows the principal set; the policy still applies to the same resources.
 
 Principal exclusion is already handled by the existing principal selectors (`byComposition` with `match: not` is the canonical form, and the v1 candidates already address whether more concise forms are needed). The policy container's ordered first-match (ADR-015) further enables expressing principal exclusion via rule ordering.
 
@@ -168,11 +168,11 @@ appliesTo:
       sensitivity: PII
 ```
 
-Whether this v0 addition includes `except` is a design choice for ADR-019 — it's small enough to include up front, but it's also possible to defer until a worked exercise drives it. The straightforward path is including it: Snowflake and Databricks ABAC both support scope-level exclusion patterns, and a v0 that omits it would force a follow-on amendment soon after.
+Whether this v0 addition includes `except` is a design choice for ADR-019. It's small enough to include up front, but also possible to defer until a worked exercise drives it. The straightforward path is including it: Snowflake and Databricks ABAC both support scope-level exclusion patterns, and a v0 that omits it would force a follow-on amendment soon after.
 
 ### The relationship to `appliesTo`
 
-The existing `appliesTo` field carries a selector. The selector can be `byIdentity` (today's behavior — points at a specific resource), `byClassification` (now refactored to use attribute axes), `byDataset` (existing data-driven selection), or `byScope` (new). The `byScope` selector is the addition; the others continue to work.
+The existing `appliesTo` field carries a selector. The selector can be `byIdentity` (today's behavior, points at a specific resource), `byClassification` (now refactored to use attribute axes), `byDataset` (existing data-driven selection), or `byScope` (new). The `byScope` selector is the addition; the others continue to work.
 
 A policy with `byScope` selection plus attribute-matching conditions is an ABAC policy in Tessera terms. A policy with `byIdentity` selection is a table-specific policy. Both shapes remain valid.
 
@@ -248,7 +248,7 @@ The algebra is the same across platforms; only the surface syntax differs.
 
 ## §5. Adapter configuration mappings (tag-taxonomy as one instance)
 
-§2 through §4 add to the IR. §5 is structurally different: it specifies *adapter configuration shape*, not IR vocabulary. The reason it belongs in this scoping document is that ABAC support requires it, but the underlying pattern is broader than ABAC and worth establishing as a general framework rather than as a one-off for tags.
+§2 through §4 add to the IR. §5 is structurally different: it specifies *adapter configuration shape*, not IR vocabulary. It belongs in this scoping document because ABAC support requires it, but the underlying pattern is broader than ABAC and general enough to establish as a framework, not a one-off for tags.
 
 ### The pattern
 
@@ -312,7 +312,7 @@ The pattern is the same; the platform-specific identifier fields differ per adap
 
 ### Default behavior on unmapped identifiers
 
-During extraction, the adapter may encounter a platform-specific identifier that is not in the configuration mapping — a tag whose key/value pair has no Tessera axis/value equivalent, a principal IRI not in identity-binding. ADR-021 specifies three configurable behaviors, with **strict as the default**:
+During extraction, the adapter may encounter a platform-specific identifier that is not in the configuration mapping: a tag whose key/value pair has no Tessera axis/value equivalent, or a principal IRI not in identity-binding. ADR-021 specifies three configurable behaviors, with **strict as the default**:
 
 - **Strict (default).** Unmapped identifier is an extraction error. The adapter refuses to lift the policy into the IR without an explicit mapping. The IR stays clean of unknown attributes. Adopters configuring strict accept that they must declare all their tag and identity mappings before extraction runs.
 - **Permissive.** Unmapped identifier is lifted onto a synthetic axis or principal namespace (e.g., `unknown:tagKey` for a tag whose key isn't mapped) with confidence marker `low`. The IR carries the information but the policy semantics are not validated. Useful during migration when not all tags are yet mapped.
@@ -322,7 +322,7 @@ The default is strict because it keeps the IR honest by default; opt-in to loose
 
 ### Why this is configuration, not policy
 
-Putting these mappings in the policy file would violate the §1 principle — the policy would carry mechanism. A policy that says `sensitivity: PII` should mean the same thing on every platform; the policy author should not need to know whether the Databricks adapter expects this to emit as `has_tag('pii')`, `has_tag_value('classification', 'pii')`, or `has_tag('data_class')` with allowed value `PII`.
+Putting these mappings in the policy file would violate the §1 principle: the policy would carry mechanism. A policy that says `sensitivity: PII` should mean the same thing on every platform; the policy author should not need to know whether the Databricks adapter expects this to emit as `has_tag('pii')`, `has_tag_value('classification', 'pii')`, or `has_tag('data_class')` with allowed value `PII`.
 
 The mapping is per-adapter, per-environment. Different customers running the Databricks adapter may have different tag taxonomies; the policy file does not change.
 
@@ -386,7 +386,7 @@ CREATE POLICY redact_pii_email
     ON COLUMN pii_email_col;
 ```
 
-The clause ordering follows the verified Databricks syntax: `COLUMN MASK → TO → [EXCEPT] → FOR TABLES → [WHEN] → MATCH COLUMNS ... AS alias → ON COLUMN alias → [USING COLUMNS]`. Three details the sketch carries that the earlier version did not:
+The clause ordering follows the verified Databricks syntax: `COLUMN MASK → TO → [EXCEPT] → FOR TABLES → [WHEN] → MATCH COLUMNS ... AS alias → ON COLUMN alias → [USING COLUMNS]`. Three details matter:
 
 - **`FOR TABLES` clause** is required between the principal binding and the column-matching clauses.
 - **`AS alias` on `MATCH COLUMNS`** names the matched column set so the `ON COLUMN` clause can reference it. The alias is policy-local; it does not have to match any actual column name in the protected tables.
@@ -394,7 +394,7 @@ The clause ordering follows the verified Databricks syntax: `COLUMN MASK → TO 
 
 The `has_tag` and `has_tag_value` built-ins take literal key (and optionally value) strings; no wildcard or pattern-matching syntax is documented. To match any column tagged with a given key regardless of value, use `has_tag('pii')`; to match every column unconditionally, use `MATCH COLUMNS TRUE`. The composition algebra from §4 maps directly: `match: and` → SQL `AND` over `has_tag*` predicates, `match: or` → `OR`, `match: not` → `NOT`.
 
-The structural shape — policy-attached-at-scope, principal binding via `TO`/`EXCEPT`, tag-based selection via `MATCH COLUMNS` with aliasing, masking via `COLUMN MASK` + `ON COLUMN` — is what the design must support. The verification confirmed all of this; the only adjustments needed were the missing `FOR TABLES`, the aliasing requirement, and an explicit UDF definition.
+The structural shape (policy-attached-at-scope, principal binding via `TO`/`EXCEPT`, tag-based selection via `MATCH COLUMNS` with aliasing, masking via `COLUMN MASK` + `ON COLUMN`) is what the design must support. The verification confirmed all of this; the only adjustments needed were the missing `FOR TABLES`, the aliasing requirement, and an explicit UDF definition.
 
 ### Sketch: extraction from existing Databricks ABAC
 
@@ -422,11 +422,11 @@ CREATE MASKING POLICY redact_pii_email
 ALTER TAG governance.pii SET MASKING POLICY redact_pii_email;
 ```
 
-The same policy IR, two different platform emissions. The semantic content — "redact PIIEmail-tagged columns unless the user is a data steward" — is preserved. The implementation differs per platform mechanism.
+The same policy IR, two different platform emissions. The semantic content ("redact PIIEmail-tagged columns unless the user is a data steward") is preserved. The implementation differs per platform mechanism.
 
 Confirming this sketch concretely would require building a Snowflake adapter, which is future work. The point here is that the policy file does not change between Databricks and Snowflake emission; only the adapter and its configuration do.
 
-> **Update (2026-08-13, #31):** this is now implemented in `adapters/snowflake/emission.py` (`_emit_column_visibility_by_scope`, `_emit_row_visibility_by_scope`). The concrete emission stays faithful to this sketch's shape — a masking policy attached via `ALTER TAG ... SET MASKING POLICY` — with two refinements verified against Snowflake's docs: the policy body reads `SYSTEM$GET_TAG_ON_CURRENT_COLUMN` to scope to the matched *value* (the tag attaches by key), and role discrimination uses `IS_ROLE_IN_SESSION` per the adapter's Intent-B convention (issue #14). Row-ABAC uses the parallel `ALTER TAG ... SET ROW ACCESS POLICY` mechanism, which Snowflake also supports.
+> **Update (2026-08-13, #31):** now implemented in `adapters/snowflake/emission.py` (`_emit_column_visibility_by_scope`, `_emit_row_visibility_by_scope`). The concrete emission stays faithful to this sketch's shape (a masking policy attached via `ALTER TAG ... SET MASKING POLICY`) with two refinements verified against Snowflake's docs: the policy body reads `SYSTEM$GET_TAG_ON_CURRENT_COLUMN` to scope to the matched *value* (the tag attaches by key), and role discrimination uses `IS_ROLE_IN_SESSION` per the adapter's Intent-B convention (issue #14). Row-ABAC uses the parallel `ALTER TAG ... SET ROW ACCESS POLICY` mechanism, which Snowflake also supports.
 
 ---
 
@@ -441,10 +441,10 @@ Per ADR-017, the immutability bar is suspended until external dependency. All fo
 
 The work is captured in subsequent ADRs:
 
-- **ADR-018 (planned)** — AttributeAxis and the Classification refactor.
-- **ADR-019 (planned)** — Scoped policy attachment via `byScope`, including scope-exclusion via `except`. Explicitly does *not* prescribe a cross-policy combining algorithm (see §8 Q3); that decision is deferred until the worked exercise produces evidence.
-- **ADR-020 (planned)** — Composable attribute matching reusing the `byComposition` algebra.
-- **ADR-021 (planned)** — Adapter configuration mapping pattern, with tag taxonomy and identity binding as the first two instances.
+- **ADR-018 (planned).** AttributeAxis and the Classification refactor.
+- **ADR-019 (planned).** Scoped policy attachment via `byScope`, including scope-exclusion via `except`. Explicitly does *not* prescribe a cross-policy combining algorithm (see §8 Q3); that decision is deferred until the worked exercise produces evidence.
+- **ADR-020 (planned).** Composable attribute matching reusing the `byComposition` algebra.
+- **ADR-021 (planned).** Adapter configuration mapping pattern, with tag taxonomy and identity binding as the first two instances.
 
 These could potentially fold into fewer ADRs if cohesion suggests it, but the §7 precedent (ADR-014 / ADR-015) argues for keeping structurally distinct decisions decomposed.
 
@@ -463,27 +463,27 @@ A single ADR conflating these would lose the distinction. Following the ADR-014 
 
 ## §8. Open questions and follow-on work
 
-**Q1. Should `purpose` move from "purpose-binding via condition" to "purpose as an attribute axis"? — Resolved: stays as a condition.**
+**Q1. Should `purpose` move from "purpose-binding via condition" to "purpose as an attribute axis"? Resolved: stays as a condition.**
 
 Purpose is a property of an access request, not a property of the data. The same data can be accessed for different purposes by different requests; treating it as a data attribute would conflate "what this data is" with "what this access is for." The existing `purpose-in` condition operator stays as the canonical mechanism, and the three-category framing in §1 ("data attribute / request condition / principal property") captures the structural distinction so the question doesn't resurface.
 
-This resolution does not preclude per-resource declarations of *which purposes are permitted for this data*, if a future exercise drives that need. That would be a different concept — a kind of resource-level capability or contract — and not the same as making purpose an attribute axis. Out of scope for ABAC v0; revisit if evidence demands.
+This resolution does not preclude per-resource declarations of *which purposes are permitted for this data*, if a future exercise drives that need. That would be a different concept (a kind of resource-level capability or contract), not the same as making purpose an attribute axis. Out of scope for ABAC v0; revisit if evidence demands.
 
 **Q2. What is the relationship between `attributes:` on a resource and `Classification` references that pre-date this work?**
 
 The existing `Classification` system is preserved. The refactor moves classifications onto axes (`Classification: PII` becomes `attributes.sensitivity: PII`), but existing files referencing classifications without an axis should still validate. The schema needs to handle both shapes during the v0 lifecycle, possibly with a deprecation note on the bare-classification form. ADR-018 specifies the backward-compat behavior.
 
-**Q3. How does the ABAC policy structure interact with the policy container's combining algebra (ADR-015)? — Targeted by the worked exercise.**
+**Q3. How does the ABAC policy structure interact with the policy container's combining algebra (ADR-015)? Targeted by the worked exercise.**
 
-This is the most consequential open question. ADR-015 specifies first-match within a single policy. ABAC's defining behavior is that *multiple policies* can attach at overlapping scopes, and their combined effect depends on cross-policy resolution rules. Snowflake has explicit ordering (row access first, then masking; single column can't be in both signatures). Databricks ABAC evaluates dynamically with its own rules. ADR-015 does not speak to either.
+ADR-015 specifies first-match within a single policy. ABAC's defining behavior is that *multiple policies* can attach at overlapping scopes, and their combined effect depends on cross-policy resolution rules. Snowflake has explicit ordering (row access first, then masking; single column can't be in both signatures). Databricks ABAC evaluates dynamically with its own rules. ADR-015 does not speak to either.
 
 Three resolution paths the worked exercise (§9) should help discriminate between:
 
-- **α — Tessera ignores cross-policy combination.** Policies are evaluated independently per platform conventions. Adapters handle platform-specific combining; Tessera doesn't model it. The IR cannot represent the intent of "this should take precedence when both apply."
-- **β — Tessera adopts a single cross-policy combining algorithm.** Names one (deny-overrides, permit-overrides, declared priority) and requires adapters to enforce it. Commits to a position that may not match Databricks or Snowflake's native semantics.
-- **γ — Tessera declares cross-policy combining as adapter-configurable.** The IR doesn't pick; each adapter declares its combining semantics in its capability profile. Policies depending on a specific algorithm declare that as a capability requirement.
+- **α: Tessera ignores cross-policy combination.** Policies are evaluated independently per platform conventions. Adapters handle platform-specific combining; Tessera doesn't model it. The IR cannot represent the intent of "this should take precedence when both apply."
+- **β: Tessera adopts a single cross-policy combining algorithm.** Names one (deny-overrides, permit-overrides, declared priority) and requires adapters to enforce it. Commits to a position that may not match Databricks or Snowflake's native semantics.
+- **γ: Tessera declares cross-policy combining as adapter-configurable.** The IR doesn't pick; each adapter declares its combining semantics in its capability profile. Policies depending on a specific algorithm declare that as a capability requirement.
 
-The exercise designed in §9 should include a multi-policy case explicitly — two ABAC policies attached to overlapping scopes with different attribute matchers and different effects, designed to put them in tension. What Databricks does, what the customer would want it to do, and whether they match are all observable. The result discriminates between α, β, and γ.
+The exercise designed in §9 should include a multi-policy case explicitly: two ABAC policies attached to overlapping scopes with different attribute matchers and different effects, designed to put them in tension. What Databricks does, what the customer would want it to do, and whether they match are all observable. The result discriminates between α, β, and γ.
 
 ADR-019 (scoped attachment) deliberately does *not* prescribe a cross-policy combining algorithm. That decision is held until the exercise produces evidence.
 
@@ -491,9 +491,9 @@ ADR-019 (scoped attachment) deliberately does *not* prescribe a cross-policy com
 
 §3 of this document includes `except` on the scope selector in the design. The question is whether to include it in the v0 addition or defer until evidence demands it. The straightforward answer is to include it, because both Snowflake and Databricks ABAC support scope-level exclusion patterns and a v0 that omits it would force a follow-on amendment quickly. ADR-019 includes the `except` facility unless the worked exercise reveals a reason to defer.
 
-**Q5. What about coordination labels that are governance-relevant — like a tag that records "data classification reviewer"?**
+**Q5. What about coordination labels that are governance-relevant, like a tag that records "data classification reviewer"?**
 
-If a tag is used as a record of a governance decision (who reviewed, when), it is metadata about the policy, not a property of the data. Falls under provenance (ADR-007 partially), not under attributes. Worth being explicit about so the distinction holds: the §1 three-category framing identifies what counts as a data attribute; classifications-of-the-policy-process are a fourth category that Tessera handles via provenance, not via attribute axes.
+If a tag is used as a record of a governance decision (who reviewed, when), it is metadata about the policy, not a property of the data. Falls under provenance (ADR-007 partially), not under attributes. To keep the distinction: the §1 three-category framing identifies what counts as a data attribute; classifications-of-the-policy-process are a fourth category that Tessera handles via provenance, not via attribute axes.
 
 ---
 
@@ -515,10 +515,10 @@ One task should complete before ADRs are drafted:
 
 After Stage 1, draft the ABAC ADRs against the revised scoping document:
 
-- **ADR-018 — AttributeAxis and the Classification refactor.** Introduces the axis concept, declares the four v0 axes with their structural types (hierarchical vs flat), specifies the axis-extensibility convention, and handles the backward-compat relationship to existing classifications per §8 Q2.
-- **ADR-019 — Scoped policy attachment via `byScope`.** Introduces the `Scope` concept, the resource-IRI-prefix-based kind inference, the implicit-downward inheritance semantics, and (likely) the `except` facility per §8 Q4. Explicitly does *not* prescribe cross-policy combining (held until §9 Stage 3 produces evidence).
-- **ADR-020 — Composable attribute matching.** Reuses the `byComposition` algebra (`match: and|or|not`, `criteria: [...]`) over attribute leaves; specifies the implicit-AND shortcut as syntactic sugar; aligns with the existing principal-selector composition pattern.
-- **ADR-021 — Adapter configuration mapping pattern.** Establishes the general pattern for per-environment mapping between platform-specific identifiers and Tessera semantic identifiers. Specifies the strict default with permissive and pass-through as configurable alternatives. Names tag taxonomy and identity binding as the first two instances; future instances follow the same shape.
+- **ADR-018: AttributeAxis and the Classification refactor.** Introduces the axis concept, declares the four v0 axes with their structural types (hierarchical vs flat), specifies the axis-extensibility convention, and handles the backward-compat relationship to existing classifications per §8 Q2.
+- **ADR-019: Scoped policy attachment via `byScope`.** Introduces the `Scope` concept, the resource-IRI-prefix-based kind inference, the implicit-downward inheritance semantics, and (likely) the `except` facility per §8 Q4. Explicitly does *not* prescribe cross-policy combining (held until §9 Stage 3 produces evidence).
+- **ADR-020: Composable attribute matching.** Reuses the `byComposition` algebra (`match: and|or|not`, `criteria: [...]`) over attribute leaves; specifies the implicit-AND shortcut as syntactic sugar; aligns with the existing principal-selector composition pattern.
+- **ADR-021: Adapter configuration mapping pattern.** Establishes the general pattern for per-environment mapping between platform-specific identifiers and Tessera semantic identifiers. Specifies the strict default with permissive and pass-through as configurable alternatives. Names tag taxonomy and identity binding as the first two instances; future instances follow the same shape.
 
 These four could fold into fewer ADRs if cohesion suggests it, but the §7 precedent (ADR-014 / ADR-015 as separate decisions for policy container and combining algebra) argues for keeping structurally distinct decisions decomposed.
 
@@ -528,7 +528,7 @@ A column-masking exercise driven by a `sensitivity` attribute, designed to surfa
 
 The exercise's shape:
 
-- **Phase 1 inputs.** Tag a column in the test notebook with a governed tag corresponding to `sensitivity: PIIClerk` (or similar — the actual tag name is the customer's choice; the Tessera attribute axis is Tessera's choice). Construct a second ABAC policy attached to the same catalog scope with a different attribute matcher and a different effect, designed to overlap with the first policy on at least some columns. The conflict is intentional — the question is what happens.
+- **Phase 1 inputs.** Tag a column in the test notebook with a governed tag corresponding to `sensitivity: PIIClerk` (or similar; the actual tag name is the customer's choice, the Tessera attribute axis is Tessera's choice). Construct a second ABAC policy attached to the same catalog scope with a different attribute matcher and a different effect, designed to overlap with the first policy on at least some columns. The conflict is intentional; the question is what happens.
 - **Phase 2 derivation.** Express both policies in Tessera's vocabulary, run the Databricks adapter sketch to produce the emitted DDL, observe what each policy produces independently and what they produce together.
 - **Phase 3 verification and comparison.** Observe what Databricks actually does when both policies are applied to the same column. Compare against the Tessera-level expectations. The result either confirms a specific cross-policy resolution semantics (which then informs whether ADR-019 should adopt α, β, or γ) or surfaces that Tessera's view is platform-specific and the IR cannot express it portably.
 
@@ -538,10 +538,10 @@ The user (Brice) needs to construct the ABAC examples in the test notebook to en
 
 After the exercise runs and the ADRs are drafted with its findings incorporated, the spec changes land:
 
-- `spec/v0/ontology.ttl` — `AttributeAxis`, `Scope`, `byScope`, attribute-matching shape, adapter-configuration vocabulary.
-- `spec/v0/context.jsonld` — short names for the new terms.
-- `spec/v0/schema.json` — structural validation including per-axis hierarchy expectations.
-- `docs/technical-design-v0.2.md` §4 — incorporates scope, attribute axes, composable matching, and the configuration-mapping pattern.
-- `spec/v0/examples/` — the worked-exercise artifacts produced in Stage 3.
+- `spec/v0/ontology.ttl`: `AttributeAxis`, `Scope`, `byScope`, attribute-matching shape, adapter-configuration vocabulary.
+- `spec/v0/context.jsonld`: short names for the new terms.
+- `spec/v0/schema.json`: structural validation including per-axis hierarchy expectations.
+- `docs/technical-design-v0.2.md` §4: incorporates scope, attribute axes, composable matching, and the configuration-mapping pattern.
+- `spec/v0/examples/`: the worked-exercise artifacts produced in Stage 3.
 
 The exercise either confirms the design or surfaces something the scoping document missed. Either outcome is cheaper before ADRs publish and the spec changes land than after.

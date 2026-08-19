@@ -1,6 +1,6 @@
 # Migration scenario — Snowflake → Unity Catalog via Tessera IR
 
-This walkthrough takes three policies actually running on Snowflake — a role-based row-access policy, a mapping-table byDataset row-access policy, and a column masking policy — discovers them, extracts them into Tessera IR, emits equivalent Databricks DDL, deploys the DDL on Unity Catalog, and verifies behavioral equivalence. End to end, in one runnable script.
+This walkthrough takes three policies actually running on Snowflake (a role-based row-access policy, a mapping-table byDataset row-access policy, and a column masking policy), discovers them, extracts them into Tessera IR, emits equivalent Databricks DDL, deploys the DDL on Unity Catalog, and verifies behavioral equivalence. End to end, in one runnable script.
 
 It is the answer to the question that motivated the project: *can the same governance intent enforce identically on two platforms, with the Tessera IR as the portable pivot?* For the three policy shapes here the answer is yes, with caveats this document calls out honestly.
 
@@ -132,9 +132,9 @@ The fix: the UC `byDataset` emission now consults `config.bind_resource(f"table:
 
 The byDataset emission initially named the function parameter after the IR's `resourceColumn` field — `O_ORDERPRIORITY` in this case. SQL is case-insensitive on identifiers, so the predicate `p.o_orderpriority = O_ORDERPRIORITY` inside the EXISTS subquery is ambiguous: Databricks resolves the bare identifier to the column reference (`p.o_orderpriority`), the predicate degenerates to `col = col`, and the row filter passes everything.
 
-First deployment of the migration script showed all 7,500,000 rows visible — a hint the filter wasn't filtering. The fix is the same one the Snowflake adapter already had: pin a fixed parameter alias (`policy_input_value`) that doesn't collide with any column referenced in the body. The column-to-parameter bind happens positionally via `ALTER TABLE ... SET ROW FILTER ... ON (col)`.
+First deployment of the migration script showed all 7,500,000 rows visible, a hint the filter wasn't filtering. The fix is the same one the Snowflake adapter already had: pin a fixed parameter alias (`policy_input_value`) that doesn't collide with any column referenced in the body. The column-to-parameter bind happens positionally via `ALTER TABLE ... SET ROW FILTER ... ON (col)`.
 
-Both findings landed as commits during this exercise — the cycle of *exercise drives improvement* working as the project's discipline intends.
+Both findings landed as commits during this exercise: the cycle of *exercise drives improvement* working as the project's discipline intends.
 
 ---
 
@@ -146,7 +146,7 @@ This is a worked migration of three policies, not a complete migration tooling s
 - **Identity migration.** Snowflake roles (`ACME_HIGH_PRIORITY_OPS`) and Databricks groups (`acme_high_priority_ops`) are not auto-provisioned. The script assumes the groups already exist on Databricks (they were created in earlier worked exercises). A real migration would inventory Snowflake roles, provision equivalent Databricks groups, and populate the bindings.
 - **Schema migration.** This exercise reuses TPC-H sample tables on both platforms. A real migration would mirror the source schemas onto the target.
 - **Reconciliation.** The adapter contract includes a `reconcile()` method (still stubbed); a real production cycle would compare deployed state to the IR and flag drift. This exercise applies in one direction without reconciliation.
-- **Cross-platform extraction shapes.** The Snowflake extractor recognizes three body shapes — the ones the project's worked exercises deployed. Production extraction would need a SQL AST parser and broader pattern coverage.
+- **Cross-platform extraction shapes.** The Snowflake extractor recognizes three body shapes, the ones the project's worked exercises deployed. Production extraction would need a SQL AST parser and broader pattern coverage.
 - **Audit trail.** Each step is logged; a real cycle would emit structured logs for compliance review. The script's output goes to stdout.
 
 What this exercise *does* demonstrate is that the **IR pivot works**: a Snowflake policy can be lifted into Tessera IR, that IR validates cleanly, and the same IR produces working Databricks DDL. The promise of the framework is empirically validated for these shapes.
@@ -165,7 +165,7 @@ Prereqs:
 - A `~/snowflake_auth.txt` file with the Snowflake password (the file is local-only; never committed).
 - A Databricks SDK profile that resolves to a workspace with `acme` provisioned (or change the constants at the top of the script).
 
-The script is idempotent — re-running it drops existing attachments before re-applying the new DDL. Useful for exercising the adapter when emission paths or extraction heuristics change.
+The script is idempotent: re-running it drops existing attachments before re-applying the new DDL. Useful for exercising the adapter when emission paths or extraction heuristics change.
 
 ---
 
@@ -175,7 +175,7 @@ The script is idempotent — re-running it drops existing attachments before re-
 - **The worked-example shapes the extractor recognizes**: `spec/v0/examples/group-row-visibility-policy-a.tessera.yaml`, `spec/v0/examples/snowflake-byDataset-row-visibility-policy.tessera.yaml`, `spec/v0/examples/column-mask-orders-clerk-policy.tessera.yaml`.
 - **The Databricks-target DDL the extractor produces**: the hand-derived companions in `spec/v0/examples/*.databricks.sql`; the adapter-emitted output matches structurally (modulo function names and the parameter-alias fix described above).
 - **Adapter contract**: ADR-024 in `DECISIONS.md`.
-- **Adapter configuration mapping pattern**: ADR-021 — including `identity_bindings` and `resource_bindings`.
+- **Adapter configuration mapping pattern**: ADR-021, including `identity_bindings` and `resource_bindings`.
 - **The companion practitioner tutorial**: `docs/user-guide/scenarios/acl-and-masking.md` covers authoring the same shapes from scratch, rather than migrating them.
 
 ## The reverse direction also works
@@ -184,9 +184,9 @@ The script is idempotent — re-running it drops existing attachments before re-
 
 | Surface | Result under caller (BGIESBRECHT / ACCOUNTADMIN) |
 |---|---|
-| `ACME.REVERSE_DEMO.demo_orders` | 60,080 rows (priorities 3/4/5) — third branch fires |
-| `ACME.REVERSE_DEMO.demo_orders_rls_acl` | 40,324 rows (1-URGENT + 2-HIGH) — caller's ACL codenames |
-| `ACME.REVERSE_DEMO.demo_orders.o_clerk` | `'CLERK-REDACTED'` — caller isn't in the privileged role |
+| `ACME.REVERSE_DEMO.demo_orders` | 60,080 rows (priorities 3/4/5); third branch fires |
+| `ACME.REVERSE_DEMO.demo_orders_rls_acl` | 40,324 rows (1-URGENT + 2-HIGH); caller's ACL codenames |
+| `ACME.REVERSE_DEMO.demo_orders.o_clerk` | `'CLERK-REDACTED'`; caller isn't in the privileged role |
 
 This is the symmetric demonstration the IR pivot exists for. The same three Tessera policies enforce identically on both platforms; the migration tooling has discovery, extraction, emission, and reconcile real on both sides; the cycle works in both directions.
 

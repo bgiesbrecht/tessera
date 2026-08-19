@@ -1,14 +1,14 @@
 # Federated Governance Policy Spec — Technical Design v0.2
 
 **Status:** Draft, supersedes v0.1
-**Audience:** Technical reviewers — architects, senior engineers, specification editors
+**Audience:** technical reviewers (architects, senior engineers, specification editors)
 **Authoritative context:** This document is consistent with the ADRs in `DECISIONS.md` (ADR-001 through ADR-027 as of 2026-05-20). Conflicts are resolved in favor of the ADRs. The document's voice is **descriptive, not prescriptive** (ADR-027): it describes what the IR represents and what each adapter emits, without recommending authoring preferences the platforms themselves do not document.
 
 ---
 
 ## 1. Purpose and scope
 
-The Federated Governance Policy project delivers **semantic interoperability of data governance policy** across heterogeneous data platforms (ADR-001). The same business rule — who can see what, under what conditions, for what purpose — can be expressed once in a portable representation, reviewed and version-controlled as a primary artifact, and translated into native enforcement on Unity Catalog, on Snowflake, or on customer-specific enforcement patterns through adapters.
+The Federated Governance Policy project delivers **semantic interoperability of data governance policy** across heterogeneous data platforms (ADR-001). The same business rule (who can see what, under what conditions, for what purpose) can be expressed once in a portable representation, reviewed and version-controlled as a primary artifact, and translated into native enforcement on Unity Catalog, on Snowflake, or on customer-specific enforcement patterns through adapters.
 
 The project is a customer-enablement initiative for joint Databricks–Snowflake (and other multi-platform) environments (ADR-002). Unity Catalog remains the source of truth for governance inside a Databricks environment; the portable representation operates between governance estates. For customers running Databricks alone, the project is not applicable.
 
@@ -110,7 +110,7 @@ Policies reference principals and resources through selectors, not enumeration:
 
 The `byDataset` selector (ADR-003) is what enables the framework to express data-driven principal/resource sets, including the ACL-table-and-view pattern common in enterprises.
 
-The `byScope` selector (ADR-019) is what enables ABAC-style policy attachment: a policy attaches at a level in the resource hierarchy and automatically applies to anything within that scope matching its attribute predicates. The scope kind (catalog, schema, table, column) is inferred from the resource IRI's namespace prefix. `byScope` carries an optional `except` list (resources to exclude — narrowing the resource set; structurally distinct from principal exclusion) and an optional `matching` block (attribute predicates that further narrow which resources within the scope the policy applies to; see §4.9).
+The `byScope` selector (ADR-019) is what enables ABAC-style policy attachment: a policy attaches at a level in the resource hierarchy and automatically applies to anything within that scope matching its attribute predicates. The scope kind (catalog, schema, table, column) is inferred from the resource IRI's namespace prefix. `byScope` carries an optional `except` list (resources to exclude, narrowing the resource set; structurally distinct from principal exclusion) and an optional `matching` block (attribute predicates that further narrow which resources within the scope the policy applies to; see §4.9).
 
 ### 3.3a Attribute axes (ADR-018)
 
@@ -125,7 +125,7 @@ Resources carry zero or more **attribute assignments**, each on an independent s
 | `trainingEligibility` | Flat | `NoTraining`, `TrainingWithConsent`, `TrainingAllowed` (AI governance, ADR-029) |
 | `automatedDecision` | Flat | `NoAutomatedDecision`, `ADMWithHumanReview`, `AutomatedDecisionAllowed` (AI governance, ADR-029) |
 
-Each axis declares its structural type. Hierarchical axes' values participate in `rdfs:subClassOf` subsumption — `sensitivity: PIIEmail` implies `sensitivity: PII`. Flat axes' values are independent enumeration members; no subsumption is inferred.
+Each axis declares its structural type. Hierarchical axes' values participate in `rdfs:subClassOf` subsumption: `sensitivity: PIIEmail` implies `sensitivity: PII`. Flat axes' values are independent enumeration members; no subsumption is inferred.
 
 Adopters extend the axis set by declaring new `AttributeAxis` instances under their own namespace (e.g., `acme:rowDiscriminator`). Each adopter-declared axis declares its own structural type.
 
@@ -133,10 +133,10 @@ The existing `Classification` hierarchy is preserved as the value set of the `se
 
 ### 3.4 What the vocabulary excludes
 
-- Identity provider specifics — handled by adapter identity bindings.
-- Platform mechanism vocabulary — "masking policy," "row access policy" are emission-side terminology, not vocabulary.
-- Operational concerns — deployment, monitoring, alerting.
-- Lifecycle, quality, and contract concepts — reserved.
+- Identity provider specifics: handled by adapter identity bindings.
+- Platform mechanism vocabulary: "masking policy," "row access policy" are emission-side terminology, not vocabulary.
+- Operational concerns: deployment, monitoring, alerting.
+- Lifecycle, quality, and contract concepts: reserved.
 
 ---
 
@@ -162,7 +162,7 @@ The IR has **two top-level shapes**. Both are valid; one is canonical, one is a 
 
 **Single `PolicyConstraint`.** A standalone policy constraint at the document root. Backward-compatible from before ADR-014. Equivalent to a Policy with a single rule. Customers may continue to use this shape for single-rule policies; tools normalize to Policy form for internal processing.
 
-A third shape — a JSON-LD `@graph` of multiple `PolicyConstraint` instances — was used to represent multi-branch policies before ADR-014. It is deprecated; the converter accepts it during the v0 lifecycle and normalizes to Policy form. At v1 cut, only the Policy shape will be accepted for multi-branch policies.
+A third shape, a JSON-LD `@graph` of multiple `PolicyConstraint` instances, was used to represent multi-branch policies before ADR-014. It is deprecated; the converter accepts it during the v0 lifecycle and normalizes to Policy form. At v1 cut, only the Policy shape will be accepted for multi-branch policies.
 
 #### 4.2.1 Properties of a Policy
 
@@ -170,10 +170,10 @@ A `tessera:Policy` carries:
 
 - **Identity.** Stable opaque identifier (`@id`) and semantic version.
 - **Vocabulary reference.** Explicit `@context` reference to a specific vocabulary version.
-- **Kind.** `policyKind` — the policy domain discriminator. References one of the existing PolicyConstraint subclasses.
-- **Applies to.** `appliesTo` — a resource selector identifying the resource(s) the policy applies to. Policy-wide; shared across all rules.
+- **Kind.** `policyKind`, the policy domain discriminator. References one of the existing PolicyConstraint subclasses.
+- **Applies to.** `appliesTo`, a resource selector identifying the resource(s) the policy applies to. Policy-wide; shared across all rules.
 - **Action.** The action the policy concerns (e.g., `Read` for visibility policies).
-- **Rules.** `rules` — an **ordered** list of rule sub-objects. Each rule carries a principal selector, optional condition, effect, and kind-specific extras (`transformation` for `ColumnVisibilityConstraint`). Order is semantically meaningful: rules are evaluated in declaration order under first-match combining (§4.7 and ADR-015).
+- **Rules.** `rules`, an **ordered** list of rule sub-objects. Each rule carries a principal selector, optional condition, effect, and kind-specific extras (`transformation` for `ColumnVisibilityConstraint`). Order is semantically meaningful: rules are evaluated in declaration order under first-match combining (§4.7 and ADR-015).
 - **Default strategy.** Optional. Names how principals matching no rule are handled. One of `explicit-baseline-group`, `negated-complement`, or `none`. See §4.6 and ADR-013.
 - **Baseline group.** Required iff `defaultStrategy` is `explicit-baseline-group`. Names the universal baseline group (e.g., `account users` on Databricks). The rule whose principal references this group is, by convention, the last rule in `rules` and is recognized by the framework as the default branch.
 - **Default branch.** Required iff `defaultStrategy` is `negated-complement`. A slimmer rule (effect plus optional condition; no principal selector) describing what principals matching no rule see. Forbidden under other strategies.
@@ -184,12 +184,12 @@ A `tessera:Policy` carries:
 
 A rule is a structurally slimmer object than a freestanding PolicyConstraint. It carries:
 
-- **Principal.** `principal` — a principal selector identifying the principals the rule applies to.
+- **Principal.** `principal`, a principal selector identifying the principals the rule applies to.
 - **Condition.** Optional, drawn from the condition algebra (§4.4).
-- **Effect.** What the rule does when it matches — `keep-matching-rows` and `drop-matching-rows` for RowVisibility; `allow`, `deny`, `transform` for AccessConstraint; etc.
-- **Transformation.** Required when `effect: transform`; forbidden otherwise (per ADR-022). When present, the transformation field carries a structured `TransformationInstance` object — a `type` identifying the transformation kind, plus any parameters specific to that kind. See §4.8 for the parameter shapes formalized in v0. The same effect-driven rule applies to the Policy's `defaultBranch`.
+- **Effect.** What the rule does when it matches: `keep-matching-rows` and `drop-matching-rows` for RowVisibility; `allow`, `deny`, `transform` for AccessConstraint; etc.
+- **Transformation.** Required when `effect: transform`; forbidden otherwise (per ADR-022). When present, the transformation field carries a structured `TransformationInstance` object: a `type` identifying the transformation kind, plus any parameters specific to that kind. See §4.8 for the parameter shapes formalized in v0. The same effect-driven rule applies to the Policy's `defaultBranch`.
 
-Rules do not carry their own `@type`, `appliesTo`, or `action` — those are inherited from the containing Policy.
+Rules do not carry their own `@type`, `appliesTo`, or `action`; those are inherited from the containing Policy.
 
 #### 4.2.3 Properties of a freestanding PolicyConstraint
 
@@ -212,7 +212,7 @@ Conditions are expressible from a fixed set of constructors:
 - **Comparison.** Equality, ordering, set membership.
 - **Boolean combination.** Conjunction, disjunction, negation.
 - **Context predicates.** `current-purpose`, `current-jurisdiction`, `current-time-window`, `consent-granted`, `current-session-attribute`.
-- **Dataset predicates.** `exists-in-dataset` — used by `byDataset` selectors.
+- **Dataset predicates.** `exists-in-dataset`, used by `byDataset` selectors.
 
 Extensibility of the algebra is an open question (ADR-007).
 
@@ -282,11 +282,11 @@ Other shapes in current use:
 - **`negated-complement` variant.** Same observable behavior, different intent: no baseline group; the default branch (rule for non-matchers) is expressed via a `defaultBranch` field on the Policy. See `spec/v0/examples/group-row-visibility-policy-b.tessera.yaml`.
 - **Single-rule (backward-compat) shape.** A freestanding `RowVisibilityConstraint` at document root, equivalent to a one-rule Policy. Used by the deferred ACL-table exercise example (see `docs/exercises/`).
 
-For the data-driven (ACL-table) variant of row visibility — exercised by the deferred custom-pattern adapter work — a Policy contains a single rule with a `byDataset` principal selector and a `PrincipalSetFromTable` reference. Conceptually the same shape as the worked example, with one rule and no default branch.
+For the data-driven (ACL-table) variant of row visibility, exercised by the deferred custom-pattern adapter work, a Policy contains a single rule with a `byDataset` principal selector and a `PrincipalSetFromTable` reference. Conceptually the same shape as the worked example, with one rule and no default branch.
 
 ### 4.6 Default-handling strategy
 
-A multi-rule Policy may have an affirmative default branch — a behavior for principals matching no other rule. The framework's default disposition is fail-closed; an affirmative default is opt-in via `defaultStrategy`.
+A multi-rule Policy may have an affirmative default branch, a behavior for principals matching no other rule. The framework's default disposition is fail-closed; an affirmative default is opt-in via `defaultStrategy`.
 
 Two semantically distinct mechanisms produce the same observable default behavior:
 
@@ -297,15 +297,15 @@ Both patterns are common, and the choice between them is intent, not just SQL sh
 
 The IR makes the choice explicit via the `defaultStrategy` field. The values are:
 
-- `explicit-baseline-group` — the Policy asserts a specific group is the universal baseline. The companion field `baselineGroup` names the group. A rule keyed off that group is the default branch.
-- `negated-complement` — the Policy asserts no baseline group. The `defaultBranch` field on the Policy carries the default-branch row predicate. Required iff this strategy.
-- `none` — the Policy has no default branch. Principals matching no rule see nothing. Equivalent to omitting the field, but preferred when the author wants to assert the choice explicitly.
+- `explicit-baseline-group`: the Policy asserts a specific group is the universal baseline. The companion field `baselineGroup` names the group. A rule keyed off that group is the default branch.
+- `negated-complement`: the Policy asserts no baseline group. The `defaultBranch` field on the Policy carries the default-branch row predicate. Required iff this strategy.
+- `none`: the Policy has no default branch. Principals matching no rule see nothing. Equivalent to omitting the field, but preferred when the author wants to assert the choice explicitly.
 
 Field-level rules summarized: `baselineGroup` is required iff `defaultStrategy: explicit-baseline-group`; `defaultBranch` is required iff `defaultStrategy: negated-complement`; both are forbidden under any other strategy.
 
-Adapters consult `defaultStrategy` when emitting native code. The `negated-complement` strategy with a clear set of affirmative-grant rules plus a single `defaultBranch` should produce a readable structural shape (a `CASE`/`WHEN`/`ELSE` row filter on Databricks, for example) — the `defaultBranch` lowers to the `ELSE` clause directly, without pattern-recognition heuristics. The `explicit-baseline-group` strategy produces affirmative emission referencing the named baseline, with an extra `WHEN` branch keyed off the baseline group.
+Adapters consult `defaultStrategy` when emitting native code. The `negated-complement` strategy with a clear set of affirmative-grant rules plus a single `defaultBranch` should produce a readable structural shape (a `CASE`/`WHEN`/`ELSE` row filter on Databricks, for example). The `defaultBranch` lowers to the `ELSE` clause directly, without pattern-recognition heuristics. The `explicit-baseline-group` strategy produces affirmative emission referencing the named baseline, with an extra `WHEN` branch keyed off the baseline group.
 
-If a target platform cannot natively support the declared strategy — for example, a platform without a universal group concept cannot honor `explicit-baseline-group` directly — the adapter's diagnostic report names this as a partial-enforcement gap and either falls back to negated-complement form (with a clear note in the report) or refuses to emit, depending on adapter policy.
+If a target platform cannot natively support the declared strategy (for example, a platform without a universal group concept cannot honor `explicit-baseline-group` directly), the adapter's diagnostic report names this as a partial-enforcement gap and either falls back to negated-complement form (with a clear note in the report) or refuses to emit, depending on adapter policy.
 
 See ADR-013 (the `defaultStrategy` decision) and ADR-014 (the Policy container and `defaultBranch` decision) for the decision history.
 
@@ -323,11 +323,11 @@ See ADR-015 for the decision and the foreclosures.
 
 ### 4.8 Transformation parameters
 
-A `ColumnVisibilityConstraint`'s transformation is a structured object, not a bare class reference. The structure has a `type` field naming the transformation (one of `Mask`, `Hash`, `Tokenize`, `Redact`, `Bucketize`) plus per-transformation parameter fields. This uniform structure applies even for parameterless transformations — `type: Hash` (with defaults for algorithm) is valid and is the canonical shape, not `transformation: Hash`.
+A `ColumnVisibilityConstraint`'s transformation is a structured object, not a bare class reference. The structure has a `type` field naming the transformation (one of `Mask`, `Hash`, `Tokenize`, `Redact`, `Bucketize`) plus per-transformation parameter fields. This uniform structure applies even for parameterless transformations: `type: Hash` (with defaults for algorithm) is valid and is the canonical shape, not `transformation: Hash`.
 
 The parameter shapes formalized in v0 are:
 
-**`Redact`** replaces the column value with a literal. Required parameter: `replacement` (JSON-encodable value — string, number, boolean, or null). The adapter checks type-compatibility with the column at emission time.
+**`Redact`** replaces the column value with a literal. Required parameter: `replacement` (a JSON-encodable value: string, number, boolean, or null). The adapter checks type-compatibility with the column at emission time.
 
 **`Mask`** replaces characters with a fixed mask character, optionally preserving a prefix or suffix. Optional parameters: `maskChar` (default `'X'`), `preserveFirst` (non-negative integer, default 0), `preserveLast` (non-negative integer, default 0). If `preserveFirst` and `preserveLast` together meet or exceed the value's character length, the value is returned unchanged (forgiving behavior). Character counts are over Unicode code points, not bytes.
 
@@ -381,16 +381,16 @@ See ADRs 018 (axes), 019 (byScope), 020 (matching algebra) for the design histor
 
 ### 4.10 Mechanism A vs Mechanism B for principal-bound transformations
 
-This is a design observation surfaced by the ABAC worked exercises, not a v0 vocabulary addition. Worth documenting so future contributors don't re-derive it.
+A design observation from the ABAC worked exercises, not a v0 vocabulary addition, documented so future contributors need not re-derive it.
 
 When emitting a column-mask or row-filter policy, the principal logic can live in two places:
 
-- **Mechanism A** — *policy header.* The principal binding (`TO ... EXCEPT ...`) splits principals into "applies to" / "does not apply to" groups. The UDF body is unconditional. Used for binary exempt/not-exempt cases.
-- **Mechanism B** — *UDF body.* The UDF body branches via `is_account_group_member(...)` calls in a `CASE` expression. The policy header's `TO` is broad. Used for three-or-more-branch cases that the binary `TO/EXCEPT` cannot express.
+- **Mechanism A, the policy header.** The principal binding (`TO ... EXCEPT ...`) splits principals into "applies to" / "does not apply to" groups. The UDF body is unconditional. Used for binary exempt/not-exempt cases.
+- **Mechanism B, the UDF body.** The UDF body branches via `is_account_group_member(...)` calls in a `CASE` expression. The policy header's `TO` is broad. Used for three-or-more-branch cases that the binary `TO/EXCEPT` cannot express.
 
 Tessera's IR is opinionated toward Mechanism A for binary cases: a Policy with one rule (`effect: allow` on the privileged group) plus a `defaultBranch` (`effect: transform`) emits cleanly to `TO ... EXCEPT ...` plus an unconditional UDF. For multi-branch cases (the row-filter exercise's three-branch shape), Tessera's clean multi-rule IR compiles to a single Mechanism-B UDF with `CASE` branches.
 
-The IR's `defaultStrategy` distinction (`negated-complement` vs `explicit-baseline-group`) is preserved at the IR layer regardless of which mechanism the adapter chooses. For Mechanism A emissions, the strategy choice produces structurally different SQL. For Mechanism B emissions on platforms where principal binding is binary (Databricks ABAC), both strategies collapse to the same UDF — the IR's richer expressivity than platform emission is the right relationship.
+The IR's `defaultStrategy` distinction (`negated-complement` vs `explicit-baseline-group`) is preserved at the IR layer regardless of which mechanism the adapter chooses. For Mechanism A emissions, the strategy choice produces structurally different SQL. For Mechanism B emissions on platforms where principal binding is binary (Databricks ABAC), both strategies collapse to the same UDF. The IR being more expressive than the platform emission is the right relationship.
 
 See the ABAC column-mask comparison and the ABAC row-filter diagnostic for the worked-example evidence.
 
@@ -402,7 +402,7 @@ Adapters connect the IR to real systems. Every adapter implements four responsib
 
 ### 5.1 Adapter responsibilities
 
-1. **Discovery.** Inventory policy-bearing artifacts in the target system. For native adapters: catalog of masking policies, row access policies, grants, tags. For custom-pattern adapters: ACL tables, views, middleware configurations — whatever the pattern uses.
+1. **Discovery.** Inventory policy-bearing artifacts in the target system. For native adapters: catalog of masking policies, row access policies, grants, tags. For custom-pattern adapters: ACL tables, views, and middleware configurations (whatever the pattern uses).
 2. **Extraction.** Produce IR from discovered artifacts, with confidence and provenance.
 3. **Emission.** Produce native artifacts from IR, with a diagnostic report.
 4. **Reconciliation.** Compare current state in the target system against a desired IR state and produce a diff.
@@ -419,7 +419,7 @@ Each adapter publishes a profile declaring, per vocabulary concept and IR constr
 
 For partially supported features, the profile names the limitation in machine-readable form. The compiler refuses to emit policies depending on unsupported features and surfaces limitations on partial features in the diagnostic report.
 
-The profile also covers **timing and consistency characteristics** of the mechanisms an adapter emits. The Databricks adapter, for the group-based row-visibility mechanism, declares a 2–4 minute propagation window for membership changes via the account-group cache — observed empirically during the first worked example (see `spec/v0/examples/group-row-visibility.comparison.md` §2.3). The general principle is that timing characteristics belong to specific enforcement mechanisms, not to the framework as a whole: an ACL-table-driven row filter on the same adapter would have a different timing profile than a group-membership check; a tag-driven column mask has yet another; a Snowflake session-tag-gated row access policy has yet another still. The framework's role is to require the disclosure; the vocabulary describing the timing is mechanism-specific and lives in the adapter's profile, not in the IR or in the policy. Conversely, enumerating a fixed set of "timing categories" at the framework layer would push mechanism vocabulary up into the IR and would not survive contact with the next adapter.
+The profile also covers **timing and consistency characteristics** of the mechanisms an adapter emits. The Databricks adapter, for the group-based row-visibility mechanism, declares a 2–4 minute propagation window for membership changes via the account-group cache, observed empirically during the first worked example (see `spec/v0/examples/group-row-visibility.comparison.md` §2.3). The general principle is that timing characteristics belong to specific enforcement mechanisms, not to the framework as a whole: an ACL-table-driven row filter on the same adapter would have a different timing profile than a group-membership check; a tag-driven column mask has yet another; a Snowflake session-tag-gated row access policy has yet another still. The framework's role is to require the disclosure; the vocabulary describing the timing is mechanism-specific and lives in the adapter's profile, not in the IR or in the policy. Conversely, enumerating a fixed set of "timing categories" at the framework layer would push mechanism vocabulary up into the IR and would not survive contact with the next adapter.
 
 ### 5.3 The diagnostic report
 
@@ -448,11 +448,11 @@ Adapters are versioned independently of the spec. An adapter declares the spec v
 
 ### 5.5a Emission readability — `defaultStrategy: negated-complement` and the `ELSE` clause
 
-When emitting a `Policy` whose `defaultStrategy: negated-complement` carries a `defaultBranch`, the adapter SHOULD render the default branch as the platform's natural default-clause construct — the `ELSE` of a `CASE` expression on Databricks, the `ELSE` of a Snowflake masking-policy `CASE`, etc. — rather than as an additional explicit `WHEN` branch with negated principal predicates.
+When emitting a `Policy` whose `defaultStrategy: negated-complement` carries a `defaultBranch`, the adapter SHOULD render the default branch as the platform's natural default-clause construct (the `ELSE` of a `CASE` expression on Databricks, the `ELSE` of a Snowflake masking-policy `CASE`, etc.) rather than as an additional explicit `WHEN` branch with negated principal predicates.
 
 Both forms are behaviorally equivalent; the `ELSE` form is the readable one and is the IR's structural intent (the `defaultBranch` field exists precisely to communicate "this is the catch-all").
 
-For pre-ADR-014 IR shapes (non-container, multi-rule with a `byComposition`/`match: not` final rule), the same expectation holds: an adapter SHOULD recognize the negated-complement pattern and render it as `ELSE`. This is a quality-of-output expectation; the naive rule-by-rule emission is correct but harder to read in audit. Issue [#5](https://github.com/bgiesbrecht/tessera/issues/5) tracked this; ADR-014's Policy container made it largely automatic by giving `defaultBranch` first-class structure, and the existing adapters take that path.
+For pre-ADR-014 IR shapes (non-container, multi-rule with a `byComposition`/`match: not` final rule), the same expectation holds: an adapter SHOULD recognize the negated-complement pattern and render it as `ELSE`. The expectation is about output quality: the naive rule-by-rule emission is correct but harder to read in audit. Issue [#5](https://github.com/bgiesbrecht/tessera/issues/5) tracked this; ADR-014's Policy container made it largely automatic by giving `defaultBranch` first-class structure, and the existing adapters take that path.
 
 ### 5.6 Adapter configuration mappings (the general pattern)
 
@@ -482,12 +482,12 @@ tagTaxonomy:
 
 Two well-known instance kinds ship with v0:
 
-- **`identityBindings`** — maps Tessera principal IRIs to platform-native principals (groups, users, roles). The same policy artifact, emitted to two different organizations, binds to different native principals. Identity binding is bidirectional: emission lowers Tessera IRIs to platform principals; extraction lifts platform principals back to Tessera IRIs.
-- **`tagTaxonomy`** — maps Tessera attribute axis-values to platform-native tag keys/values. Same bidirectional shape; same per-environment scoping.
+- **`identityBindings`.** Maps Tessera principal IRIs to platform-native principals (groups, users, roles). The same policy artifact, emitted to two different organizations, binds to different native principals. Identity binding is bidirectional: emission lowers Tessera IRIs to platform principals; extraction lifts platform principals back to Tessera IRIs.
+- **`tagTaxonomy`.** Maps Tessera attribute axis-values to platform-native tag keys/values. Same bidirectional shape; same per-environment scoping.
 
 Future configuration-mapping kinds (classification-name mapping, group-hierarchy mapping) follow the same pattern without requiring a new ADR per kind.
 
-**Default behavior on unmapped identifiers** — three configurable behaviors, with **strict as the default**:
+**Default behavior on unmapped identifiers.** Three configurable behaviors, with **strict as the default**:
 
 - **Strict (default).** Unmapped identifier is an extraction/emission error. The IR stays clean of unknown identifiers. Adopters configuring strict must declare their mappings explicitly.
 - **Permissive.** Unmapped identifier lifted onto a synthetic axis or principal namespace (e.g., `unknown:tagKey`) with confidence marker `low`. Useful during migration.
@@ -501,9 +501,9 @@ Some platforms reject configurations where multiple policies resolve to the same
 
 Initial v0 capability-profile vocabulary:
 
-- **`single-column-mask-per-column`** — at most one ColumnVis policy may resolve to any given column. Databricks ABAC declares this.
-- **`single-row-filter-per-table`** — at most one RowVis policy may resolve to any given table. Databricks ABAC declares this.
-- **`cross-mechanism-conflict-blocked`** — ABAC policies and legacy `SET MASK` / `SET ROW FILTER` compose on the same column/table only if they resolve to the same function; otherwise the platform blocks access. Databricks declares this.
+- **`single-column-mask-per-column`.** At most one ColumnVis policy may resolve to any given column. Databricks ABAC declares this.
+- **`single-row-filter-per-table`.** At most one RowVis policy may resolve to any given table. Databricks ABAC declares this.
+- **`cross-mechanism-conflict-blocked`.** ABAC policies and legacy `SET MASK` / `SET ROW FILTER` compose on the same column/table only if they resolve to the same function; otherwise the platform blocks access. Databricks declares this.
 
 Other platforms (Snowflake, custom adapters) declare their own constraints; the vocabulary is open per the configuration-mapping pattern of §5.6.
 
@@ -547,7 +547,7 @@ Five layers, in order:
 1. **YAML parse.** Strict YAML 1.2. Fail on duplicate keys, on ambiguous types, on tags outside the allowed set.
 2. **YAML → JSON-LD conversion.** Mechanical. Should not fail if YAML parse succeeded.
 3. **JSON Schema validation.** Structural conformance to the IR schema.
-4. **SHACL validation.** Semantic conformance against the vocabulary — references resolve, selectors are well-formed, classifications exist in the imported vocabulary.
+4. **SHACL validation.** Semantic conformance against the vocabulary: references resolve, selectors are well-formed, classifications exist in the imported vocabulary.
 5. **Adapter compatibility check.** For a given target adapter, all required capabilities are available. Performed at emission, not authoring.
 
 Layers 1–4 run on every commit. Layer 5 runs when emission is requested. Errors at any layer surface with source location in the original YAML, not in the converted JSON-LD.
@@ -556,7 +556,7 @@ Layers 1–4 run on every commit. Layer 5 runs when emission is requested. Error
 
 Per-adapter round-trip tests are a correctness gate. The contract: extract from platform A → IR → emit to platform A → extract again → IR'. The two IR documents are equivalent up to stated tolerances (timestamps, generated names, ordering).
 
-Cross-platform behavioral equivalence — extract from A, emit to B, observe equivalent behavior — is reported, not gated. The framework makes lossiness explicit rather than denying it.
+Cross-platform behavioral equivalence (extract from A, emit to B, observe equivalent behavior) is reported, not gated. The framework makes lossiness explicit rather than denying it.
 
 ### 7.4 Reasoning
 

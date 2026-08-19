@@ -1,4 +1,4 @@
-# Tessera — Handoff to Claude Code
+# Tessera: Handoff to Claude Code
 
 **Purpose:** This document is for Claude Code, working in the `bgiesbrecht/tessera` repository. It transfers the context from the design conversation that produced the current state of the repo. Read this once before any non-trivial work; refer back when uncertain about direction.
 
@@ -17,7 +17,7 @@ The project does *not* deliver:
 - Operational interoperability (policy behavior on data physically moving between platforms via Delta Sharing or Iceberg). Reserved space; not in scope for v0.
 - A universal authorization language. Scope is data-platform governance specifically.
 
-For customers running only Databricks, Tessera is not applicable — Unity Catalog already does what they need.
+For customers running only Databricks, Tessera is not applicable, since Unity Catalog already does what they need.
 
 ---
 
@@ -27,7 +27,7 @@ For customers running only Databricks, Tessera is not applicable — Unity Catal
 
 `DECISIONS.md` contains numbered ADRs (Architecture Decision Records). Every significant choice in the project is recorded there. Read it before proposing changes that touch architecture, scope, naming, or posture.
 
-When a user request conflicts with a recorded ADR, the right response is to flag the conflict and reference the ADR by number, not to silently override the decision. If the user wants to change a recorded decision, propose adding a new ADR that supersedes the old one — do not retroactively edit ADRs.
+When a user request conflicts with a recorded ADR, the right response is to flag the conflict and reference the ADR by number, not to silently override the decision. If the user wants to change a recorded decision, propose adding a new ADR that supersedes the old one; do not retroactively edit ADRs.
 
 The ADRs cover, at a high level: project framing and posture, architectural choices about the IR and adapters, vocabulary alignment with standards, the canonical name and license, repository hosting decisions, and specific IR-design refinements that emerged during early work. The authoritative current list lives in `DECISIONS.md`; do not maintain a parallel enumeration here.
 
@@ -103,7 +103,7 @@ Three forms of policy exist:
 
 Adapters connect the IR to real systems. Each adapter has four responsibilities: discovery (inventory policy-bearing artifacts), extraction (lift to IR), emission (lower from IR), and reconciliation (diff state). Each adapter declares a capability profile listing which IR concepts it supports, partially supports, or cannot support. Diagnostic reports are first-class artifacts of every emit operation.
 
-Adapters are *peers*. Unity Catalog adapter, Snowflake-native adapter, and custom-pattern adapters all implement the same contract. The IR layer is platform-neutral by design — privileging one platform there would defeat the project.
+Adapters are *peers*. Unity Catalog adapter, Snowflake-native adapter, and custom-pattern adapters all implement the same contract. The IR layer is platform-neutral by design; privileging one platform there would defeat the project.
 
 Two v0 IR details worth knowing about up front because the first worked example surfaced them and they reshape how policies are written:
 
@@ -116,15 +116,15 @@ Another v0 IR detail worth knowing: column-visibility transformations are refere
 
 A foundational principle worth absorbing: **Tessera expresses meaning, not mechanism.** When a policy references "PII columns" or "EU-resident customer data," the IR carries the semantic attribute (`sensitivity: PII`, `dataSubject: EUResident`), not the platform-specific mechanism that identifies it (governed tags on Databricks, object tags on Snowflake, classification tables elsewhere). The same Tessera policy is portable across platforms because the meaning is preserved; the platform translation is the adapter's job, configured via per-environment tag-taxonomy mappings.
 
-This principle has practical consequences: do not introduce a `Tag` class to the IR (that models mechanism, not meaning). Do not put platform-specific tag references in policy files. Do not model coordination labels (`team: fraud-ops`, `cost-center: 12345`) as data attributes — those are operational metadata. The IR's vocabulary stays semantic; the adapter's configuration handles platform mechanics. See `docs/v1-candidates/abac-and-attribute-axes.md` for the design that formalizes this for ABAC support.
+This principle has practical consequences: do not introduce a `Tag` class to the IR (that models mechanism, not meaning). Do not put platform-specific tag references in policy files. Do not model coordination labels (`team: fraud-ops`, `cost-center: 12345`) as data attributes; those are operational metadata. The IR's vocabulary stays semantic; the adapter's configuration handles platform mechanics. See `docs/v1-candidates/abac-and-attribute-axes.md` for the design that formalizes this for ABAC support.
 
 ---
 
-## What to do next — recommended priorities
+## What to do next: recommended priorities
 
 These are not strict orderings; the user may redirect. But this is what the project most needs:
 
-### Priority 1 — Enable GitHub Pages and verify URLs resolve
+### Priority 1: Enable GitHub Pages and verify URLs resolve
 
 Settings → Pages → Source: deploy from a branch (main, root). Once it builds, verify:
 
@@ -135,11 +135,11 @@ curl -I https://bgiesbrecht.github.io/tessera/spec/v0/ontology.ttl
 
 Both should return 200. Content types will be wrong (`.ttl` and `.jsonld` served as `text/plain` by default); this is acceptable for v0 and not worth fixing unless tools choke on it.
 
-### Priority 2 — ABAC support and attribute axes (in flight)
+### Priority 2: ABAC support and attribute axes (in flight)
 
 The two row-visibility worked examples (group-based and ACL-table) are complete. The next substantial design work is adding ABAC support to v0: orthogonal attribute axes, scoped policy attachment, composable attribute selectors, and tag-taxonomy mapping as adapter configuration.
 
-The scoping document is `docs/v1-candidates/abac-and-attribute-axes.md`. The directory name (`v1-candidates`) is historical — these additions now land in v0 per ADR-017. The scoping document proposes four structural additions to v0 and outlines a worked exercise to validate them.
+The scoping document is `docs/v1-candidates/abac-and-attribute-axes.md`. The directory name (`v1-candidates`) is historical; these additions now land in v0 per ADR-017. The scoping document proposes four structural additions to v0 and outlines a worked exercise to validate them.
 
 The framing principle is **View 2: meaning over mechanism**. Tessera expresses *what* policies decide about data (semantic attributes like "PII" or "EU resident"), not *how* the platform records those attributes (governed tags on Databricks, object tags on Snowflake, classification tables elsewhere). The IR carries axes and values; the adapter handles the mechanism translation via per-environment tag-taxonomy configuration.
 
@@ -154,21 +154,21 @@ The user may need to construct an ABAC example in the test notebook to enable Ph
 
 A separate, deferred ACL-table-driven exercise (using the `byDataset` selector and a custom-pattern adapter) is also tracked but completed in an earlier round.
 
-### Priority 3 — JSON Schema for structural validation (done)
+### Priority 3: JSON Schema for structural validation (done)
 
 `spec/v0/schema.json` exists. JSON Schema 2020-12; structural validation only, per §4.2 of the technical design. Validates both single-policy and `@graph` documents. Enforces conditional dependencies (e.g., `baselineGroup` required when `defaultStrategy` is `explicit-baseline-group`; `transformation` required iff `@type` is `ColumnVisibilityConstraint`). Semantic constraints (CURIE resolution, classification membership) are deliberately left for SHACL.
 
 Validated against the worked-example artifacts and the technical-design §4.5 ACL example.
 
-### Priority 4 — A first cut of SHACL shapes (complete, 2026-05-19)
+### Priority 4: A first cut of SHACL shapes (complete, 2026-05-19)
 
 `spec/v0/shapes.ttl` exists and validates all seven worked-example JSON-LD policies. The shape coverage is intentionally scoped to the semantic checks JSON Schema cannot perform: closed vocabularies (policyKind, action, effect, defaultStrategy, condition operator, selector kind), IRI/class typing of axis references (AttributeAxis), and node shapes invoked via `sh:node` (the JSON-LD `@type` is not asserted on blank nodes, so `sh:targetClass` is unreliable). Conditional dependencies (baselineGroup↔defaultStrategy, defaultBranch↔defaultStrategy, transformation↔effect, selector-kind→required-fields, transformation-type→required-params) are deliberately deferred to the JSON Schema layer; SHACL would express them as verbose `sh:or`/`sh:not` biconditionals with no additional safety beyond what the schema already provides. The shapes file also surfaced one semantic clarification worth recording: `defaultBranch` carries no `principal` (it applies to whichever principals match no preceding rule), so the rule-shape requirement of `principal` does not extend to it. This is implicit in ADR-014 and now also visible in shapes.ttl's comment.
 
-### Priority 5 — The converter tool (v1 complete, 2026-05-20)
+### Priority 5: The converter tool (v1 complete, 2026-05-20)
 
-`tools/converter/` — Python YAML → JSON-LD converter. v1 scope:
+`tools/converter/`: a Python YAML → JSON-LD converter. v1 scope:
 - **Envelope-form** YAML (the practitioner shape: `policy: { id, kind, ... }`) and **flat-form** YAML (JSON-LD-shaped YAML used in earlier worked examples) both accepted.
-- Mechanical mapping: envelope unwrap, `id → @id` with `policy:` prefix injection, `kind → policyKind`, context-aware `type → @type` (datasets and operands convert; transformation `type` stays — the schema explicitly requires lowercase).
+- Mechanical mapping: envelope unwrap, `id → @id` with `policy:` prefix injection, `kind → policyKind`, context-aware `type → @type` (datasets and operands convert; transformation `type` stays, since the schema explicitly requires lowercase).
 - Canonical `@context` URL injected at root.
 - Trailing-whitespace normalization on string values (handles YAML block-scalar artifacts).
 - CLI entry: `python -m tools.converter <file.tessera.yaml> [--out path]`.
@@ -179,16 +179,16 @@ Validated against the worked-example artifacts and the technical-design §4.5 AC
 v1 deferred:
 - **Comment preservation** per ADR-004 (positional YAML round-trips; `rdfs:comment` mapping on YAML → JSON-LD). Architecture is comment-preservation-ready (round-trip ruamel parser); the feature is a follow-up.
 - **JSON-LD → YAML direction.** Single-direction (YAML as source of truth) covers the practitioner path. Reverse direction belongs with the adapter extraction story (migration use case).
-- **Descriptive-field drift in the existing corpus** — 5 of 11 examples have prose differences between their YAML and committed JSON-LD (the regression test surfaces these as informational findings). A follow-up regeneration commit would zero this out by re-running the converter against every YAML and committing the new JSON-LDs as the canonical form.
+- **Descriptive-field drift in the existing corpus.** 5 of 11 examples have prose differences between their YAML and committed JSON-LD (the regression test surfaces these as informational findings). A follow-up regeneration commit would zero this out by re-running the converter against every YAML and committing the new JSON-LDs as the canonical form.
 
-### Priority 6 — Adapter scaffolds (complete, 2026-05-19)
+### Priority 6: Adapter scaffolds (complete, 2026-05-19)
 
 Two adapters were scaffolded simultaneously (Unity Catalog and Snowflake) to pressure-test the contract from two platforms at once. ADR-024 records the resulting contract shape. The scaffold ships:
 
-- `adapters/contract/` — `Adapter` ABC, `CapabilityProfile` (closed `Capability` enum), `AdapterConfig` (the concrete implementation of ADR-021's identity-binding / tag-taxonomy mapping), structured Result types (`EmissionResult`, `DiscoveryResult`, `ExtractionResult`, `ReconciliationResult`), `Diagnostic` with severity / code / message / location.
-- `adapters/unity_catalog/` — emission live for group-driven row-visibility policies; uses `is_account_group_member(...)` and `SET ROW FILTER`.
-- `adapters/snowflake/` — emission live for the same policy shape; uses `IS_ROLE_IN_SESSION('...')` and `ADD ROW ACCESS POLICY`. Connection-handling lazy-imports `snowflake-connector-python` (not in `.venv` by default).
-- `adapters/tests/test_parity.py` — loads `spec/v0/examples/group-row-visibility-policy-a.jsonld`, emits through both adapters, and asserts the platform-specific principal-binding mechanism is present in each output and that the SQL diverges meaningfully.
+- `adapters/contract/`: `Adapter` ABC, `CapabilityProfile` (closed `Capability` enum), `AdapterConfig` (the concrete implementation of ADR-021's identity-binding / tag-taxonomy mapping), structured Result types (`EmissionResult`, `DiscoveryResult`, `ExtractionResult`, `ReconciliationResult`), `Diagnostic` with severity / code / message / location.
+- `adapters/unity_catalog/`: emission live for group-driven row-visibility policies; uses `is_account_group_member(...)` and `SET ROW FILTER`.
+- `adapters/snowflake/`: emission live for the same policy shape; uses `IS_ROLE_IN_SESSION('...')` and `ADD ROW ACCESS POLICY`. Connection-handling lazy-imports `snowflake-connector-python` (not in `.venv` by default).
+- `adapters/tests/test_parity.py`: loads `spec/v0/examples/group-row-visibility-policy-a.jsonld`, emits through both adapters, and asserts the platform-specific principal-binding mechanism is present in each output and that the SQL diverges meaningfully.
 
 Adapters never execute. They return structured Results; the caller composes execution with its own logging, retry, dry-run, and audit policy. The Databricks `.venv` already includes `databricks-sdk`; Snowflake live testing requires `pip install snowflake-connector-python` against the provided account (`FBGQMMZ-DCC90967.snowflakecomputing.com`, user `BGIESBRECHT`, warehouse `COMPUTE_WH`, db `ACME`, schema `TESSERA`).
 
@@ -237,17 +237,17 @@ When working in this repository:
 
 The user (Brice, github: `bgiesbrecht`) established the repository and has run several rounds of design refinement on top of the initial commits. The immediate context as of this handoff:
 
-- Documents and spec artifacts are committed at v0 — including ADR-013 (`defaultStrategy`/`baselineGroup`), ADR-014 (Policy container), ADR-015 (ordered first-match combining), ADR-016 (transformation parameterization), ADR-017 (suspended immutability), ADR-018–021 (ABAC additions — AttributeAxis, `byScope`, composable attribute matching, adapter configuration mapping pattern), ADR-022 (transformation constraint is effect-driven, not policy-kind-driven), and ADR-023 (cross-policy combination γ-with-refinement).
+- Documents and spec artifacts are committed at v0, including ADR-013 (`defaultStrategy`/`baselineGroup`), ADR-014 (Policy container), ADR-015 (ordered first-match combining), ADR-016 (transformation parameterization), ADR-017 (suspended immutability), ADR-018–021 (ABAC additions: AttributeAxis, `byScope`, composable attribute matching, adapter configuration mapping pattern), ADR-022 (transformation constraint is effect-driven, not policy-kind-driven), and ADR-023 (cross-policy combination γ-with-refinement).
 - **The v0 immutability bar is suspended** per ADR-017, until external dependency exists. ADR-014's closing claim that the bar came down with its commit chain was anticipatory and is now superseded. Spec additions continue to land in v0, each captured as an ADR.
 - GitHub Pages is enabled; URLs under `https://bgiesbrecht.github.io/tessera/spec/v0/` resolve.
 - **Eight worked examples complete** (seven Databricks; one Snowflake):
-  - **Group-based row visibility** — Phase 1 / 2 / 3 done against `RLS Demo (3).ipynb` cells 1–9. Artifacts at `spec/v0/examples/group-row-visibility-*`. Drove ADR-014 / ADR-015.
-  - **ACL-table-driven row visibility** — Phase 1 / 2 / 3 done against `RLS Demo (3).ipynb` cells 11–15. Artifacts at `spec/v0/examples/acl-row-visibility-*`. Exercised `byDataset` / `PrincipalSetFromTable`; surfaced four v1-candidate gaps (issues #7–#11).
-  - **Column mask on `orders.o_clerk`** — single-pass / combined-input exercise (the SQL was shared up front). Artifacts at `spec/v0/examples/column-mask-orders-clerk-*`. Surfaced and corrected the over-tight transformation constraint (ADR-022).
-  - **ABAC column mask on `orders_abac.o_clerk`** — full blind derivation. Artifacts at `spec/v0/examples/abac-column-mask-*`. Drove ADR-023 (γ-with-refinement for cross-policy combination via the `MULTIPLE_MASKS` observation).
-  - **ABAC row filter on `orders_abac.o_orderpriority`** — full blind derivation. Artifacts at `spec/v0/examples/abac-row-filter-priority-*`. Surfaced issue #12 (`policy-two-axis-attribute-matching`); reinforced the Mechanism A vs B design observation (§4.10 of technical design).
-  - **Snowflake `byDataset` row visibility on `ACME.TESSERA.SNOW_ORDERS_RLS_ACL`** — adapted-business-requirements derivation (no competing impl). Artifacts at `spec/v0/examples/snowflake-byDataset-row-visibility-*`. All four scenarios pass including secondary-roles immunity (`USE SECONDARY ROLES NONE` and `ALL` produce identical row counts because `CURRENT_USER()` ignores role activation). Empirically grounds the user-doc recommendation of `byDataset` + mapping table as the preferred Snowflake authoring pattern. Surfaced one v1 candidate: `ResourceSetFromTable.resourceColumn` is conflated as both ACL column and protected-table column.
-  - **Table-grants RBAC exercise** — three scenarios (single-table read, schema-level read with downward propagation, function execute). Artifacts at `spec/v0/examples/table-grants-*`. Brief at `docs/exercises/table-grants-handoff.md`. Live-verified on Databricks; propagation test confirmed `GRANT ... ON SCHEMA` extends to new tables created post-grant. Drove ADR-025 (`Execute` action added to v0 with semantic-vs-mechanism boundary) and surfaced two open candidates: `AccessGrantConstraint` policyKind (#15), `function:` IRI prefix formalization. Closed issue #10 (policy-execute-grants).
+  - **Group-based row visibility.** Phase 1 / 2 / 3 done against `RLS Demo (3).ipynb` cells 1–9. Artifacts at `spec/v0/examples/group-row-visibility-*`. Drove ADR-014 / ADR-015.
+  - **ACL-table-driven row visibility.** Phase 1 / 2 / 3 done against `RLS Demo (3).ipynb` cells 11–15. Artifacts at `spec/v0/examples/acl-row-visibility-*`. Exercised `byDataset` / `PrincipalSetFromTable`; surfaced four v1-candidate gaps (issues #7–#11).
+  - **Column mask on `orders.o_clerk`.** Single-pass / combined-input exercise (the SQL was shared up front). Artifacts at `spec/v0/examples/column-mask-orders-clerk-*`. Surfaced and corrected the over-tight transformation constraint (ADR-022).
+  - **ABAC column mask on `orders_abac.o_clerk`.** Full blind derivation. Artifacts at `spec/v0/examples/abac-column-mask-*`. Drove ADR-023 (γ-with-refinement for cross-policy combination via the `MULTIPLE_MASKS` observation).
+  - **ABAC row filter on `orders_abac.o_orderpriority`.** Full blind derivation. Artifacts at `spec/v0/examples/abac-row-filter-priority-*`. Surfaced issue #12 (`policy-two-axis-attribute-matching`); reinforced the Mechanism A vs B design observation (§4.10 of technical design).
+  - **Snowflake `byDataset` row visibility on `ACME.TESSERA.SNOW_ORDERS_RLS_ACL`.** Adapted-business-requirements derivation (no competing impl). Artifacts at `spec/v0/examples/snowflake-byDataset-row-visibility-*`. All four scenarios pass including secondary-roles immunity (`USE SECONDARY ROLES NONE` and `ALL` produce identical row counts because `CURRENT_USER()` ignores role activation). Empirically grounds the user-doc recommendation of `byDataset` + mapping table as the preferred Snowflake authoring pattern. Surfaced one v1 candidate: `ResourceSetFromTable.resourceColumn` is conflated as both ACL column and protected-table column.
+  - **Table-grants RBAC exercise.** Three scenarios (single-table read, schema-level read with downward propagation, function execute). Artifacts at `spec/v0/examples/table-grants-*`. Brief at `docs/exercises/table-grants-handoff.md`. Live-verified on Databricks; propagation test confirmed `GRANT ... ON SCHEMA` extends to new tables created post-grant. Drove ADR-025 (`Execute` action added to v0 with semantic-vs-mechanism boundary) and surfaced two open candidates: `AccessGrantConstraint` policyKind (#15), `function:` IRI prefix formalization. Closed issue #10 (policy-execute-grants).
 - **ABAC scoping work complete; Stage 4 spec changes landed 2026-05-19.** `docs/v1-candidates/abac-and-attribute-axes.md` is the design document. ADRs 018–021 are filed, the two ABAC worked exercises (column-mask and row-filter) validated the design empirically, and Stage 4 spec changes are now in `spec/v0/ontology.ttl`, `spec/v0/context.jsonld`, `spec/v0/schema.json`, and `docs/technical-design-v0.2.md` §3.3 / §3.3a / §4.9 / §4.10 / §5.6 / §5.7. ADR-023 records the cross-policy combination resolution.
 - **Thirty-one GitHub issues** total. Resolved/closed: #1, #2, #5, #6, #10 (ADR-025), #15 (ADR-026), #26, #27, #28, #29. Open from worked-example findings: #3 (deferred-not-needed-yet), #4, #7, #8, #9, #11, #12, #13, #14. Open from the 2026-05-19 governance-gap survey: #16–#25 (see `docs/handoffs/2026-05-19-governance-gaps-handoff.md`). Open from the 2026-05-20 migration-cycle work (0.4.0+): #30 (UC ABAC byScope column-mask), #31 (Snowflake ABAC byScope). Phase 2 scoping documents for #19/#21/#25 are still queued.
 - `spec/v0/schema.json` exists and reflects the Policy container, ADR-016/022 transformation shape, and (post Stage 4) the ABAC `byScope` + `matching` vocabulary. All **seven** committed JSON-LD examples validate cleanly.
@@ -267,22 +267,22 @@ The user values:
 
 ## Final note
 
-This document is itself an artifact and may need updating. When ADRs are added, when the project's state changes meaningfully, when the priorities shift — this document should be revised so that the next handoff (whether to another tool, another contributor, or a future session) inherits an accurate picture rather than a stale one.
+This document is itself an artifact and may need updating. When ADRs are added, when the project's state changes meaningfully, when the priorities shift, this document should be revised so that the next handoff (whether to another tool, another contributor, or a future session) inherits an accurate picture rather than a stale one.
 
 The document should be revised by appending updates with dates, not by silently rewriting history. Stale sections can be marked as such rather than deleted.
 
 ---
 
-## State update — 2026-08-05
+## State update: 2026-08-05
 
 Several sections above predate substantial work and are **superseded**; read this update over them:
 
 - **"What's planned but not built" and "No converter, linter, or adapter scaffolding exists yet" are stale.** The converter (`tools/converter/`), both adapters (UC + Snowflake, full ADR-024 emit/discover/extract/reconcile cycle), SHACL shapes (`spec/v0/shapes.ttl`), and a unified CLI (`tools/cli/`, `python -m tools.cli`) all exist. The "next concrete deliverable is SHACL shapes" note is long overtaken.
-- **Change-impact analysis shipped (0.7.0).** `tools/impact/` — a static, advisory tool that reports how a proposed change to a policy corpus alters what it decides, before emission. Checks C1–C6 plus standing lints L1/L2; `tessera impact` / `tessera lint` in the unified CLI. It holds the ADR-001 line rigorously (reasons about selector expressions, never populations). Design: `docs/v1-candidates/change-impact-analysis.md`; usage: `docs/user-guide/analyzing-changes.md`; project map: `docs/ROADMAP.md` (new).
-- **Worked examples: eight** (not seven as stated above) — seven Databricks, one Snowflake.
+- **Change-impact analysis shipped (0.7.0).** `tools/impact/`: a static, advisory tool that reports how a proposed change to a policy corpus alters what it decides, before emission. Checks C1–C6 plus standing lints L1/L2; `tessera impact` / `tessera lint` in the unified CLI. It holds the ADR-001 line rigorously (reasons about selector expressions, never populations). Design: `docs/v1-candidates/change-impact-analysis.md`; usage: `docs/user-guide/analyzing-changes.md`; project map: `docs/ROADMAP.md` (new).
+- **Worked examples: eight** (not seven as stated above): seven Databricks, one Snowflake.
 - **Issue status:** #30 (UC ABAC byScope column-mask) closed in 0.6.3; the listing above showing it open is stale. #31 (Snowflake ABAC byScope) remains the open adapter item.
-- **The ABAC sequencing note is historical** — that work completed (ADRs 018–023, Stage 4 spec changes, and byScope emission on UC).
+- **The ABAC sequencing note is historical.** That work completed (ADRs 018–023, Stage 4 spec changes, and byScope emission on UC).
 
-Current priorities, superseding the "recommended priorities" framing above: (1) Snowflake ABAC `byScope` emission (#31); (2) the scoping-needed in-scope gaps — audit-logging obligation vocabulary (#19), retention (#21), AI-governance axes (#25); (3) the third adapter (custom ACL-table pattern). See `docs/ROADMAP.md` for the consolidated, maintained view — prefer it over this handoff's older status prose.
+Current priorities, superseding the "recommended priorities" framing above: (1) Snowflake ABAC `byScope` emission (#31); (2) the scoping-needed in-scope gaps: audit-logging obligation vocabulary (#19), retention (#21), AI-governance axes (#25); (3) the third adapter (custom ACL-table pattern). See `docs/ROADMAP.md` for the consolidated, maintained view; prefer it over this handoff's older status prose.
 
-**Update 2026-08-05 (0.8.0) — ADR-028: attribute values are vocabulary IRIs.** `spec/v0/context.jsonld` now declares a top-level `@vocab` and `sensitivity` is `"@type": "@vocab"` (matching the other axes). Authoring rule: **a bare attribute value is Tessera's vocabulary (`PII` ⇒ `tessera:PII`); an explicit prefix is an adopter specialization (`acme:PIIClerk`)**. The ABAC column-mask examples' `PIIClerk` (always described as an adopter stand-in) is now `acme:PIIClerk`. This unblocked ontology `subClassOf*` subsumption for the graph path and fixed a UC-adapter bug where a namespaced value's colon produced an invalid SQL alias. Line 151 above ("`sensitivity: PIIClerk`") refers to the concept; the policy files carry `acme:PIIClerk`.
+**Update 2026-08-05 (0.8.0): ADR-028, attribute values are vocabulary IRIs.** `spec/v0/context.jsonld` now declares a top-level `@vocab` and `sensitivity` is `"@type": "@vocab"` (matching the other axes). Authoring rule: **a bare attribute value is Tessera's vocabulary (`PII` ⇒ `tessera:PII`); an explicit prefix is an adopter specialization (`acme:PIIClerk`)**. The ABAC column-mask examples' `PIIClerk` (always described as an adopter stand-in) is now `acme:PIIClerk`. This unblocked ontology `subClassOf*` subsumption for the graph path and fixed a UC-adapter bug where a namespaced value's colon produced an invalid SQL alias. Line 151 above ("`sensitivity: PIIClerk`") refers to the concept; the policy files carry `acme:PIIClerk`.

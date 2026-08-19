@@ -10,31 +10,31 @@
 
 ### 1.1 Context
 
-Modern data platforms — Snowflake, Databricks, and others — each provide rich, native mechanisms for enforcing data governance: row-level security, column masking, access grants, tag-based policies, and cross-account sharing. These mechanisms are deeply integrated with each platform's query engine, identity model, and catalog. Individually, they are fit for purpose.
+Modern data platforms (Snowflake, Databricks, and others) each provide rich, native mechanisms for enforcing data governance: row-level security, column masking, access grants, tag-based policies, and cross-account sharing. These mechanisms are deeply integrated with each platform's query engine, identity model, and catalog. Individually, they are fit for purpose.
 
-The difficulty arises when an organization operates across more than one platform. The *business rules* an organization needs to enforce — who can see what data, under what circumstances, for what purpose, with what obligations — are platform-independent. The *mechanisms* available to enforce them are not. Two platforms with the same governance intent will encode it in different SQL, different catalog objects, different identity primitives, and different runtime behaviors.
+The difficulty arises when an organization operates across more than one platform. The *business rules* an organization needs to enforce (who can see what data, under what circumstances, for what purpose, with what obligations) are platform-independent. The *mechanisms* available to enforce them are not. Two platforms with the same governance intent will encode it in different SQL, different catalog objects, different identity primitives, and different runtime behaviors.
 
-A further complication: many organizations have, over time, built their own enforcement patterns that predate or sit alongside native platform mechanisms. ACL tables joined into views, middleware that injects predicates, BI-tool row contexts, application-layer interceptors. These patterns are no less real as policy than native constructs — and in many enterprises, they hold the majority of the actual access logic.
+A further complication: many organizations have, over time, built their own enforcement patterns that predate or sit alongside native platform mechanisms. ACL tables joined into views, middleware that injects predicates, BI-tool row contexts, application-layer interceptors. These patterns are no less real as policy than native constructs, and in many enterprises they hold the majority of the actual access logic.
 
 ### 1.2 The problem in plain terms
 
-Organizations that operate across multiple data platforms, or that wish to migrate between them, currently have no portable way to express, review, transport, or reconcile their data governance policies. Each policy must be authored, maintained, and audited separately in each platform's native form, and the *intent* behind those policies — the business rule the policy was meant to enforce — is lost in the translation to platform-specific code.
+Organizations that operate across multiple data platforms, or that wish to migrate between them, currently have no portable way to express, review, transport, or reconcile their data governance policies. Each policy must be authored, maintained, and audited separately in each platform's native form, and the *intent* behind those policies (the business rule the policy was meant to enforce) is lost in the translation to platform-specific code.
 
 ### 1.3 Concrete harms this produces
 
 - **Migration cost.** Moving a workload from Snowflake to Databricks, or the reverse, requires manually rewriting every access policy, row filter, and masking rule. The work is tedious, error-prone, and the resulting policies must be re-audited from scratch.
-- **Drift between platforms.** When the same business rule exists in two places, the implementations diverge over time. Reconciling them — proving they enforce the same thing — is a manual, expert-led exercise.
+- **Drift between platforms.** When the same business rule exists in two places, the implementations diverge over time. Reconciling them (proving they enforce the same thing) is a manual, expert-led exercise.
 - **Loss of intent.** Native policy code captures *what* is enforced but not *why*. A masking rule attached to a column has no machine-readable record that it exists because the column is PII, that the exception for fraud investigators reflects a specific business purpose, or that the rule originated from a particular regulation. Reviewers and auditors must reconstruct intent from code, comments, and institutional memory.
 - **Inability to reason across platforms.** Questions like "show me every place where PII is accessible without a logged audit obligation" cannot be answered uniformly. Each platform must be queried separately, in its own terms, by someone fluent in that platform.
-- **Custom enforcement patterns are invisible.** Where governance is enforced via homegrown patterns — ACL tables, view layers, middleware — there is no shared vocabulary in which those patterns and native platform policies can be compared.
-- **Reluctance to migrate or modernize.** The cumulative effect of the above is that organizations defer platform changes, defer adoption of better native governance features, and defer harmonization of policy across the enterprise — not because the changes are technically infeasible but because the policy-translation cost is unbounded.
+- **Custom enforcement patterns are invisible.** Where governance is enforced via homegrown patterns (ACL tables, view layers, middleware), there is no shared vocabulary in which those patterns and native platform policies can be compared.
+- **Reluctance to migrate or modernize.** The cumulative effect of the above is that organizations defer platform changes, defer adoption of better native governance features, and defer harmonization of policy across the enterprise, not because the changes are technically infeasible but because the policy-translation cost is unbounded.
 
 ### 1.4 Who is affected
 
 - **Data platform engineers** who must implement and maintain policies in each platform.
 - **Data governance and security teams** who must verify that policies meet stated intent, and that intent is consistent across platforms.
 - **Compliance and audit functions** that must produce evidence of effective controls and explain *why* controls exist.
-- **Business stakeholders** whose intent is encoded — and frequently lost — somewhere between their original requirement and the platform DDL that implements it.
+- **Business stakeholders** whose intent is encoded, and frequently lost, somewhere between their original requirement and the platform DDL that implements it.
 - **Architecture and platform-strategy leadership** for whom platform choice is currently constrained by migration cost rather than fit.
 
 ### 1.5 Why existing approaches do not solve this
@@ -52,7 +52,7 @@ The gap is specifically: a *portable, intent-preserving representation of data-p
 
 The effort succeeds if it produces all of the following:
 
-1. **A portable representation of data governance policies** that captures intent — including classification, purpose, principal, conditions, transformations, and obligations — independent of any specific platform's mechanisms.
+1. **A portable representation of data governance policies** that captures intent (including classification, purpose, principal, conditions, transformations, and obligations) independent of any specific platform's mechanisms.
 2. **A vocabulary of governance concepts** grounded in established standards where possible, such that the same concept (PII, purpose, jurisdiction, masking) means the same thing across platforms and across organizations.
 3. **The ability to extract existing policy from a platform into the portable representation**, including from custom enforcement patterns, with explicit confidence indicators where extraction involves inference.
 4. **The ability to emit policy from the portable representation into a target platform's native or custom mechanisms**, with a clear and honest report of which parts are fully enforced, partially enforced, or unsupported on that target.
@@ -61,7 +61,7 @@ The effort succeeds if it produces all of the following:
 
 ### 1.7 Non-goals
 
-To keep scope honest, the following are explicitly out of scope for the initial effort:
+Out of scope for the initial effort:
 
 - **A runtime policy enforcement engine.** The project compiles to native enforcement; it does not run as a query-time gateway.
 - **Data quality, lineage, retention, or contract policies.** These are adjacent and important, but each is its own problem and conflating them slows all of them down. Reserved for future extension.
@@ -77,11 +77,11 @@ The effort is successful when:
 - The portable representation can be reviewed by governance stakeholders as a primary artifact, not as a secondary translation of "the real policy."
 - The same portable representation can be emitted to a different target platform such that the resulting native enforcement is behaviorally equivalent within a documented and accepted set of trade-offs.
 - The custom enforcement pattern of at least one real customer is supported through the extension mechanism, without requiring changes to the core specification.
-- Stakeholders — engineers, security, compliance, leadership — agree the artifact captures their intent and can be used as the basis for cross-platform governance discussions.
+- Stakeholders (engineers, security, compliance, leadership) agree the artifact captures their intent and can be used as the basis for cross-platform governance discussions.
 
 ### 1.9 Constraints and principles
 
-The work is bound by the following:
+The work is bound by these principles:
 
 - **Intent over mechanism.** The representation captures what a policy is meant to achieve, not the specific code that achieves it on any one platform.
 - **Honesty over completeness.** Where translation is lossy, the loss must be visible and explicit, not silently papered over.
@@ -97,13 +97,13 @@ The work is bound by the following:
 
 The recommended approach is to define a **portable, intent-preserving representation of data governance policies**, supported by an **extensible adapter model** that connects the portable representation to the specific platforms and patterns where policies are actually enforced. The core of the project is the representation and its surrounding vocabulary; the adapters are the means by which the representation meets the real world.
 
-This is a single direction with two complementary halves: the *what* (the portable representation and its vocabulary) and the *how* (the adapters that move policy between the representation and real systems).
+The direction has two complementary halves: the *what* (the portable representation and its vocabulary) and the *how* (the adapters that move policy between the representation and real systems).
 
 ### 2.2 Core elements of the approach
 
 #### A vocabulary of governance concepts
 
-A shared definition of the entities involved in data governance — principals, resources, classifications, purposes, jurisdictions, conditions, obligations, transformations, and the kinds of policy that connect them. This vocabulary is the agreement that makes everything else possible: it is what allows "PII" or "purpose of access" to mean the same thing in two different platforms and two different organizations. Where existing standards cover parts of this vocabulary, they are adopted directly.
+A shared definition of the entities involved in data governance: principals, resources, classifications, purposes, jurisdictions, conditions, obligations, transformations, and the kinds of policy that connect them. This vocabulary is the agreement that makes everything else possible: it is what allows "PII" or "purpose of access" to mean the same thing in two different platforms and two different organizations. Where existing standards cover parts of this vocabulary, they are adopted directly.
 
 #### A portable representation of policies
 
@@ -111,9 +111,9 @@ A canonical form in which a policy can be expressed, reviewed, stored, and excha
 
 #### Adapters as the bridge to real systems
 
-Each platform or enforcement pattern is connected to the portable representation through an adapter. An adapter has two responsibilities: **extraction** — reading what exists in a platform and lifting it into the portable representation — and **emission** — taking a policy from the portable representation and producing the native artifacts that enforce it.
+Each platform or enforcement pattern is connected to the portable representation through an adapter. An adapter has two responsibilities: **extraction** (reading what exists in a platform and lifting it into the portable representation) and **emission** (taking a policy from the portable representation and producing the native artifacts that enforce it).
 
-Adapters are first-class. The project ships with adapters for Snowflake-native and Databricks-native enforcement at minimum. Custom enforcement patterns — such as the ACL-table-and-view pattern used by some customers — are supported through additional adapters, authored against a stable adapter contract. An organization that has a custom pattern can connect it to the portable representation by writing an adapter for it; the rest of the system works unchanged.
+Adapters are first-class. The project ships with adapters for Snowflake-native and Databricks-native enforcement at minimum. Custom enforcement patterns (such as the ACL-table-and-view pattern used by some customers) are supported through additional adapters, authored against a stable adapter contract. An organization that has a custom pattern can connect it to the portable representation by writing an adapter for it; the rest of the system works unchanged.
 
 #### A capability and confidence model
 
@@ -123,7 +123,7 @@ Similarly, extraction is not always certain. Inferring intent from native DDL or
 
 #### A human-friendly authoring surface
 
-In addition to the portable representation, the project provides a human-oriented way to author and review policies. This authoring surface is designed for the people who actually write and maintain governance rules — data engineers, security professionals, governance leads — and is deliberately separate from the machine-readable representation that the adapters consume. The authoring surface is a projection of the representation, not a replacement for it.
+In addition to the portable representation, the project provides a human-oriented way to author and review policies. This authoring surface is designed for the people who actually write and maintain governance rules (data engineers, security professionals, governance leads), and is deliberately separate from the machine-readable representation that the adapters consume. The authoring surface is a projection of the representation, not a replacement for it.
 
 ### 2.3 How this addresses the stated problem
 
@@ -156,14 +156,14 @@ The choice of operating model is a stakeholder decision and should be made delib
 
 ### 2.6 What it will take to demonstrate the approach
 
-A credible demonstration of the recommended approach involves the following, in roughly the following order:
+Demonstrating the approach involves the following, in roughly this order:
 
 1. **An agreed vocabulary** for the initial scope of governance concepts.
 2. **A defined portable representation** that uses that vocabulary.
-3. **One end-to-end adapter pair** — extraction and emission — for a chosen first platform.
+3. **One end-to-end adapter pair** (extraction and emission) for a chosen first platform.
 4. **A second adapter pair** for a different platform, with a worked round-trip showing behavioral equivalence within stated trade-offs.
 5. **A custom-pattern adapter** for at least one real-world non-native enforcement pattern, demonstrating that the extension model holds.
-6. **A reviewable corpus** of real policies — extracted, represented, re-emitted, and reviewed by stakeholders — showing that the artifacts are useful, not just internally consistent.
+6. **A reviewable corpus** of real policies (extracted, represented, re-emitted, and reviewed by stakeholders), showing that the artifacts are useful, not just internally consistent.
 
 Each of these steps produces an artifact that can be evaluated independently, so the approach can be validated incrementally rather than only at the end.
 
@@ -173,10 +173,10 @@ These are decisions that should be made before, or early in, the work. They are 
 
 1. **Scope of policy types.** Should the initial scope be access policies only, or include sharing, retention, and other adjacent kinds? The recommendation is access-only for the first iteration, with reserved space for the rest.
 2. **Operating model.** Will the portable representation be treated as source of truth, as reconciliation layer, or as a hybrid? This choice shapes governance processes more than it shapes design.
-3. **Primary authoring audience.** Who writes policies in the new system — data engineers, governance professionals, business stakeholders? Different audiences imply different authoring surfaces.
+3. **Primary authoring audience.** Who writes policies in the new system (data engineers, governance professionals, business stakeholders)? Different audiences imply different authoring surfaces.
 4. **Standards posture.** Is this an internal capability, an open specification, or eventually a candidate for standards-body adoption? The choice affects governance, IP, and how aggressively to align with existing standards bodies.
 5. **Custom-pattern strategy.** When a customer or business unit has a custom enforcement pattern, does the project build the adapter, or is adapter authorship a customer responsibility supported by a documented contract? The recommendation is that the project builds the first few to learn what the contract needs to be, then opens it.
-6. **Source-of-truth ownership.** Even within "portable representation as source of truth," who owns the representation — central platform team, governance organization, federated per data product? This is a Data Mesh question more than a technical one and should be settled before the tooling lands in production.
+6. **Source-of-truth ownership.** Even within "portable representation as source of truth," who owns the representation (central platform team, governance organization, federated per data product)? That is a Data Mesh question more than a technical one, and should be settled before the tooling lands in production.
 
 ---
 

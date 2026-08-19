@@ -96,7 +96,7 @@ def main() -> None:
 
     # Snowflake activates secondary roles per session. With the default of ALL,
     # `IS_ROLE_IN_SESSION(...)` returns true for every role granted to the user,
-    # regardless of which role is set as primary via USE ROLE — defeating the
+    # regardless of which role is set as primary via USE ROLE, defeating the
     # row-access policy's intended discrimination during testing. Disable secondary
     # roles for the probe so each USE ROLE actually exercises that role alone.
     cur.execute("USE SECONDARY ROLES NONE")

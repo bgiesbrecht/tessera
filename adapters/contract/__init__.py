@@ -1,4 +1,4 @@
-"""Adapter contract — the shared interface every platform adapter implements."""
+"""Adapter contract: the shared interface every platform adapter implements."""
 
 from adapters.contract.types import (
     Capability,

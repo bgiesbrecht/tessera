@@ -28,7 +28,7 @@ No other findings of substance. The behavioral logic is straightforward and maps
 |---|---|---|
 | Resource binding (`column:acme.tpch.orders.o_clerk`) | **Fully enforced** | `ALTER TABLE ... ALTER COLUMN ... SET MASK` attaches the masking function to the specific column. |
 | `orders_full_access` pass-through rule | **Fully enforced** | The `CASE WHEN is_account_group_member('orders_full_access') THEN o_clerk` branch returns the unredacted value for members. |
-| Default branch — Redact with literal | **Fully enforced** | The `ELSE 'CLERK-REDACTED'` branch returns the literal redaction value. Matches the Tessera `defaultBranch.transformation: { type: Redact, replacement: 'CLERK-REDACTED' }`. |
+| Default branch: Redact with literal | **Fully enforced** | The `ELSE 'CLERK-REDACTED'` branch returns the literal redaction value. Matches the Tessera `defaultBranch.transformation: { type: Redact, replacement: 'CLERK-REDACTED' }`. |
 | `defaultStrategy: negated-complement` | **Fully enforced** | The existing SQL is structurally negated-complement (unconditional `ELSE`). The Tessera declaration matches the implementation's intent. |
 | `effect: allow` (pass-through) | **Fully enforced** (post-ADR-022) | The pass-through branch is implemented; what the schema rejects is the *expression* of it, not its enforcement. ADR-022 corrects the schema. |
 | `effect: transform` + `Redact` transformation | **Fully enforced** | The literal `'CLERK-REDACTED'` replacement value is passed through unchanged. ADR-016's `Redact` parameter shape carries the value correctly. |
@@ -93,7 +93,7 @@ The right constraint is effect-driven, not policy-kind-driven:
 This applies symmetrically to `defaultBranch`:
 
 - A `defaultBranch` with `effect: transform` requires `transformation`.
-- A `defaultBranch` with `effect: allow` (rare but structurally legitimate — "if no rule matches, pass through") forbids it.
+- A `defaultBranch` with `effect: allow` (rare but structurally legitimate: "if no rule matches, pass through") forbids it.
 
 ### 4.2 Why this wasn't surfaced by ADR-016's own validation
 
@@ -103,7 +103,7 @@ The column-mask exercise is the first to exercise a multi-rule (or rule + defaul
 
 ### 4.3 Recommended correction: ADR-022
 
-A new ADR records the corrected constraint. The schema and the technical-design §4.2.2 update accordingly. The vocabulary in `ontology.ttl` does not need to change — the constraint was never an ontology axiom; it was an over-tight implementation choice in the schema. Per ADR-017, this admission of a corrected constraint is within the suspended-immutability window.
+A new ADR records the corrected constraint. The schema and the technical-design §4.2.2 update accordingly. The vocabulary in `ontology.ttl` does not need to change; the constraint was never an ontology axiom, only an over-tight implementation choice in the schema. Per ADR-017, this admission of a corrected constraint is within the suspended-immutability window.
 
 The diagnostic recommends:
 
@@ -119,7 +119,7 @@ The column-mask mechanism on Databricks (pre-ABAC `SET MASK` form, gated by `is_
 
 No new mechanism-specific timing surfaces here. The column-mask SQL evaluates the same `is_account_group_member` function the row filter evaluated, on the same cache; the propagation behavior is the same.
 
-The Databricks adapter capability profile (when built) would declare a single timing characteristic shared by both mechanisms — both depend on the account-group cache, so they share the latency. The disclosure structure from technical-design §5.2 supports this: timing is per-mechanism, but mechanisms that share a propagation path share a timing characteristic.
+The Databricks adapter capability profile (when built) would declare a single timing characteristic shared by both mechanisms, since both depend on the account-group cache. The disclosure structure from technical-design §5.2 supports this: timing is per-mechanism, but mechanisms that share a propagation path share a timing characteristic.
 
 ---
 
@@ -127,7 +127,7 @@ The Databricks adapter capability profile (when built) would declare a single ti
 
 | Requirement | Status |
 |---|---|
-| `CREATE FUNCTION` + `ALTER COLUMN ... SET MASK` accepted by Unity Catalog | ✓ — emission matches the verified mechanism. |
+| `CREATE FUNCTION` + `ALTER COLUMN ... SET MASK` accepted by Unity Catalog | ✓. Emission matches the verified mechanism. |
 | Applied to `o_clerk` on `acme.tpch.orders` | ✓. |
 | References `orders_full_access` verbatim | ✓. |
 | Uses literal `'CLERK-REDACTED'` | ✓ in both the Tessera `replacement` parameter and the SQL `ELSE` clause. |
@@ -142,7 +142,7 @@ The Databricks adapter capability profile (when built) would declare a single ti
 | Behavioral equivalence with existing SQL | **Pending Phase 3 verification** | Deploy and run; see the comparison document and the verification script. |
 | Cosmetic divergences (function name, GRANT EXECUTE, header comments) | **Accepted divergences** | Documented in the comparison; the GRANT EXECUTE is consistent with the policy-execute-grants v1 candidate (issue #10) already filed from the ACL exercise. |
 
-The exercise's value is in surfacing finding §4. The schema correction is small but real — without it, the natural shape for two-branch column masking (one rule + defaultBranch) cannot validate.
+The exercise surfaced finding §4. The schema correction is small but real. Without it, the natural shape for two-branch column masking (one rule + defaultBranch) cannot validate.
 
 ---
 

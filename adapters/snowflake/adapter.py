@@ -1,4 +1,4 @@
-"""Snowflake adapter — concrete Adapter implementation.
+"""Snowflake adapter: concrete Adapter implementation.
 
 Connection handling: the snowflake-connector-python dependency is imported lazily
 so the rest of the adapter contract is importable without it. Real execution

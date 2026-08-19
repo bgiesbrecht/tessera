@@ -128,14 +128,14 @@ def _render() -> str:
     # One representative report rendered in all three formats.
     fmt_report = _l1_dead_rules()
 
-    return f"""# Change-impact tool — output reference
+    return f"""# Change-impact tool: output reference
 
 > **Generated file.** Produced by `tools/impact/demo/build_output_reference.py`.
 > Every block below is real tool output, captured by running the checks against
 > the committed demo fixtures. Regenerate with
 > `./.venv/bin/python -m tools.impact.demo.build_output_reference`.
 
-This is a reference for *what the tool emits* — one example per check, plus each
+This is a reference for *what the tool emits*: one example per check, plus each
 output format. For the narrative walkthroughs see
 [`dead-rule-lint-demo.md`](../../../docs/exercises/dead-rule-lint-demo.md) and
 [`cross-policy-overlap-demo.md`](../../../docs/exercises/cross-policy-overlap-demo.md).
@@ -161,52 +161,52 @@ Findings are ordered PROVEN before CANDIDATE, then by check code.
 
 ## Diff checks (`tessera impact`)
 
-### C6 — exposure polarity: WIDEN
+### C6 exposure polarity: WIDEN
 
 A condition value-set gains a value on a `keep-matching-rows` rule.
 
 {_fence(render_text(_c6_widen()))}
 
-### C6 — exposure polarity: NARROW (with C1)
+### C6 exposure polarity: NARROW (with C1)
 
 Removing a rule reduces exposure, and the selector loses its last governing
-rule — so C1 reports where those principals now fall through.
+rule, so C1 reports where those principals now fall through.
 
 {_fence(render_text(_c6_narrow_and_c1()))}
 
-### C6 — exposure polarity: INVERT (transformation swap)
+### C6 exposure polarity: INVERT (transformation swap)
 
 `Redact` → `Hash` has no total order (scoping doc §9.4): the tool refuses to
 fabricate a direction and routes the substitution to review.
 
 {_fence(render_text(_c6_invert_transform()))}
 
-### C2 — default-net change
+### C2: default-net change
 
 `defaultStrategy` moves from fail-closed (`none`) to a baseline grant. This edit
 also trips C5: it names a `baselineGroup` without adding a rule that targets it,
-so the declared default branch is unreachable — a realistic mistake, and a good
+so the declared default branch is unreachable, a realistic mistake, and a good
 illustration of checks composing on one change.
 
 {_fence(render_text(_c2_default_net()))}
 
-### C3 — reachability / shadowing
+### C3: reachability / shadowing
 
 An unconditional grant is inserted above a narrower rule on the same selector,
 rendering it unreachable under ordered first-match (ADR-015).
 
 {_fence(render_text(_c3_shadowing()))}
 
-### C4 — cross-policy overlap
+### C4: cross-policy overlap
 
-Two column masks resolve to the same columns with divergent transformations —
+Two column masks resolve to the same columns with divergent transformations:
 the ADR-023 MULTIPLE_MASKS situation. Note the mixed confidence: the two
 attribute predicates provably overlap, while the predicate-vs-concrete-column
 pair is CANDIDATE with the unknown named.
 
 {_fence(render_text(_c4_overlap()))}
 
-### C5 — dangling reference
+### C5: dangling reference
 
 A condition operand points outside the policy's `appliesTo` scope.
 
@@ -223,14 +223,14 @@ inventing noise.
 
 ## Standing lints (`tessera lint`)
 
-### L1 — dead rules
+### L1: dead rules
 
 Every provably-unreachable rule in the corpus, naming the rule that shadows it.
 Healthy policies in the same corpus produce no findings.
 
 {_fence(render_text(_l1_dead_rules()))}
 
-### L2 — cross-policy overlap
+### L2: cross-policy overlap
 
 Every overlap currently present, regardless of when it was introduced.
 
@@ -248,7 +248,7 @@ The same report (L1, above) in each format. Select with `--format`.
 
 ### `--format md`
 
-Renders a table — useful for pasting into a pull-request comment.
+Renders a table, useful for pasting into a pull-request comment.
 
 {_fence(render_markdown(fmt_report), "markdown")}
 

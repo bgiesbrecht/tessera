@@ -62,7 +62,7 @@ def main() -> None:
     )
     print("  ensured: acme.tpch.orders")
 
-    # Scenario B target — initial table in the staging schema.
+    # Scenario B target: initial table in the staging schema.
     run_sql(
         w,
         "CREATE TABLE IF NOT EXISTS acme.tpch_staging.initial_table "

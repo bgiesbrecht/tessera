@@ -73,10 +73,10 @@ policy:
 
 **Key shapes:**
 
-- **`Policy` container** — one top-level shape carrying metadata (`appliesTo`, `action`, `defaultStrategy`) plus an ordered `rules` list. See ADR-014.
-- **Ordered first-match combining** — rules evaluate top-to-bottom; the first matching rule wins (ADR-015). If no rule matches, `defaultStrategy` controls the fallback.
-- **`byIdentity` selectors** — both for the resource (`table:...`) and for principals (`group:...`). The IR uses platform-neutral IRIs; the adapter resolves them.
-- **`in` condition** — single-operand membership test against a fixed list of values. Other operators: `eq`, `lt`, `gt`, `purpose-in`, `located-in`, `time-window`, `consent-granted`, `exists-in-dataset`.
+- **`Policy` container.** One top-level shape carrying metadata (`appliesTo`, `action`, `defaultStrategy`) plus an ordered `rules` list. See ADR-014.
+- **Ordered first-match combining.** Rules evaluate top-to-bottom; the first matching rule wins (ADR-015). If no rule matches, `defaultStrategy` controls the fallback.
+- **`byIdentity` selectors**, both for the resource (`table:...`) and for principals (`group:...`). The IR uses platform-neutral IRIs; the adapter resolves them.
+- **`in` condition:** single-operand membership test against a fixed list of values. Other operators: `eq`, `lt`, `gt`, `purpose-in`, `located-in`, `time-window`, `consent-granted`, `exists-in-dataset`.
 
 For the full authoring vocabulary, see [`authoring.md`](./authoring.md).
 
@@ -84,7 +84,7 @@ For the full authoring vocabulary, see [`authoring.md`](./authoring.md).
 
 ## 3. Mental model — JSON-LD canonical form
 
-YAML is what you write; JSON-LD is what the system reasons over. The conversion is mechanical (mapping keys, expanding short names to IRIs via the spec's `context.jsonld`). A v1 converter handles this — `python -m tools.converter <file.tessera.yaml> --out <file.jsonld>` or the library function `tools.converter.yaml_to_jsonld()`. Comment preservation in YAML round-trips and JSON-LD → YAML are deferred to v2.
+YAML is what you write; JSON-LD is what the system reasons over. The conversion is mechanical (mapping keys, expanding short names to IRIs via the spec's `context.jsonld`). A v1 converter handles this: `python -m tools.converter <file.tessera.yaml> --out <file.jsonld>` or the library function `tools.converter.yaml_to_jsonld()`. Comment preservation in YAML round-trips and JSON-LD → YAML are deferred to v2.
 
 For now, the JSON-LD is hand-maintained alongside the YAML. Look at `spec/v0/examples/group-row-visibility-policy-a.jsonld` for the canonical form of the policy above. The shape is similar; the IRIs are explicit and the `@context` line at the top declares the vocabulary namespace.
 
@@ -154,7 +154,7 @@ config = AdapterConfig(
 )
 ```
 
-The same IR can target different platforms by swapping the config — same `identity_bindings` keys (the IRIs), different values (the platform identifiers). See [`operating.md`](./operating.md) for the full configuration surface (including `tag_taxonomy` for ABAC).
+The same IR can target different platforms by swapping the config: same `identity_bindings` keys (the IRIs), different values (the platform identifiers). See [`operating.md`](./operating.md) for the full configuration surface (including `tag_taxonomy` for ABAC).
 
 ---
 
@@ -209,7 +209,7 @@ for stmt in result.statements:
     assert r.status.state == StatementState.SUCCEEDED, r.status.error
 ```
 
-**Verification.** After deployment, query the table as different users and confirm the row counts match the policy intent. On the live test we ran (`adapters/tests/live_databricks.py`), the caller was a member of `account users` only; they saw 4,499,708 rows (priorities 3, 4, 5 — the third branch of the policy).
+**Verification.** After deployment, query the table as different users and confirm the row counts match the policy intent. On the live test we ran (`adapters/tests/live_databricks.py`), the caller was a member of `account users` only; they saw 4,499,708 rows (priorities 3, 4, 5; the third branch of the policy).
 
 ---
 
@@ -250,11 +250,11 @@ ALTER TABLE ACME.TESSERA.SNOW_ORDERS
 ```
 
 Same IR; platform-divergent DDL. Note the differences:
-- `is_account_group_member` → `IS_ROLE_IN_SESSION` — Databricks groups, Snowflake roles.
-- `SET ROW FILTER` → `ADD ROW ACCESS POLICY` — different DDL primitives for the same concept.
+- `is_account_group_member` → `IS_ROLE_IN_SESSION`: Databricks groups, Snowflake roles.
+- `SET ROW FILTER` → `ADD ROW ACCESS POLICY`: different DDL primitives for the same concept.
 - Table identifier resolved through `resource_bindings` to a Snowflake-qualified name.
 
-**The Snowflake authoring intent question** that this policy hits: `IS_ROLE_IN_SESSION` is what [Snowflake recommends](https://docs.snowflake.com/en/user-guide/security-row-using) for role-discrimination policies — "If role activation and role hierarchy are important, Snowflake recommends that the policy conditions use the IS_ROLE_IN_SESSION function..." With `DEFAULT_SECONDARY_ROLES = ('ALL')` (Snowflake's default since 2024 per BCR-1692), every granted role is session-active, so the predicate sees them all. This is consistent with `IS_ROLE_IN_SESSION`'s permission-scope semantics, not a defeat of them. If your policy is actually doing data-driven entitlement rather than role discrimination, see § 8 below for the `byDataset` pattern. [`operating.md`](./operating.md) covers the operator-side configuration question in detail.
+**The Snowflake authoring intent question** that this policy hits: `IS_ROLE_IN_SESSION` is what [Snowflake recommends](https://docs.snowflake.com/en/user-guide/security-row-using) for role-discrimination policies: "If role activation and role hierarchy are important, Snowflake recommends that the policy conditions use the IS_ROLE_IN_SESSION function..." With `DEFAULT_SECONDARY_ROLES = ('ALL')` (Snowflake's default since 2024 per BCR-1692), every granted role is session-active, so the predicate sees them all, consistent with `IS_ROLE_IN_SESSION`'s permission-scope semantics rather than a defeat of them. If your policy is actually doing data-driven entitlement rather than role discrimination, see § 8 below for the `byDataset` pattern. [`operating.md`](./operating.md) covers the operator-side configuration question in detail.
 
 **Deployment on Snowflake via the connector:**
 
@@ -269,7 +269,7 @@ for stmt in result.statements:
     cur.execute(stmt)
 ```
 
-**Verification.** The live test (`adapters/tests/live_snowflake.py`) verifies the four role configurations and confirms `IS_ROLE_IN_SESSION`'s hierarchical behavior — see [`operating.md`](./operating.md).
+**Verification.** The live test (`adapters/tests/live_snowflake.py`) verifies the four role configurations and confirms `IS_ROLE_IN_SESSION`'s hierarchical behavior; see [`operating.md`](./operating.md).
 
 ---
 
@@ -319,8 +319,8 @@ AS (POLICY_INPUT_VALUE VARCHAR) RETURNS BOOLEAN ->
 
 ## 9. Where to go from here
 
-- **More authoring patterns** — `byClassification`, `byScope` for ABAC, `byComposition` for predicate algebra. [`authoring.md`](./authoring.md).
-- **Per-platform operator playbooks** — Snowflake `DEFAULT_SECONDARY_ROLES`, Databricks group propagation lag, capability-profile interpretation. [`operating.md`](./operating.md).
-- **The worked-example library** — `spec/v0/examples/` holds seven completed exercises, each with a `.tessera.yaml`, `.jsonld`, `.databricks.sql` or `.snowflake.sql`, and a `.diagnostic.md` explaining findings.
-- **Decision rationale** — `DECISIONS.md` has all the ADRs. ADRs 013–024 cover the core IR shapes (Policy container, ABAC, adapter contract).
-- **Spec reference** — `docs/technical-design-v0.2.md` is the authoritative spec; the user guide explains how to use it; the technical design explains what it is.
+- **More authoring patterns.** `byClassification`, `byScope` for ABAC, `byComposition` for predicate algebra. [`authoring.md`](./authoring.md).
+- **Per-platform operator playbooks.** Snowflake `DEFAULT_SECONDARY_ROLES`, Databricks group propagation lag, capability-profile interpretation. [`operating.md`](./operating.md).
+- **The worked-example library.** `spec/v0/examples/` holds seven completed exercises, each with a `.tessera.yaml`, `.jsonld`, `.databricks.sql` or `.snowflake.sql`, and a `.diagnostic.md` explaining findings.
+- **Decision rationale.** `DECISIONS.md` has all the ADRs. ADRs 013–024 cover the core IR shapes (Policy container, ABAC, adapter contract).
+- **Spec reference.** `docs/technical-design-v0.2.md` is the authoritative spec; the user guide explains how to use it; the technical design explains what it is.

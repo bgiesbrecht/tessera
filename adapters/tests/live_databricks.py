@@ -27,7 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES = REPO_ROOT / "spec" / "v0" / "examples"
 
 PROFILE = "adb-984752964297111"
-WAREHOUSE_ID = "148ccb90800933a1"   # "Shared Endpoint" — currently RUNNING
+WAREHOUSE_ID = "148ccb90800933a1"   # "Shared Endpoint", currently RUNNING
 TARGET_TABLE = "acme.tpch.orders"
 
 

@@ -1,10 +1,10 @@
-"""Oracle discovery & extraction — deployed VPD / Redaction / grants → Tessera IR.
+"""Oracle discovery & extraction: deployed VPD / Redaction / grants → Tessera IR.
 
 `discover_schema` inventories the policy-bearing artifacts on an Oracle schema from
 the data-dictionary views:
-    * VPD policies      — ALL_POLICIES (+ the policy function body from ALL_SOURCE)
-    * Redaction policies — REDACTION_POLICIES / REDACTION_COLUMNS
-    * Grants            — DBA_TAB_PRIVS / ALL_TAB_PRIVS
+    * VPD policies: ALL_POLICIES (+ the policy function body from ALL_SOURCE)
+    * Redaction policies: REDACTION_POLICIES / REDACTION_COLUMNS
+    * Grants: DBA_TAB_PRIVS / ALL_TAB_PRIVS
 Each is normalized to an artifact dict; `extract_artifact` lifts one artifact to IR.
 
 The extractors operate on the normalized artifact dicts (not on a live cursor), so

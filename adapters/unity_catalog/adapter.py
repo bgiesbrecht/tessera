@@ -1,4 +1,4 @@
-"""Unity Catalog adapter — concrete Adapter implementation."""
+"""Unity Catalog adapter: concrete Adapter implementation."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ class UnityCatalogAdapter(Adapter):
 
         Caller passes `catalog` and `schema` (or sets them in `config.extras` as
         `discover_catalog` / `discover_schema`). A `run_sql` callable must be
-        supplied via `config.extras["run_sql"]` — a function `(sql: str) ->
+        supplied via `config.extras["run_sql"]`, a function `(sql: str) ->
         list[list]` that executes via whatever SDK / connection the caller has
         in hand. Keeps this module SDK-agnostic.
         """

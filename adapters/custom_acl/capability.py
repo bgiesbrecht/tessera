@@ -3,7 +3,7 @@
 This is a *pattern* adapter (ADR-032), not a platform adapter. Its enforcement
 target is the customer's ACL-table + wrapping-view convention (ADR-003), so its
 capability surface is shaped by what a view over a two-table ACL join can express
-— which is exactly the data-driven selectors the native adapters treat as a
+exactly the data-driven selectors the native adapters treat as a
 secondary path.
 """
 
@@ -23,7 +23,7 @@ CUSTOM_ACL_PROFILE = CapabilityProfile(
             "a correlated EXISTS over the two-table ACL join. The view is the enforcement "
             "mechanism (no platform RLS primitive); consumers are granted the view, not the "
             "base table. Coverage: byDataset principal + exists-in-dataset condition "
-            "(the ACL-join shape). defaultStrategy: none is inherent — principals absent from "
+            "(the ACL-join shape). defaultStrategy: none is inherent, since principals absent from "
             "the ACL join match no rows (fail-closed). byIdentity group gating in the view is "
             "a queued follow-up.",
         ),

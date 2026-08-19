@@ -1,7 +1,7 @@
 """Tessera change-impact analysis.
 
 Given a corpus of Tessera policies and a proposed change to it, report how the
-change alters what the corpus decides about data — before the change is
+change alters what the corpus decides about data, before the change is
 authored, validated, or emitted to any platform.
 
 The tool reasons about selector *expressions*, never about the populations

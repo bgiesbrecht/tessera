@@ -18,7 +18,7 @@ never committed), and the user + DSN from TESSERA_ORA_USER / TESSERA_ORA_DSN (or
 constants below). Requires `pip install oracledb`. Gated on a real Oracle instance;
 not part of the offline pytest suite.
 
-The connecting user must (a) be able to run DBMS_RLS.ADD_POLICY — EXECUTE on
+The connecting user must (a) be able to run DBMS_RLS.ADD_POLICY; EXECUTE on
 SYS.DBMS_RLS is grantable only by SYS, so on a SYSTEM-only instance run this AS
 SYSTEM (`TESSERA_ORA_USER=SYSTEM`), which works because SYSTEM is NOT VPD-exempt by
 default; and (b) NOT hold EXEMPT ACCESS POLICY (SYS and that privilege bypass VPD).

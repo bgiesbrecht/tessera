@@ -11,7 +11,7 @@ No knowledge of RDF, JSON-LD, or semantic-web tooling is assumed. If you can rea
 You're a data engineer, security engineer, or governance practitioner. You probably already have:
 
 - One or more tables in production that need access control.
-- An ACL mapping table somewhere — maybe two tables linked by a codename — that decides which principals get which rows.
+- An ACL mapping table somewhere (maybe two tables linked by a codename) that decides which principals get which rows.
 - At least one column where the value should be redacted for most callers but visible to a privileged team (compliance, ops leadership, internal audit, etc.).
 - Either Databricks, Snowflake, or both. Bonus if you're trying to make the same policy enforce identically across both.
 
@@ -30,9 +30,9 @@ Two policies. Two patterns. They co-exist on the same table.
 
 ### What the policies need to do
 
-**Policy 1 — Row visibility.** A CSR sees a row in `orders` if and only if the ACL mapping tables grant them access to that row's `o_orderpriority` value. Principals with no ACL entry see no rows.
+**Policy 1, row visibility.** A CSR sees a row in `orders` if and only if the ACL mapping tables grant them access to that row's `o_orderpriority` value. Principals with no ACL entry see no rows.
 
-**Policy 2 — Column masking.** Anyone reading `orders` sees `'CLERK-REDACTED'` for the `o_clerk` column **unless** they're a member of the `orders_full_access` group, in which case they see the real value.
+**Policy 2, column masking.** Anyone reading `orders` sees `'CLERK-REDACTED'` for the `o_clerk` column **unless** they're a member of the `orders_full_access` group, in which case they see the real value.
 
 Together, the policies form a layered access model: row visibility limits *which* rows you see, column masking shapes *what* you see of each row.
 
@@ -42,14 +42,14 @@ Together, the policies form a layered access model: row visibility limits *which
 
 - A YAML editor.
 - Python 3.11+ with the Tessera repo cloned and a venv ready (`pip install -r requirements.txt` once that file exists; for now `pip install jsonschema rdflib pyshacl databricks-sdk snowflake-connector-python` covers it).
-- A target platform — Databricks workspace **or** Snowflake account, ideally both.
+- A target platform: a Databricks workspace **or** a Snowflake account, ideally both.
 - The ability to create tables, groups (or roles on Snowflake), and run admin SQL.
 
 You do **not** need:
 
 - Familiarity with RDF, JSON-LD, OWL, or SHACL.
-- A Tessera CLI (none exists yet — deployment is library-shaped Python).
-- A separate Tessera runtime — Tessera produces platform-native SQL; the platform enforces.
+- Deep CLI knowledge. A small `tessera` CLI ships (`python -m tools.cli`), but the pipeline is equally callable as library-shaped Python.
+- A separate Tessera runtime. Tessera produces platform-native SQL; the platform enforces.
 
 ---
 
@@ -178,20 +178,20 @@ policy:
 
 ### What this is saying, line by line
 
-- **`kind: RowVisibilityConstraint`** — this policy gates row visibility, not column values.
-- **`appliesTo`** — which resource the policy attaches to. The selector `byIdentity` means "attach to this specific table by name."
-- **`action: Read`** — the action being governed.
-- **`defaultStrategy: none`** — fail-closed. A principal who doesn't match the rule sees nothing.
-- **`rules`** — what to do for matching principals. Just one rule here.
-  - **`principal.selector: byDataset`** — the set of principals authorized by this rule isn't a single group; it's computed at query time by looking up the caller in a mapping table.
-  - **`PrincipalSetFromTable`** — the mapping table itself. `principalColumn: username` says "match the caller against this column"; `resourceColumn: code_name` says "the rows you find produce codenames."
-  - **`condition: op: exists-in-dataset`** — additionally, the row in `orders` must have its `o_orderpriority` value present in the second ACL table (joined by codename).
-  - **`ResourceSetFromTable`** — the second ACL table, joined by `code_name`. The `resourceColumn` is the column on the protected table whose value must match.
-  - **`effect: keep-matching-rows`** — when this rule matches, the row stays visible.
+- **`kind: RowVisibilityConstraint`.** Gates row visibility, not column values.
+- **`appliesTo`.** Which resource the policy attaches to. The selector `byIdentity` means "attach to this specific table by name."
+- **`action: Read`.** The action being governed.
+- **`defaultStrategy: none`.** Fail-closed. A principal who doesn't match the rule sees nothing.
+- **`rules`.** What to do for matching principals. Just one rule here.
+  - **`principal.selector: byDataset`.** The set of principals authorized by this rule isn't a single group; it's computed at query time by looking up the caller in a mapping table.
+  - **`PrincipalSetFromTable`.** The mapping table itself. `principalColumn: username` says "match the caller against this column"; `resourceColumn: code_name` says "the rows you find produce codenames."
+  - **`condition: op: exists-in-dataset`.** Additionally, the row in `orders` must have its `o_orderpriority` value present in the second ACL table (joined by codename).
+  - **`ResourceSetFromTable`.** The second ACL table, joined by `code_name`. The `resourceColumn` is the column on the protected table whose value must match.
+  - **`effect: keep-matching-rows`.** When this rule matches, the row stays visible.
 
 ### Why `byDataset` here
 
-You could try to express this with `byIdentity` against groups, but every change to which CSRs can see which priorities would require platform-side group membership updates. Putting the mapping in a table means it can change without re-granting permissions. This is the [data-driven entitlement pattern Snowflake documents for mapping tables](https://docs.snowflake.com/en/user-guide/security-row-using): the platform-native equivalent gates on `CURRENT_USER()` against the mapping table. (For role-discrimination scenarios, Snowflake recommends `IS_ROLE_IN_SESSION` instead — Tessera's `byIdentity`. See [authoring.md § Snowflake authoring guidance](../authoring.md#snowflake-authoring-guidance) for the selector-fit decision.)
+You could try to express this with `byIdentity` against groups, but every change to which CSRs can see which priorities would require platform-side group membership updates. Putting the mapping in a table means it can change without re-granting permissions. This is the [data-driven entitlement pattern Snowflake documents for mapping tables](https://docs.snowflake.com/en/user-guide/security-row-using): the platform-native equivalent gates on `CURRENT_USER()` against the mapping table. (For role-discrimination scenarios, Snowflake recommends `IS_ROLE_IN_SESSION` instead, which is Tessera's `byIdentity`. See [authoring.md § Snowflake authoring guidance](../authoring.md#snowflake-authoring-guidance) for the selector-fit decision.)
 
 ---
 
@@ -230,19 +230,19 @@ policy:
 
 ### What this is saying
 
-- **`kind: ColumnVisibilityConstraint`** — this policy gates a column's value, not row visibility.
-- **`appliesTo.resource: column:...`** — the column being protected. The `column:` prefix is a Tessera convention for identifying a column by its fully-qualified name.
-- **`defaultStrategy: negated-complement`** — there's one explicit rule (members of the privileged group), and a `defaultBranch` for everyone else.
-- **`rules[0]`** — members of `orders_full_access` see the real value (`effect: allow`).
-- **`defaultBranch`** — non-members get the transformation: replace the column value with `'CLERK-REDACTED'`.
+- **`kind: ColumnVisibilityConstraint`.** Gates a column's value, not row visibility.
+- **`appliesTo.resource: column:...`.** The column being protected. The `column:` prefix is a Tessera convention for identifying a column by its fully-qualified name.
+- **`defaultStrategy: negated-complement`.** One explicit rule (members of the privileged group), plus a `defaultBranch` for everyone else.
+- **`rules[0]`.** Members of `orders_full_access` see the real value (`effect: allow`).
+- **`defaultBranch`.** Non-members get the transformation: replace the column value with `'CLERK-REDACTED'`.
 
 ### Why `Redact` and not `Mask` or `Hash`
 
 `Redact` substitutes a fixed string. Other transformations available in v0:
 
-- `Mask` — replaces characters with a mask character, optionally preserving a prefix/suffix (e.g., `XXXX1234` for the last four digits of a card number).
-- `Hash` — replaces with a cryptographic hash.
-- `Tokenize` and `Bucketize` — declared but parameter shapes are deferred to a future version.
+- `Mask`: replaces characters with a mask character, optionally preserving a prefix/suffix (e.g. `XXXX1234` for the last four digits of a card number).
+- `Hash`: replaces with a cryptographic hash.
+- `Tokenize` and `Bucketize`: declared, but parameter shapes are deferred to a future version.
 
 For a "make the value obviously redacted" intent, `Redact` is the cleanest choice. If you needed reversible pseudonymization, `Hash` with a deterministic salt is the usual move.
 
@@ -260,7 +260,7 @@ The validators read canonical JSON-LD. The Tessera converter handles the YAML �
     --out policies/orders-clerk-mask.jsonld
 ```
 
-Each invocation reads one YAML file and writes its canonical JSON-LD counterpart. The converter handles the mechanical mapping (envelope unwrap, `id → @id` with `policy:` prefix, `kind → policyKind`, `type → @type` for typed entities, canonical `@context` injection). Use the JSON-LD outputs for everything downstream — validation, adapter emission, deployment.
+Each invocation reads one YAML file and writes its canonical JSON-LD counterpart. The converter handles the mechanical mapping (envelope unwrap, `id → @id` with `policy:` prefix, `kind → policyKind`, `type → @type` for typed entities, canonical `@context` injection). Use the JSON-LD outputs for everything downstream: validation, adapter emission, and deployment.
 
 The converter's library entry points are also available if you'd rather drive it from Python:
 
@@ -304,13 +304,13 @@ validate_policy(Path('policies/orders-clerk-mask.jsonld'))
 
 If either policy is malformed (a required field missing, an enum value typo, a structural issue), one of the validators will tell you which line. Fix the YAML, re-run the converter, re-run the validators until both pass.
 
-**On YAML as source of truth.** YAML is the form you author and edit. JSON-LD is the form tooling consumes. Don't hand-edit the JSON-LD — re-run the converter from the YAML. Comment preservation in YAML round-trips is a deferred feature (the converter uses `ruamel.yaml` from the start so this lands cleanly later); for now, treat YAML comments as authoring documentation that doesn't survive to the canonical form.
+**On YAML as source of truth.** YAML is the form you author and edit. JSON-LD is the form tooling consumes. Don't hand-edit the JSON-LD; re-run the converter from the YAML. Comment preservation in YAML round-trips is a deferred feature (the converter uses `ruamel.yaml` from the start so this lands cleanly later); for now, treat YAML comments as authoring documentation that doesn't survive to the canonical form.
 
 ---
 
 ## Step 5 — See what Tessera produces for each platform
 
-Tessera's job is to translate your policy intent into platform-native enforcement. You don't run a Tessera service in production — you run an adapter that emits SQL, then you deploy the SQL the way you'd deploy any other SQL.
+Tessera's job is to translate your policy intent into platform-native enforcement. You don't run a Tessera service in production. You run an adapter that emits SQL, then deploy the SQL the way you'd deploy any other SQL.
 
 ```python
 import json
@@ -348,15 +348,15 @@ for s in sf_result.statements: print(s); print()
 
 For Policy 1 (the byDataset row visibility) you'll see something like:
 
-**Databricks** — a row-filter UDF that joins the ACL tables and an `ALTER TABLE ... SET ROW FILTER ON (o_orderpriority)`.
+**Databricks.** A row-filter UDF that joins the ACL tables and an `ALTER TABLE ... SET ROW FILTER ON (o_orderpriority)`.
 
-**Snowflake** — a `CREATE ROW ACCESS POLICY ... -> EXISTS (... CURRENT_USER() ...)` and an `ALTER TABLE ... ADD ROW ACCESS POLICY ... ON (O_ORDERPRIORITY)`. Note the policy gates on `CURRENT_USER()` against your mapping table; this is the data-driven entitlement pattern Snowflake documents for mapping tables, and it's a structural fit because your policy decision is "which codenames does this user have" rather than "does this user have role X."
+**Snowflake.** A `CREATE ROW ACCESS POLICY ... -> EXISTS (... CURRENT_USER() ...)` and an `ALTER TABLE ... ADD ROW ACCESS POLICY ... ON (O_ORDERPRIORITY)`. Note the policy gates on `CURRENT_USER()` against your mapping table; this is the data-driven entitlement pattern Snowflake documents for mapping tables, and it's a structural fit because your policy decision is "which codenames does this user have" rather than "does this user have role X."
 
 For Policy 2 (the column mask):
 
-**Databricks** — a `CREATE FUNCTION` that returns `o_clerk` when `is_account_group_member('orders_full_access')` is true and `'CLERK-REDACTED'` otherwise, plus an `ALTER TABLE ... ALTER COLUMN o_clerk SET MASK ...`.
+**Databricks.** A `CREATE FUNCTION` that returns `o_clerk` when `is_account_group_member('orders_full_access')` is true and `'CLERK-REDACTED'` otherwise, plus an `ALTER TABLE ... ALTER COLUMN o_clerk SET MASK ...`.
 
-**Snowflake** — a `CREATE MASKING POLICY ... -> CASE WHEN IS_ROLE_IN_SESSION('ORDERS_FULL_ACCESS') THEN o_clerk ELSE 'CLERK-REDACTED' END` and an `ALTER TABLE ... MODIFY COLUMN O_CLERK SET MASKING POLICY ...`.
+**Snowflake.** A `CREATE MASKING POLICY ... -> CASE WHEN IS_ROLE_IN_SESSION('ORDERS_FULL_ACCESS') THEN o_clerk ELSE 'CLERK-REDACTED' END` and an `ALTER TABLE ... MODIFY COLUMN O_CLERK SET MASKING POLICY ...`.
 
 **The same YAML produces both.** That's the value proposition: one source of policy intent, two platform-native enforcements.
 
@@ -417,7 +417,7 @@ for stmt in mask_sf_result.statements:   # Policy 2
     cur.execute(stmt)
 ```
 
-**Snowflake operator note.** This scenario's Policy 1 uses `byDataset` because the underlying decision is data-driven entitlement (which codenames does this CSR have access to). The Snowflake emission gates on `CURRENT_USER()` against your mapping table, which is orthogonal to role activation — so `DEFAULT_SECONDARY_ROLES = ('ALL')` (Snowflake's default since 2024) doesn't affect this policy either way. The role-activation question only arises for `IS_ROLE_IN_SESSION`-based (i.e., `byIdentity`) policies; full discussion in [operating.md](../operating.md). For when `byIdentity` is the right choice instead, see [authoring.md § Snowflake authoring guidance](../authoring.md#snowflake-authoring-guidance).
+**Snowflake operator note.** This scenario's Policy 1 uses `byDataset` because the underlying decision is data-driven entitlement (which codenames does this CSR have access to). The Snowflake emission gates on `CURRENT_USER()` against your mapping table, which is orthogonal to role activation, so `DEFAULT_SECONDARY_ROLES = ('ALL')` (Snowflake's default since 2024) doesn't affect this policy either way. The role-activation question only arises for `IS_ROLE_IN_SESSION`-based (i.e., `byIdentity`) policies; full discussion in [operating.md](../operating.md). For when `byIdentity` is the right choice instead, see [authoring.md § Snowflake authoring guidance](../authoring.md#snowflake-authoring-guidance).
 
 ---
 
@@ -470,19 +470,19 @@ The two policies operate on different surfaces (rows vs. column values), so they
 
 ### My ACL table has different column names
 
-Change `principalColumn` and `resourceColumn` in the `PrincipalSetFromTable` and `ResourceSetFromTable` blocks. The columns must exist on the named tables, but the names are up to you. The IR validates the structure, not the column names — your platform will reject the emitted DDL if the columns don't exist.
+Change `principalColumn` and `resourceColumn` in the `PrincipalSetFromTable` and `ResourceSetFromTable` blocks. The columns must exist on the named tables, but the names are up to you. The IR validates the structure, not the column names; your platform will reject the emitted DDL if the columns don't exist.
 
 ### I want the mask to apply to multiple columns
 
-Each `ColumnVisibilityConstraint` policy targets one column. For multiple columns under the same masking intent, write one policy per column with the same `rules` and `defaultBranch`. A future ABAC-driven variant lets you write a single policy that attaches to any column tagged a particular way — see the existing exercises under `spec/v0/examples/abac-column-mask-*` for the shape, though full adapter support is still in progress.
+Each `ColumnVisibilityConstraint` policy targets one column. For multiple columns under the same masking intent, write one policy per column with the same `rules` and `defaultBranch`. A future ABAC-driven variant lets you write a single policy that attaches to any column tagged a particular way; see the existing exercises under `spec/v0/examples/abac-column-mask-*` for the shape, though full adapter support is still in progress.
 
 ### I want everyone except a specific group to see the value, with no other condition
 
-That's exactly Policy 2's shape — one rule for the privileged group, `defaultBranch` for everyone else. Just substitute your group name in `principal.resource`.
+That's exactly Policy 2's shape: one rule for the privileged group, `defaultBranch` for everyone else. Just substitute your group name in `principal.resource`.
 
 ### My priorities or codenames need to change over time
 
-You don't update the Tessera policy. You update the ACL tables. The policy reads them at query time — that's the whole point of `byDataset`. Audit log shows the policy text is stable; the access semantics evolve with the data.
+You don't update the Tessera policy. You update the ACL tables. The policy reads them at query time. That's the whole point of `byDataset`. Audit log shows the policy text is stable; the access semantics evolve with the data.
 
 ### What if I need both `byDataset` row visibility AND ABAC-driven column masking?
 
@@ -496,10 +496,10 @@ Tessera still works. You'll just never invoke the Snowflake adapter. The value p
 
 ## Where to go from here
 
-- **More authoring patterns** — [authoring.md](../authoring.md) covers attribute axes, ABAC scoping, condition operators, transformations.
-- **Per-platform deployment depth** — [operating.md](../operating.md) has the operator checklists, including the Snowflake `DEFAULT_SECONDARY_ROLES` discussion if your policies need role discrimination.
-- **The worked-example library** — `spec/v0/examples/` has eight completed exercises with all artifacts (YAML, canonical form, target SQL, diagnostics). They're the most concrete reference for what's actually possible.
-- **The conceptual tutorial** — [tutorial.md](../tutorial.md) walks the group-row-visibility example end to end, with more attention to what's happening at each step.
-- **Issues and discussions** — `https://github.com/bgiesbrecht/tessera/issues` is where active gaps and design questions live. The governance-gap survey issues (#16–#25) are a good map of what's known to be in/out of scope today.
+- **More authoring patterns.** [authoring.md](../authoring.md) covers attribute axes, ABAC scoping, condition operators, and transformations.
+- **Per-platform deployment depth.** [operating.md](../operating.md) has the operator checklists, including the Snowflake `DEFAULT_SECONDARY_ROLES` discussion if your policies need role discrimination.
+- **The worked-example library.** `spec/v0/examples/` has eight completed exercises with all artifacts (YAML, canonical form, target SQL, diagnostics), a concrete reference for what's possible.
+- **The conceptual tutorial.** [tutorial.md](../tutorial.md) walks the group-row-visibility example end to end, with more attention to what's happening at each step.
+- **Issues and discussions.** `https://github.com/bgiesbrecht/tessera/issues` is where active gaps and design questions live. The governance-gap survey issues (#16–#25) are a good map of what's in and out of scope today.
 
 If you got two YAML files validating and you saw the platform DDL emit cleanly: you've done the thing. The rest is iteration on your real corpus.

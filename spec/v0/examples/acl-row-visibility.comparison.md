@@ -1,4 +1,4 @@
-# Phase 3 Comparison — ACL-Table Row Visibility
+# Phase 3 Comparison: ACL-Table Row Visibility
 
 **Companion artifacts:**
 - `acl-row-visibility-policy.tessera.yaml` / `.jsonld`
@@ -7,7 +7,7 @@
 
 **Inputs:** `docs/exercises/acl-row-visibility-inputs.md`
 **Exercise framing:** `docs/worked-example-exercise.md`
-**Existing implementation reference:** `RLS Demo (3).ipynb` (Databricks notebook), cells 11–15 — the "Mapping-table RLS (managed ACL table)" section. Shared 2026-05-18.
+**Existing implementation reference:** `RLS Demo (3).ipynb` (Databricks notebook), cells 11–15, the "Mapping-table RLS (managed ACL table)" section. Shared 2026-05-18.
 
 **Status:** Behavioral verification (§2) and structural comparison (§3) both complete.
 
@@ -39,7 +39,7 @@ Verification mechanics: an SDK-driven script created the protected table (`order
 
 All three scenarios fall into the "both implementations agree" category for the Tessera-derived filter against the inputs' expectations. The §3.1 four-category analysis (Tessera-wrong / existing-wrong / spec-wrong / intent-ambiguous) requires the existing implementation; it will be filled in when Brice shares it.
 
-### 2.3 Operational observation — ACL change propagation
+### 2.3 Operational observation: ACL change propagation
 
 The ACL mechanism showed **synchronous propagation** of membership changes: each scenario's query ran immediately after its `INSERT`/`DELETE` against the ACL tables, and the row-filter's `EXISTS` clause reflected the change on the very next query. There was no cache lag.
 
@@ -54,7 +54,7 @@ Two mechanisms, same adapter, materially different timing characteristics. Recor
 
 ### 2.4 Setup gotcha worth recording
 
-A setup mistake during initial deployment is worth noting because it could trip a future contributor: the protected table was first created as a CTAS from `acme.tpch.orders`, which already had the *group* exercise's row filter attached. Because the operator's group membership at the time was "in neither restrictive group" (left over from the group exercise's Scenario 3), the CTAS source was filtered to only show priorities 3, 4, 5 — the new ACL table inherited that filtered set and was missing the 1-URGENT and 2-HIGH rows the ACL was supposed to grant to Brice.
+A setup mistake during initial deployment could trip a future contributor: the protected table was first created as a CTAS from `acme.tpch.orders`, which already had the *group* exercise's row filter attached. Because the operator's group membership at the time was "in neither restrictive group" (left over from the group exercise's Scenario 3), the CTAS source was filtered to only show priorities 3, 4, 5, so the new ACL table inherited that filtered set and was missing the 1-URGENT and 2-HIGH rows the ACL was supposed to grant to Brice.
 
 The fix was straightforward: rebuild the table from `samples.tpch.orders` (the unfiltered TPC-H source).
 
@@ -64,14 +64,14 @@ The fix was straightforward: rebuild the table from `samples.tpch.orders` (the u
 
 ## 3. Structural comparison (§3.2 of the exercise framing)
 
-### 3.1 SQL row-filter function — line-by-line
+### 3.1 SQL row-filter function: line-by-line
 
 Both implementations produce a Unity Catalog row filter function with substantively identical logic: a `RETURN EXISTS (SELECT 1 FROM rls_acl_mapping JOIN rls_priority_acl ON code_name WHERE lower(trim(username)) = lower(trim(current_user())) AND p.orderpriority = $parameter)`.
 
 | Dimension | Existing implementation | Tessera-derived | Category |
 |---|---|---|---|
 | Function name | `acme.tpch.rls_orders_by_priority` | `acme.tpch.tessera__acl_row_visibility__row_filter` | **Accepted divergence** per inputs §7.2; Tessera's form is deterministic and traces back to the policy ID. |
-| Function parameter name | `p_priority` | `o_orderpriority` | **Accepted divergence**. Both work — parameter names are local to the function body; Databricks binds the function to the table column via the `ON (…)` clause in `ALTER TABLE`. |
+| Function parameter name | `p_priority` | `o_orderpriority` | **Accepted divergence**. Both work; parameter names are local to the function body, and Databricks binds the function to the table column via the `ON (…)` clause in `ALTER TABLE`. |
 | `RETURNS BOOLEAN` clause | Implicit (Databricks infers from the EXISTS expression) | Explicit | **Accepted divergence**. Behaviorally identical. |
 | JOIN ON column order | `ON p.code_name = m.code_name` | `ON m.code_name = p.code_name` | **Match** (semantically). Equivalent join predicate. |
 | Principal normalization | `lower(trim(m.username)) = lower(trim(current_user()))` | Same | **Match** verbatim. |
@@ -91,7 +91,7 @@ GRANT EXECUTE ON FUNCTION acme.tpch.rls_orders_by_priority TO `account users`;
 
 This is operationally meaningful: without it, callers other than the function owner may hit `PERMISSION_DENIED` when their query triggers the row filter. The notebook's own prerequisite cell (cell 0) hints at this with "EXECUTE on functions" as a precondition.
 
-The Tessera-derived form does not emit this grant. The v0 IR does not have a place to declare "the function this policy compiles to must be executable by these principals" — grants are typically considered separate from policy semantics. But for a deployable artifact, the grant is part of what makes the policy actually work for users.
+The Tessera-derived form does not emit this grant. The v0 IR does not have a place to declare "the function this policy compiles to must be executable by these principals," since grants are typically considered separate from policy semantics. But for a deployable artifact, the grant is part of what makes the policy actually work for users.
 
 This is a real finding the exercise produced:
 
@@ -99,7 +99,7 @@ This is a real finding the exercise produced:
 
 **Candidate v1 shape:** an optional `executeGrants` field on Policy that names the principals (or principal selectors) authorized to be subject to the policy. The adapter compiles this into platform-specific grants alongside the row filter function. Default value: `account users` on Databricks (matching the existing convention); explicitly overridable.
 
-**Alternative framing:** treat grants as out-of-band operational concern, document in the adapter contract that emitting policies requires a separate grant step, and leave it to deployment tooling. Defensible but loses the "v0 artifact is complete" property — a customer who copy-pastes Tessera-emitted SQL into their environment would need to remember the grant manually.
+**Alternative framing:** treat grants as out-of-band operational concern, document in the adapter contract that emitting policies requires a separate grant step, and leave it to deployment tooling. Defensible but loses the "v0 artifact is complete" property. A customer who copy-pastes Tessera-emitted SQL into their environment would need to remember the grant manually.
 
 I lean toward making this an explicit IR concern in v1 (the first framing), because the grant is structurally part of "this policy is deployable" and the alternative is silent operational footgun. But it's a real design question that needs working through.
 
@@ -119,12 +119,12 @@ I lean toward making this an explicit IR concern in v1 (the first framing), beca
 
 | Element | Existing form | Tessera capture |
 |---|---|---|
-| `GRANT EXECUTE` on the row filter function | Inline cell after the function definition | Not captured. See §3.2 — this is the substantive finding. |
+| `GRANT EXECUTE` on the row filter function | Inline cell after the function definition | Not captured. See §3.2, the finding of this comparison. |
 | Verification queries (cell 15) | Inline `select o_orderpriority, count(o_orderpriority) ... group by` after attachment | Tessera has parallel scaffolding in `verify_scenario.py` (covers the group exercise's scenarios; ACL verification was scripted ad-hoc, not committed). |
-| Catalog/schema/table creation cells (cells 1–4) | Inline setup | Tessera does not try to express this — it is deployment, not policy. (Same call as the group exercise's §3.3.) |
-| Seed-data INSERTs (cells 11–12) | Inline | Same — data, not policy. |
+| Catalog/schema/table creation cells (cells 1–4) | Inline setup | Tessera does not try to express this. It is deployment, not policy. (Same call as the group exercise's §3.3.) |
+| Seed-data INSERTs (cells 11–12) | Inline | Same: data, not policy. |
 
-The notebook's setup, seeding, and verification cells are correctly **out of scope** for the IR — they are deployment and demonstration, not policy meaning. The only structural finding from §3.4 is the `GRANT EXECUTE`, which the inputs §7.3 disqualifying checklist did not capture but which the existing implementation actually requires for non-owner usage.
+The notebook's setup, seeding, and verification cells are correctly **out of scope** for the IR. They are deployment and demonstration, not policy meaning. The only structural finding from §3.4 is the `GRANT EXECUTE`, which the inputs §7.3 disqualifying checklist did not capture but which the existing implementation actually requires for non-owner usage.
 
 ---
 
@@ -136,7 +136,7 @@ None anticipated. The diagnostic-flagged gaps (§4 of the diagnostic) are limita
 
 ### 4.2 v0 corrections in non-immutable artifacts
 
-The diagnostic surfaced one gap — IRI-safety convention from the group exercise — that has been resolved by issues #4–#6 from the prior exercise. No new doc-correction items are anticipated from this exercise, pending §3.
+The diagnostic surfaced one gap (IRI-safety convention from the group exercise) that has been resolved by issues #4–#6 from the prior exercise. No new doc-correction items are anticipated from this exercise, pending §3.
 
 The setup-gotcha in §2.4 may warrant a one-paragraph addition to `docs/worked-example-exercise.md` about validating the source corpus when creating a protected test table. Low priority.
 
@@ -154,26 +154,26 @@ A fourth gap from this comparison's §3:
 
 All four should be opened as v1-candidate GitHub issues. The first and third are structurally related and likely to be co-designed in v1; the fourth is standalone.
 
-A fifth, lower-priority candidate is recorded for tracking: **ACL integrity checks** (diagnostic §3.1) — surfacing the three silent failure modes characteristic of data-driven access patterns (codename collisions across users, codenames without priority mappings, priorities without codename coverage).
+A fifth, lower-priority candidate is recorded for tracking: **ACL integrity checks** (diagnostic §3.1), surfacing the three silent failure modes characteristic of data-driven access patterns (codename collisions across users, codenames without priority mappings, priorities without codename coverage).
 
 ### 4.4 Out-of-scope confirmations
 
-- **Operational interoperability**, **runtime interoperability**, **group-based row visibility** — all out of scope per ADR-001, ADR-002, and inputs §0.3 respectively. Correctly not addressed.
-- **Purpose binding, obligations, classifications, transformations** — declared not applicable per inputs §4. Correctly not invented.
+- **Operational interoperability**, **runtime interoperability**, **group-based row visibility.** All out of scope per ADR-001, ADR-002, and inputs §0.3 respectively. Correctly not addressed.
+- **Purpose binding, obligations, classifications, transformations.** Declared not applicable per inputs §4. Correctly not invented.
 
 ---
 
 ## 5. Recommended actions
 
-1. ✓ **Behavioral verification of the three scenarios** — done (§2).
-2. ✓ **Existing-implementation comparison** — done (§3, against `RLS Demo (3).ipynb` cells 11–15).
+1. ✓ **Behavioral verification of the three scenarios.** Done (§2).
+2. ✓ **Existing-implementation comparison.** Done (§3, against `RLS Demo (3).ipynb` cells 11–15).
 3. **Open four v1-candidate issues** (with `v1-candidate` label):
-   - `principal-set-from-joined-tables` — multi-table support in `PrincipalSetFromTable` (diagnostic §4.1).
-   - `principal-set-match-modifiers` — case-insensitive / trim match flag on `PrincipalSetFromTable` (diagnostic §4.2).
-   - `exists-in-dataset-operand-formalization` — formal operand shape for the `existsInDataset` operator (diagnostic §4.3).
-   - `policy-execute-grants` — Policy-level declaration of function-execute grants the adapter compiles in (comparison §3.2).
+   - `principal-set-from-joined-tables`: multi-table support in `PrincipalSetFromTable` (diagnostic §4.1).
+   - `principal-set-match-modifiers`: case-insensitive / trim match flag on `PrincipalSetFromTable` (diagnostic §4.2).
+   - `exists-in-dataset-operand-formalization`: formal operand shape for the `existsInDataset` operator (diagnostic §4.3).
+   - `policy-execute-grants`: Policy-level declaration of function-execute grants the adapter compiles in (comparison §3.2).
 4. **Open one lower-priority v1-candidate issue**:
-   - `acl-integrity-checks` — surface silent failure modes characteristic of data-driven access patterns (diagnostic §3.1).
+   - `acl-integrity-checks`: surface silent failure modes characteristic of data-driven access patterns (diagnostic §3.1).
 
 The first three were anticipated by Phase 2; the fourth emerged from the §3 comparison and was not predicted by the Phase 2 diagnostic.
 
@@ -190,8 +190,8 @@ The first three were anticipated by Phase 2; the fourth emerged from the §3 com
 
 ## 7. Closing observation
 
-The ACL exercise complements the group exercise: same target platform, parallel structure, different parts of the v0 IR exercised. Where the group exercise surfaced gaps around multi-branch policy expression (resolved by ADR-014/015), this exercise surfaces gaps around multi-table data-driven principal selection and operational grant emission — gaps which the v0 IR is honest enough to expose but not rich enough to resolve in-place. They become v1 candidates.
+The ACL exercise complements the group exercise: same target platform, parallel structure, different parts of the v0 IR exercised. Where the group exercise surfaced gaps around multi-branch policy expression (resolved by ADR-014/015), this exercise surfaces gaps around multi-table data-driven principal selection and operational grant emission, gaps which the v0 IR is honest enough to expose but not rich enough to resolve in-place. They become v1 candidates.
 
-The two exercises together also produce the first two worked examples that ground the §5.2 timing-disclosure principle in concrete, measured observations on a real adapter. The group exercise documented ~2–4 minute account-group cache propagation; this exercise documented synchronous ACL propagation. Two mechanisms on the same adapter, materially different timing — the principle's central claim, now grounded.
+The two exercises together also produce the first two worked examples that ground the §5.2 timing-disclosure principle in concrete, measured observations on a real adapter. The group exercise documented ~2–4 minute account-group cache propagation; this exercise documented synchronous ACL propagation. Two mechanisms on the same adapter, materially different timing: the principle's central claim, now grounded.
 
-The §3 comparison confirmed substantive equivalence between Tessera-derived and existing implementations on the EXISTS+join logic, with one operational finding (the missing `GRANT EXECUTE` emission) that the Phase 2 diagnostic did not predict. This is exactly the kind of "comparison surfaces what Phase 2 misses" outcome the exercise framework anticipates — Phase 2 found three v1 candidates; Phase 3 found a fourth.
+The §3 comparison confirmed substantive equivalence between Tessera-derived and existing implementations on the EXISTS+join logic, with one operational finding (the missing `GRANT EXECUTE` emission) that the Phase 2 diagnostic did not predict. This is exactly the kind of "comparison surfaces what Phase 2 misses" outcome the exercise framework anticipates: Phase 2 found three v1 candidates; Phase 3 found a fourth.

@@ -1,6 +1,6 @@
 # Running Tessera — End-to-End Demonstration
 
-*Captured 2026-06-12 against Tessera `0.6.3`. Every command and output block below is a verbatim transcript from a real run on this repository — nothing is illustrative.*
+*Captured 2026-06-12 against Tessera `0.6.3`. Every command and output block below is a verbatim transcript from a real run on this repository; nothing is illustrative.*
 
 This document shows the full offline pipeline: **author a policy in YAML → convert to canonical JSON-LD → validate (JSON Schema + SHACL) → emit platform-native enforcement DDL for two different platforms from the same intermediate representation.**
 
@@ -51,7 +51,7 @@ positional arguments:
 
 ## 1. The policy, authored in YAML
 
-This is the practitioner-facing form — what a customer or engineer writes and reviews. It expresses a three-branch row-visibility rule on `acme.tpch.orders`, driven by group membership, evaluated first-match (ADR-015).
+The practitioner-facing form is what a customer or engineer writes and reviews. It expresses a three-branch row-visibility rule on `acme.tpch.orders`, driven by group membership, evaluated first-match (ADR-015).
 
 ```yaml
 "@context": https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
@@ -225,13 +225,13 @@ ALTER TABLE acme.tpch.orders ADD ROW ACCESS POLICY acme.tpch.group_row_visibilit
 
 Snowflake mechanism: a `ROW ACCESS POLICY` object + `ADD ROW ACCESS POLICY`, principal binding via `IS_ROLE_IN_SESSION(...)`.
 
-**What changed and what didn't.** The policy *meaning* — three branches, the same priority predicates, first-match order — is identical. The *mechanism* is entirely different: UDF vs. policy object, `is_account_group_member` vs. `IS_ROLE_IN_SESSION`, group slug vs. upper-cased role name. The diagnostics are first-class output: the Snowflake adapter flags that role names are case-sensitive and no explicit identity binding was configured, so it fell back to the IR slug. The adapter surfaces a real deployment risk rather than failing silently.
+**What changed and what didn't.** The policy *meaning* (three branches, the same priority predicates, first-match order) is identical. The *mechanism* is entirely different: UDF vs. policy object, `is_account_group_member` vs. `IS_ROLE_IN_SESSION`, group slug vs. upper-cased role name. The diagnostics are first-class output: the Snowflake adapter flags that role names are case-sensitive and no explicit identity binding was configured, so it fell back to the IR slug. The adapter surfaces a real deployment risk rather than failing silently.
 
 ---
 
 ## 5. Breadth check — ABAC column mask on Databricks
 
-To show the pipeline isn't limited to one policy shape, here is an attribute-based (ABAC) column-mask policy emitted for Databricks. It masks columns *by semantic attribute* (`sensitivity: acme:PIIClerk` — an adopter-namespaced value per ADR-028) rather than by name — meaning over mechanism (ADR-018–021).
+To show the pipeline isn't limited to one policy shape, here is an attribute-based (ABAC) column-mask policy emitted for Databricks. It masks columns *by semantic attribute* (`sensitivity: acme:PIIClerk`, an adopter-namespaced value per ADR-028) rather than by name: meaning over mechanism (ADR-018–021).
 
 ```text
 $ .venv/bin/python -m tools.cli.main emit \
@@ -277,7 +277,7 @@ This is the modern Databricks ABAC pattern (`CREATE POLICY ... COLUMN MASK ... M
 | Emit (SF) | `... emit <jsonld> --adapter sf` | Same IR → Snowflake-native row access policy. |
 | Diagnostics | (in emit output) | Adapters surface deployment risks as structured, first-class output. |
 
-**One policy. Two platforms. Native enforcement on each, plus honest diagnostics — produced entirely offline with no platform connection.**
+**One policy. Two platforms. Native enforcement on each, plus honest diagnostics, produced entirely offline with no platform connection.**
 
 ---
 

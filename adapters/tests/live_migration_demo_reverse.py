@@ -2,10 +2,10 @@
 
 Mirror of `live_migration_demo.py` with source and target reversed:
 
-    Source: Unity Catalog (Databricks) — `acme.reverse_demo`
-    Target: Snowflake — `ACME.REVERSE_DEMO`
+    Source: Unity Catalog (Databricks), `acme.reverse_demo`
+    Target: Snowflake, `ACME.REVERSE_DEMO`
 
-Eight phases, idempotent re-run, --cleanup teardown — same shape as the
+Eight phases, idempotent re-run, --cleanup teardown, the same shape as the
 forward demo. Proves the IR pivot is symmetric: the same three Tessera
 worked-example IRs deploy onto UC via `UnityCatalogAdapter.emit`, are
 re-discovered + extracted via UC's `discover()`/`extract()` (landed in 0.5.0),
@@ -129,12 +129,12 @@ def db_runner():
 
 
 # ---------------------------------------------------------------------------
-# Phase 1 — Provision UC source schema
+# Phase 1: Provision UC source schema
 # ---------------------------------------------------------------------------
 
 
 def provision_uc_source() -> None:
-    section("Phase 1 — Provision Unity Catalog source schema")
+    section("Phase 1: Provision Unity Catalog source schema")
     run = db_runner()
 
     step(f"Drop & recreate {SOURCE_CATALOG}.{SOURCE_SCHEMA}")
@@ -170,12 +170,12 @@ def provision_uc_source() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2 — Deploy three Tessera policies on UC source
+# Phase 2: Deploy three Tessera policies on UC source
 # ---------------------------------------------------------------------------
 
 
 def deploy_uc_source_policies() -> None:
-    section("Phase 2 — Deploy three Tessera policies on UC source")
+    section("Phase 2: Deploy three Tessera policies on UC source")
     run = db_runner()
 
     uc_config = AdapterConfig(
@@ -216,13 +216,13 @@ def deploy_uc_source_policies() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Phase 3 — Discover deployed policies on UC source
-# Phase 4 — Extract each into Tessera IR; validate
+# Phase 3: Discover deployed policies on UC source
+# Phase 4: Extract each into Tessera IR; validate
 # ---------------------------------------------------------------------------
 
 
 def discover_and_extract() -> list[dict]:
-    section("Phase 3 — Discover policies on UC source")
+    section("Phase 3: Discover policies on UC source")
 
     run = db_runner()
     uc = UnityCatalogAdapter(config=AdapterConfig(extras={
@@ -239,7 +239,7 @@ def discover_and_extract() -> list[dict]:
         print(f"  • [{art['kind']}] {art['name']} on {attach.get('REF_ENTITY_NAME')}"
               + (f".{col}" if col else ""))
 
-    section("Phase 4 — Extract each into Tessera IR; validate")
+    section("Phase 4: Extract each into Tessera IR; validate")
 
     schema = json.loads(SCHEMA_PATH.read_text())
     shapes = Graph(); shapes.parse(str(SHAPES_PATH), format="turtle")
@@ -278,14 +278,14 @@ def discover_and_extract() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Phase 5 — Provision Snowflake target schema
-# Phase 6 — Emit Snowflake DDL
-# Phase 7 — Deploy on Snowflake
+# Phase 5: Provision Snowflake target schema
+# Phase 6: Emit Snowflake DDL
+# Phase 7: Deploy on Snowflake
 # ---------------------------------------------------------------------------
 
 
 def provision_snowflake_target_and_deploy(extracted: list[dict]) -> list[tuple[str, list[str]]]:
-    section("Phase 5 — Provision Snowflake target schema")
+    section("Phase 5: Provision Snowflake target schema")
     conn = sf_connect()
     cur = conn.cursor()
     try:
@@ -329,7 +329,7 @@ def provision_snowflake_target_and_deploy(extracted: list[dict]) -> list[tuple[s
             cur.execute(f"GRANT USAGE ON SCHEMA {SNOWFLAKE_DATABASE}.{TARGET_SCHEMA} TO ROLE {role}")
             cur.execute(f"GRANT SELECT ON ALL TABLES IN SCHEMA {SNOWFLAKE_DATABASE}.{TARGET_SCHEMA} TO ROLE {role}")
 
-        section("Phase 6 — Emit Snowflake DDL from extracted Tessera IR")
+        section("Phase 6: Emit Snowflake DDL from extracted Tessera IR")
 
         sf_config = AdapterConfig(
             identity_bindings={
@@ -365,7 +365,7 @@ def provision_snowflake_target_and_deploy(extracted: list[dict]) -> list[tuple[s
                 print(f"  emit: {head[:100]}")
             stmt_batches.append((policy["@id"], em.statements))
 
-        section("Phase 7 — Deploy Snowflake DDL")
+        section("Phase 7: Deploy Snowflake DDL")
         for policy_id, statements in stmt_batches:
             step(policy_id)
             for stmt in statements:
@@ -383,12 +383,12 @@ def provision_snowflake_target_and_deploy(extracted: list[dict]) -> list[tuple[s
 
 
 # ---------------------------------------------------------------------------
-# Phase 8 — Verify behavior on Snowflake target
+# Phase 8: Verify behavior on Snowflake target
 # ---------------------------------------------------------------------------
 
 
 def verify_on_snowflake() -> None:
-    section("Phase 8 — Verify behavior on Snowflake target")
+    section("Phase 8: Verify behavior on Snowflake target")
     conn = sf_connect()
     cur = conn.cursor()
     try:
@@ -432,7 +432,7 @@ def verify_on_snowflake() -> None:
 
 
 def cleanup() -> None:
-    section("Cleanup — drop demo schemas on both platforms")
+    section("Cleanup: drop demo schemas on both platforms")
 
     try:
         run = db_runner()
@@ -469,7 +469,7 @@ def main() -> int:
     extracted = discover_and_extract()
 
     if not extracted:
-        print("\n(no policies extracted — aborting before Snowflake side)")
+        print("\n(no policies extracted; aborting before Snowflake side)")
         return 1
 
     provision_snowflake_target_and_deploy(extracted)

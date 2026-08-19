@@ -1,14 +1,14 @@
 """Regression test: every worked-example YAML converts to its committed JSON-LD.
 
 For each `*.tessera.yaml` in spec/v0/examples/, run the converter and compare
-against the corresponding `*.jsonld`. Comparison is *semantic* — JSON-LD has
-several equivalent serializations (key order, whitespace, etc.) — so we
+against the corresponding `*.jsonld`. Comparison is *semantic*: JSON-LD has
+several equivalent serializations (key order, whitespace, etc.), so we
 compare the parsed dicts directly after JSON-loading both sides.
 
 The test also runs the resulting dict through the JSON Schema validator (one
 final check that the converter produces structurally valid output).
 
-Some divergences are tolerated and flagged at the bottom of this module —
+Some divergences are tolerated and flagged at the bottom of this module:
 mostly cosmetic differences between the hand-maintained JSON-LD files and the
 converter's deterministic output. The intent of the regression test is to
 verify *semantic* equivalence after conversion, not byte-identity with the
@@ -47,7 +47,7 @@ def _normalize_string(s: str) -> str:
 
     YAML's `>` (folded) and `|` (literal) block-scalar styles produce
     multi-line strings that hand-authored JSON-LDs typically render single-line.
-    For regression purposes we treat these as equivalent — the meaning is the
+    For regression purposes we treat these as equivalent; the meaning is the
     same; the rendering differs.
     """
     return " ".join(s.split())
@@ -89,7 +89,7 @@ _DESCRIPTIVE_FIELDS = {"description", "provenance"}
 def test_all_examples_convert_structurally_equivalent_to_their_committed_jsonld():
     """The converter's output and the committed JSON-LD must agree on every
     structural field (the fields validators and adapters read). Drift in the
-    descriptive fields (description, provenance) is recorded separately —
+    descriptive fields (description, provenance) is recorded separately:
     see test_descriptive_drift_is_recorded.
     """
     schema = json.loads(SCHEMA_PATH.read_text())
@@ -152,7 +152,7 @@ def test_descriptive_drift_is_recorded():
         print("Drifting:")
         for d in drifted:
             print(f"  - {d}")
-    # No assert — this is informational. A follow-up regeneration commit would
+    # No assert; this is informational. A follow-up regeneration commit would
     # zero this out; v1's contract is structural equivalence, not byte-identity.
 
 

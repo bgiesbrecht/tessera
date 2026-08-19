@@ -2,30 +2,30 @@
 
 The corpus boundary (scoping-doc §9.1) is git-tracked by default: the policies
 git knows about form the corpus. This reuses the version boundary an author
-already works with — committed policies are the real corpus, uncommitted drafts
-are naturally excluded until staged — and needs no extra config file. A
+already works with: committed policies are the real corpus, uncommitted drafts
+are naturally excluded until staged, and needs no extra config file. A
 filesystem directory is available as an explicit override.
 
 Three ways to invoke:
 
-  Default (git-tracked corpus, HEAD → working tree) — the common case,
+  Default (git-tracked corpus, HEAD → working tree), the common case,
   "what did my working-tree edit do to the tracked policies?":
       python -m tools.impact
 
   Git-tracked corpus across two explicit refs:
       python -m tools.impact --git main HEAD
 
-  Filesystem override — treat every policy file under a directory as the
+  Filesystem override: treat every policy file under a directory as the
   corpus, ignoring git (useful for a scratch/unversioned policy set):
       python -m tools.impact --corpus spec/v0/examples
       python -m tools.impact --corpus spec/v0/examples --git HEAD WORKING
 
-  Explicit file mode — compare two hand-picked sets of files:
+  Explicit file mode: compare two hand-picked sets of files:
       python -m tools.impact \
           --baseline a.jsonld b.jsonld \
           --proposed a-edited.jsonld b.jsonld
 
-  Lint mode — whole-corpus health check for dead rules (single corpus state,
+  Lint mode: whole-corpus health check for dead rules (single corpus state,
   not a diff); audits one ref (default the working tree):
       python -m tools.impact --lint
       python -m tools.impact --lint --at HEAD
@@ -244,7 +244,7 @@ def main(argv: list[str] | None = None) -> int:
             corpus_dir = Path(args.corpus).resolve() if args.corpus else None
             report = _run_lint_mode(repo_root, ref, corpus_dir)
         elif args.baseline and args.proposed:
-            # Explicit file mode — no git, no discovery.
+            # Explicit file mode: no git, no discovery.
             report = analyze_paths(args.baseline, args.proposed)
         else:
             base_ref, prop_ref = args.git if args.git else ("HEAD", WORKING)

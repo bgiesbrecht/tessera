@@ -4,7 +4,7 @@
 proposed corpus and returns a Report (C1/C2/C3/C5/C6).
 
 `lint(corpus)` runs the standing whole-corpus checks over a single corpus state
-(L1 dead-rule detection) — a health check on the corpus as it stands, rather
+(L1 dead-rule detection): a health check on the corpus as it stands, rather
 than a diff between two versions.
 """
 

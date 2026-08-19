@@ -1,6 +1,6 @@
 # Contributing to Tessera
 
-This page is for engineers extending Tessera — writing a new adapter, adding an IR concept, building tooling. It assumes familiarity with the IR ([`authoring.md`](./authoring.md)) and the adapter contract ([`operating.md`](./operating.md)).
+This page is for engineers extending Tessera: writing a new adapter, adding an IR concept, or building tooling. It assumes familiarity with the IR ([`authoring.md`](./authoring.md)) and the adapter contract ([`operating.md`](./operating.md)).
 
 The project's discipline matters more than its current code. Read this page before opening a substantial PR.
 
@@ -25,7 +25,7 @@ In practice:
 - **Capability profiles describe emission and platform behavior.** They do not editorialize about authoring preferences.
 - **Where the IR cannot represent a definable intent, file an issue or propose an ADR.** The framework grows by adding representational range, not by adding prescription. Issue [#14](https://github.com/bgiesbrecht/tessera/issues/14) (Intent A primary-role-only semantics) is the canonical example of this discipline.
 
-If a PR introduces "Tessera recommends X" framing into authoring guidance, expect it to be redirected to either (a) a citation of the platform's own recommendation, (b) a descriptive statement of what the shape represents, or (c) an issue tracking an IR-extension candidate. See ADR-027 for the full reasoning and the empirical history (two correction passes — 2026-05-19 secondary-roles reframe, 2026-05-20 Snowflake-guidance reframe — that motivated recording the principle).
+If a PR introduces "Tessera recommends X" framing into authoring guidance, expect it to be redirected to either (a) a citation of the platform's own recommendation, (b) a descriptive statement of what the shape represents, or (c) an issue tracking an IR-extension candidate. See ADR-027 for the full reasoning and the empirical history (two correction passes, the 2026-05-19 secondary-roles reframe and the 2026-05-20 Snowflake-guidance reframe, motivated recording the principle).
 
 ## Extending the IR
 
@@ -36,12 +36,12 @@ The v0 immutability bar is suspended (ADR-017) until external dependency exists.
 1. **An ADR proposing the addition.** Reference existing ADRs it relates to. Explain *why* the IR's current shape is insufficient — usually with an example from a worked exercise.
 2. **A worked example exercising the concept.** Phase 1 inputs brief in `docs/exercises/`; Phase 2 artifacts in `spec/v0/examples/`; Phase 3 diagnostic in the same directory. The exercise is the empirical grounding for the concept; "exercises drive design, not speculation" is the project's discipline.
 3. **Updates to four files**:
-   - `spec/v0/ontology.ttl` — the OWL/Turtle definition.
-   - `spec/v0/context.jsonld` — JSON-LD short names.
-   - `spec/v0/schema.json` — JSON Schema 2020-12 structural validation.
-   - `spec/v0/shapes.ttl` — SHACL semantic shapes (if the addition has IRI-resolution or closed-vocabulary semantics).
-4. **Updates to the technical design** (`docs/technical-design-v0.2.md`) — typically a new subsection.
-5. **A re-validation pass** — every existing JSON-LD example in `spec/v0/examples/` must still validate against the updated schema and shapes.
+   - `spec/v0/ontology.ttl`: the OWL/Turtle definition.
+   - `spec/v0/context.jsonld`: JSON-LD short names.
+   - `spec/v0/schema.json`: JSON Schema 2020-12 structural validation.
+   - `spec/v0/shapes.ttl`: SHACL semantic shapes (if the addition has IRI-resolution or closed-vocabulary semantics).
+4. **Updates to the technical design** (`docs/technical-design-v0.2.md`): typically a new subsection.
+5. **A re-validation pass.** Every existing JSON-LD example in `spec/v0/examples/` must still validate against the updated schema and shapes.
 
 The 2026-05-19 Stage 4 changes (ADRs 018–021 implementations) are a clean reference for what "extending v0" looks like end to end.
 
@@ -98,7 +98,7 @@ class MyPlatformAdapter(Adapter):
 - **Use `AdapterConfig.bind_principal` and `bind_resource`** for IR → platform translation. Don't embed platform-specific bindings in the adapter code.
 - **Declare every capability gap as `PARTIAL` or `UNSUPPORTED`** in the profile, with a non-empty rationale string. The profile is the project's running record of platform-specific concerns.
 - **Use parallel diagnostic codes** with existing adapters where the concern is parallel (`UNIMPLEMENTED_POLICY_KIND`, `UNSUPPORTED_PRINCIPAL_SELECTOR`, `UNBOUND_PRINCIPAL`). Diverge codes only where the platform's concern is genuinely different.
-- **Row-filter and column-mask UDF parameters must use a fixed alias** that does not collide with any column name referenced in the function body. SQL is case-insensitive on identifiers; Snowflake folds to uppercase; Databricks is mixed-case. Naming the function parameter after a column it binds to creates an ambiguous identifier when the column is also referenced inside the body — the engine resolves the bare identifier to the column, the predicate degenerates to `col = col` (always TRUE), and the policy silently passes everything. Pin a fixed alias: `POLICY_INPUT_VALUE` for uppercase platforms, `policy_input_value` for lowercase. The actual column-to-parameter bind happens positionally via `ALTER TABLE ... ON (col)`. This pattern has bitten three emission paths during development (Snowflake byDataset row, Snowflake column mask, UC byDataset row); the convention is the project's way of preventing a fourth.
+- **Row-filter and column-mask UDF parameters must use a fixed alias** that does not collide with any column name referenced in the function body. SQL is case-insensitive on identifiers; Snowflake folds to uppercase; Databricks is mixed-case. Naming the function parameter after a column it binds to creates an ambiguous identifier when the column is also referenced inside the body, so the engine resolves the bare identifier to the column, the predicate degenerates to `col = col` (always TRUE), and the policy silently passes everything. Pin a fixed alias: `POLICY_INPUT_VALUE` for uppercase platforms, `policy_input_value` for lowercase. The actual column-to-parameter bind happens positionally via `ALTER TABLE ... ON (col)`. This pattern has bitten three emission paths during development (Snowflake byDataset row, Snowflake column mask, UC byDataset row); the convention is the project's way of preventing a fourth.
 
 ### When to add a new `Capability` enum value
 

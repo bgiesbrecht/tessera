@@ -21,7 +21,7 @@ What this provisions:
                 acme.tpch.rls_priority_acl      (CODE_NAME, O_ORDERPRIORITY)
                 acme.tpch_staging.initial_table ← samples.tpch.orders LIMIT 100
     Function:   acme.tpch.compute_customer_ltv (no-op UDF)
-    Groups:     NOT provisioned by this script — Unity Catalog GRANT
+    Groups:     NOT provisioned by this script; Unity Catalog GRANT
                 requires account-level groups, and the workspace SDK
                 creates only WorkspaceGroup-typed groups (visible to
                 SHOW GROUPS but rejected by GRANT with
@@ -43,7 +43,7 @@ Group / role membership is intentionally NOT provisioned by this script.
 Adding members is a separate operational decision (and requires
 account-admin in Databricks, ACCOUNTADMIN in Snowflake).
 
-Seed ACL data is NOT inserted by this script either — the live-test
+Seed ACL data is NOT inserted by this script either. The live-test
 scripts that need ACL seed rows insert them at runtime
 (see `live_snowflake_bydataset.py`).
 
@@ -179,7 +179,7 @@ def setup_databricks() -> None:
     print("  groups. The workspace SDK's groups.create() makes WorkspaceGroup-typed")
     print("  groups, which are visible to SHOW GROUPS but fail GRANT with")
     print("  PRINCIPAL_DOES_NOT_EXIST. This script does NOT create groups for that")
-    print("  reason — provision them at account level instead:")
+    print("  reason: provision them at account level instead:")
     print()
     print("    https://accounts.cloud.databricks.com  →  User management  →  Groups")
     print()
@@ -191,7 +191,7 @@ def setup_databricks() -> None:
     print("  your workspace → Permissions → Groups → Add).")
     print()
     print("  If you have an account-admin Databricks SDK profile configured,")
-    print("  AccountClient.groups.create() can do this programmatically — that")
+    print("  AccountClient.groups.create() can do this programmatically. That")
     print("  enhancement is a future increment to this script.")
 
     print()
@@ -299,7 +299,7 @@ def main() -> None:
 
     print()
     print("=" * 70)
-    print("Setup complete. Group / role membership is empty — assign as needed.")
+    print("Setup complete. Group / role membership is empty; assign as needed.")
     print("=" * 70)
 
 

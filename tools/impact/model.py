@@ -9,7 +9,7 @@ module only ever sees the canonical dict shape.
 The model is intentionally shallow: it captures exactly the fields the Stage-1
 checks (C5 dangling-reference, C6 exposure-polarity) and the kernel need, and
 leaves everything else as opaque `raw` for later stages to reach into. Nothing
-here evaluates a policy — it only records what the document declares.
+here evaluates a policy; it only records what the document declares.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from typing import Any
 
 
 # ----------------------------------------------------------------------------
-# Selector — a principal or resource selector expression
+# Selector: a principal or resource selector expression
 # ----------------------------------------------------------------------------
 
 
@@ -32,7 +32,7 @@ class Selector:
     Only the fields the kernel compares are lifted; the originating dict is
     kept in `raw` for checks that need to reach further. Selectors are compared
     by the kernel (see kernel.py), never by resolving the population they
-    denote — that would be evaluation (ADR-001).
+    denote; that would be evaluation (ADR-001).
     """
 
     kind: str | None
@@ -79,7 +79,7 @@ class Selector:
 
 
 # ----------------------------------------------------------------------------
-# Condition — the leaf condition on a rule
+# Condition: the leaf condition on a rule
 # ----------------------------------------------------------------------------
 
 

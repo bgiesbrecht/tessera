@@ -2,7 +2,7 @@
 
 This document is for someone who has heard about Tessera and wants to know what it actually does today, before reading the README, the technical design, or any of the ADRs. It is a 5–10 minute read. Pointers throughout to runnable artifacts and supporting docs.
 
-The claim it makes — and demonstrates with real numbers from real workspaces — is this:
+The claim it makes, and demonstrates with real numbers from real workspaces, is this:
 
 > The same data governance policy, authored once in YAML, can be validated, lowered to Databricks-native enforcement and Snowflake-native enforcement, deployed on both platforms, behaviorally verified, and migrated between platforms in either direction. End to end. Runnable. Today.
 
@@ -87,8 +87,8 @@ The verification numbers from a real run on real workspaces:
 
 | Policy | Surface after migration | Caller-visible result |
 |---|---|---|
-| Group row visibility (3-branch CASE) | `acme.migration_demo.demo_orders` | 59,998 rows visible (priorities 3-MEDIUM / 4-NOT SPECIFIED / 5-LOW — the third branch fires because the caller is in `account users` only) |
-| byDataset row visibility (mapping-table EXISTS) | `acme.migration_demo.demo_orders_rls_acl` | 40,002 rows visible (priorities 1-URGENT + 2-HIGH — the caller's ACL codenames) |
+| Group row visibility (3-branch CASE) | `acme.migration_demo.demo_orders` | 59,998 rows visible (priorities 3-MEDIUM / 4-NOT SPECIFIED / 5-LOW; the third branch fires because the caller is in `account users` only) |
+| byDataset row visibility (mapping-table EXISTS) | `acme.migration_demo.demo_orders_rls_acl` | 40,002 rows visible (priorities 1-URGENT + 2-HIGH; the caller's ACL codenames) |
 | Column mask (Redact, group exception) | `acme.migration_demo.demo_orders.o_clerk` | `'CLERK-REDACTED'` for every distinct value |
 | Table grant (SELECT) | `acme.migration_demo.demo_orders` | Three explicit grants visible via `SHOW GRANTS` |
 | Schema grant (fans out to per-table) | `acme.migration_demo_staging.staged_orders` | `SELECT` grant visible (the schema-level intent landed as a per-table grant on Databricks) |
@@ -100,11 +100,11 @@ All six policies enforcing. Bidirectional cycle. Run it yourself: the scripts ar
 
 ## The IR's value
 
-The conventional answer to "how do I keep my Databricks and Snowflake governance in sync" is "you can't, exactly — write equivalent policies in both, hope they stay aligned, audit when they drift." Policy drift between platforms is a significant governance failure mode; every multi-platform customer either pays the cost or builds bespoke tooling.
+The conventional answer to "how do I keep my Databricks and Snowflake governance in sync" is "you can't, exactly: write equivalent policies in both, hope they stay aligned, and audit when they drift." Policy drift between platforms is a significant governance failure mode; every multi-platform customer either pays the cost or builds bespoke tooling.
 
-Tessera's IR addresses this. The same `.tessera.yaml` file lowers to clean Databricks DDL and clean Snowflake DDL via per-platform adapters. The bindings layer (`AdapterConfig`) carries the per-environment translation — group names, role names, table identifiers, governed-tag mappings — without contaminating the policy itself. The policy author writes intent; the operator configures the translation; the platform handles enforcement.
+Tessera's IR addresses this. The same `.tessera.yaml` file lowers to clean Databricks DDL and clean Snowflake DDL via per-platform adapters. The bindings layer (`AdapterConfig`) carries the per-environment translation (group names, role names, table identifiers, governed-tag mappings) without contaminating the policy itself. The policy author writes intent; the operator configures the translation; the platform handles enforcement.
 
-The implementation uses the W3C semantic-web stack: OWL for the vocabulary (`spec/v0/ontology.ttl`), JSON-LD 1.1 for the canonical form (`spec/v0/context.jsonld`), JSON Schema and SHACL for validation, and SKOS for vocabulary alignment to DPV and ODRL. This is not overhead; it is the substrate that makes the cross-platform claim sound. See `docs/w3c-overview.md` for details.
+The implementation uses the W3C semantic-web stack: OWL for the vocabulary (`spec/v0/ontology.ttl`), JSON-LD 1.1 for the canonical form (`spec/v0/context.jsonld`), JSON Schema and SHACL for validation, and SKOS for vocabulary alignment to DPV and ODRL. The stack is the substrate that makes the cross-platform claim sound. See `docs/w3c-overview.md` for details.
 
 ---
 
@@ -123,7 +123,7 @@ Eight phases. Idempotent. Verifiable.
 
 The script that runs this lives at `adapters/tests/live_migration_demo.py`. The reverse-direction sibling lives at `adapters/tests/live_migration_demo_reverse.py`. Both are ~500 lines of Python that exercise every adapter responsibility in coordinated fashion.
 
-A walkthrough in prose lives at `docs/user-guide/scenarios/migrating-snowflake-to-uc.md` — Phase-by-phase, with the empirical results and the findings that surfaced during development.
+A walkthrough in prose lives at `docs/user-guide/scenarios/migrating-snowflake-to-uc.md`: phase by phase, with the empirical results and the findings that surfaced during development.
 
 ---
 
@@ -196,7 +196,7 @@ $ python -m adapters.tests.live_migration_demo
 
 ## Analyzing a change before you deploy
 
-Authoring and deploying is one half; the other is knowing what a *change* to a policy corpus does before you emit anything. `tessera impact` diffs two versions of the corpus (git-tracked by default — committed policies are the corpus, uncommitted drafts excluded until staged); `tessera lint` audits the current corpus for latent problems. Both are static and advisory: they reason about the policy text, never connecting to a platform or resolving who is in which group (the ADR-001 line), and tag each finding `PROVEN` or `CANDIDATE` depending on whether it follows from the text alone or would need a platform fact the tool doesn't read.
+Authoring and deploying is one half; the other is knowing what a *change* to a policy corpus does before you emit anything. `tessera impact` diffs two versions of the corpus (git-tracked by default, so committed policies are the corpus and uncommitted drafts are excluded until staged); `tessera lint` audits the current corpus for latent problems. Both are static and advisory: they reason about the policy text, never connecting to a platform or resolving who is in which group (the ADR-001 line), and tag each finding `PROVEN` or `CANDIDATE` depending on whether it follows from the text alone or would need a platform fact the tool doesn't read.
 
 ```bash
 # What does my working-tree edit do to the git-tracked policies?
@@ -222,7 +222,7 @@ It catches coverage gaps (a group that now matches no rule), dead or newly-live 
 
 ## Honest limitations at 0.9.0
 
-The framing of these matters: not "TODO" items, but documented decisions about what the version does and doesn't cover. Each links to the tracking issue.
+Documented decisions about what the version does and doesn't cover, each linked to its tracking issue.
 
 - **Snowflake ABAC byScope is not implemented** ([#31](https://github.com/bgiesbrecht/tessera/issues/31)). Snowflake uses object tags + tag-based-attachment masking/row-access policies, which is structurally different from Databricks' `CREATE POLICY ... MATCH COLUMNS has_tag_value(...)`. Real design step, wants a worked exercise before implementation.
 - **No comment preservation in YAML round-trips** ([deferred from converter v1](docs/user-guide/scenarios/acl-and-masking.md)). The converter uses `ruamel.yaml` from the start so the round-trip parser already preserves the structural metadata; the actual comment-mapping work (per ADR-004) is a future v2 increment.
@@ -268,4 +268,4 @@ The `docs/user-guide/evaluating.md` page expands these into a fuller adopt/don't
 
 ## Version status
 
-The version is 0.9.0 because v0 isn't frozen yet (per ADR-017). Whether it reaches 1.0 depends on external dependency — a real customer corpus, a third adapter, a tooling integration — at which point the spec freezes and the project commits to the surface it has.
+The version is 0.9.0 because v0 isn't frozen yet (per ADR-017). Whether it reaches 1.0 depends on external dependency (a real customer corpus, a third adapter, a tooling integration), at which point the spec freezes and the project commits to the surface it has.

@@ -57,7 +57,7 @@ def test_row_visibility_parity_emits_clean_on_both_adapters():
     assert "IS_ROLE_IN_SESSION" in sf_sql, "Snowflake SQL missing platform-native role binding"
     assert "SET ROW FILTER" in uc_sql, "UC SQL missing row-filter attachment DDL"
     assert "ROW ACCESS POLICY" in sf_sql, "Snowflake SQL missing row-access-policy DDL"
-    assert uc_sql != sf_sql, "Adapters emitted identical SQL — the contract did not lower to platform-native form"
+    assert uc_sql != sf_sql, "Adapters emitted identical SQL; the contract did not lower to platform-native form"
 
 
 def test_column_visibility_parity_emits_clean_on_both_adapters():
@@ -102,7 +102,7 @@ def test_column_visibility_parity_emits_clean_on_both_adapters():
 
 def test_abac_byscope_alias_is_sanitized_for_namespaced_values():
     """A namespaced attribute value (acme:PIIClerk, per ADR-028) must not leak
-    its colon into the emitted `AS <alias>` / `ON COLUMN <alias>` — that would be
+    its colon into the emitted `AS <alias>` / `ON COLUMN <alias>`, which would be
     invalid Databricks SQL. The alias is sanitized to a legal identifier."""
     policy = _load("abac-column-mask-policy-a.jsonld")
     assert policy["appliesTo"]["matching"]["attributes"]["sensitivity"] == "acme:PIIClerk"
@@ -115,7 +115,7 @@ def test_abac_byscope_alias_is_sanitized_for_namespaced_values():
 
 
 def test_snowflake_abac_byscope_column_mask_is_tag_based():
-    """#31: byScope ColumnVisibility lowers to Snowflake tag-based masking —
+    """#31: byScope ColumnVisibility lowers to Snowflake tag-based masking:
     CREATE MASKING POLICY reading SYSTEM$GET_TAG_ON_CURRENT_COLUMN, attached via
     ALTER TAG ... SET MASKING POLICY."""
     policy = _load("abac-column-mask-policy-a.jsonld")
@@ -131,7 +131,7 @@ def test_snowflake_abac_byscope_column_mask_is_tag_based():
 
 
 def test_snowflake_abac_byscope_row_filter_is_tag_based():
-    """#31: byScope RowVisibility lowers to Snowflake tag-based row access —
+    """#31: byScope RowVisibility lowers to Snowflake tag-based row access:
     CREATE ROW ACCESS POLICY as a CASE ladder over IS_ROLE_IN_SESSION + a
     predicate on the matched column, attached via ALTER TAG ... SET ROW ACCESS
     POLICY ... ON (col)."""
@@ -143,7 +143,7 @@ def test_snowflake_abac_byscope_row_filter_is_tag_based():
     assert "CREATE OR REPLACE ROW ACCESS POLICY" in sql
     assert "RETURNS BOOLEAN" in sql
     # The ON clause names the real discriminator column (from the matching value),
-    # not the abstract policy param — required for tag-based row access to bind
+    # not the abstract policy param; required for tag-based row access to bind
     # (live-verified 2026-08-13).
     assert "SET ROW ACCESS POLICY" in sql and "ON (orderpriority VARCHAR)" in sql
     # Three-branch first-match: all-ops → all rows; high-ops → 1/2; else → 3/4/5.
@@ -170,7 +170,7 @@ def test_snowflake_abac_byscope_uses_configured_tag_taxonomy():
 
 def test_ai_governance_axis_composes_with_column_mask_on_both_adapters():
     """ADR-029: an AI-governance axis (trainingEligibility) drives an ordinary
-    byScope column mask — no new emission path. Both adapters lower it to real
+    byScope column mask (no new emission path). Both adapters lower it to real
     masking DDL keyed off the axis, which is where the axis gets teeth."""
     policy = _load("ai-governance-training-mask-policy.jsonld")
     assert policy["appliesTo"]["matching"]["attributes"]["trainingEligibility"] == "NoTraining"
@@ -185,7 +185,7 @@ def test_ai_governance_axis_composes_with_column_mask_on_both_adapters():
 
 
 def test_retention_constraint_is_expression_only_on_both_adapters():
-    """ADR-031: RetentionConstraint is expressed + validated but not emitted —
+    """ADR-031: RetentionConstraint is expressed + validated but not emitted:
     no platform declarative retention primitive, and Tessera does not emit
     destructive scheduled jobs in v0. Both adapters emit zero statements and a
     RETENTION_EXPRESSION_ONLY diagnostic (not the generic UNIMPLEMENTED TODO)."""
@@ -199,7 +199,7 @@ def test_retention_constraint_is_expression_only_on_both_adapters():
 
 
 def test_bydataset_acl_lowers_to_three_distinct_mechanisms():
-    """ADR-032: the same byDataset ACL IR lowers to three distinct mechanisms —
+    """ADR-032: the same byDataset ACL IR lowers to three distinct mechanisms:
     a UC row-filter function, a Snowflake row-access policy, and a custom-ACL
     wrapping VIEW. All three carry the ACL EXISTS-join; none errors; the custom-ACL
     adapter (a *pattern* adapter, not a platform) is a peer of the two native ones."""
@@ -227,7 +227,7 @@ def test_bydataset_acl_lowers_to_three_distinct_mechanisms():
         assert "EXISTS" in sql.upper()
         assert "rls_acl_mapping" in sql and "rls_priority_acl" in sql
 
-    # The view is the enforcement in the custom pattern — no native primitive.
+    # The view is the enforcement in the custom pattern; no native primitive.
     assert "orders_rls_acl_secured" in acl_sql
     assert "current_user()" in acl_sql
 
@@ -235,7 +235,7 @@ def test_bydataset_acl_lowers_to_three_distinct_mechanisms():
 def test_custom_acl_emit_extract_round_trips_to_equivalent_ir():
     """The migration on-ramp (ADR-003/ADR-032): emit an ACL view, then extract it
     back to IR. The reconstructed byDataset dataset + condition operand + protected
-    table must match the source IR — this is what lets a hand-built ACL view be
+    table must match the source IR. That is what lets a hand-built ACL view be
     lifted and re-emitted to a native platform."""
     policy = _load("acl-row-visibility-policy.jsonld")
     adapter = CustomACLAdapter()
@@ -291,7 +291,7 @@ def test_oracle_row_visibility_lowers_to_vpd():
 def test_oracle_column_mask_lowers_to_data_redaction_with_quoted_expression():
     """ADR-033: Redact-with-replacement → DBMS_REDACT.REGEXP so the replacement
     literal is honored (FULL cannot). The `expression` is a PL/SQL string literal, so
-    its inner quotes must be doubled — a regression guard for that."""
+    its inner quotes must be doubled; a regression guard for that."""
     policy = _load("column-mask-orders-clerk-policy.jsonld")
     r = OracleAdapter().emit(policy)
     assert not r.has_errors, r.diagnostics
@@ -299,7 +299,7 @@ def test_oracle_column_mask_lowers_to_data_redaction_with_quoted_expression():
     assert "DBMS_REDACT.ADD_POLICY" in sql
     assert "function_type        => DBMS_REDACT.REGEXP" in sql
     assert "regexp_replace_string => 'CLERK-REDACTED'" in sql
-    # Inner quotes doubled — the literal would be malformed otherwise.
+    # Inner quotes doubled; the literal would be malformed otherwise.
     assert "''SYS_SESSION_ROLES''" in sql and "''ORDERS_FULL_ACCESS''" in sql
 
 

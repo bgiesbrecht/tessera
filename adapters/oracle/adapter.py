@@ -1,4 +1,4 @@
-"""Oracle adapter — a third native-platform peer (ADR-033).
+"""Oracle adapter: a third native-platform peer (ADR-033).
 
 Connection handling: `oracledb` is imported lazily so the adapter contract is
 importable without the driver. Real discovery/execution against Oracle requires

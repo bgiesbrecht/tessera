@@ -14,7 +14,7 @@ Re-runnable: drops and recreates the demo schemas on each invocation.
 To tear down (drops both schemas and exits):
     .venv/bin/python -m adapters.tests.live_migration_demo --cleanup
 
-Identifier constants below — adjust if you want to target different account /
+Identifier constants below: adjust if you want to target different account /
 catalog names. The three source-policy YAMLs come from `spec/v0/examples/`;
 they are Databricks-shaped by default and get rebound via the adapter config
 to point at the fresh schemas on each platform.
@@ -42,7 +42,7 @@ from adapters.unity_catalog import UnityCatalogAdapter
 
 
 # ---------------------------------------------------------------------------
-# Identifiers — change here if you want different schemas / accounts / etc.
+# Identifiers: change here if you want different schemas / accounts / etc.
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -140,11 +140,11 @@ def db_runner():
 
 
 # ---------------------------------------------------------------------------
-# Phase 1 — Provision Snowflake source schema
+# Phase 1: Provision Snowflake source schema
 # ---------------------------------------------------------------------------
 
 def provision_snowflake_source(cur) -> None:
-    section("Phase 1 — Provision Snowflake source schema")
+    section("Phase 1: Provision Snowflake source schema")
 
     step(f"Drop & recreate {SNOWFLAKE_DATABASE}.{SOURCE_SCHEMA}")
     cur.execute(f"DROP SCHEMA IF EXISTS {SNOWFLAKE_DATABASE}.{SOURCE_SCHEMA} CASCADE")
@@ -158,7 +158,7 @@ def provision_snowflake_source(cur) -> None:
         # Add an `orderpriority` column (alias of `o_orderpriority`) so the
         # acl-row-visibility YAML's `resourceColumn: orderpriority` finds it
         # on the protected table. Surface of issue #13 (resourceColumn
-        # conflation) — the IR field carries both the ACL column name AND
+        # conflation): the IR field carries both the ACL column name AND
         # the protected column name; the demo aligns them by duplicating.
         f"CREATE TABLE {fq_sf_table('demo_orders_rls_acl')} AS "
         f"  SELECT *, O_ORDERPRIORITY AS orderpriority "
@@ -202,11 +202,11 @@ def provision_snowflake_source(cur) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2 — Deploy three Tessera policies on Snowflake source
+# Phase 2: Deploy three Tessera policies on Snowflake source
 # ---------------------------------------------------------------------------
 
 def deploy_source_policies(cur) -> None:
-    section("Phase 2 — Deploy three Tessera policies on Snowflake source")
+    section("Phase 2: Deploy three Tessera policies on Snowflake source")
 
     # Bindings translate the Databricks-shaped IR (table:acme.tpch.orders
     # and groups:acme_*) to the fresh Snowflake schema's identifiers.
@@ -217,7 +217,7 @@ def deploy_source_policies(cur) -> None:
             f"group:{GROUP_ACCOUNT_USERS}": "PUBLIC",
             "group:account-users":          "PUBLIC",
             "group:orders_full_access":     ROLE_HIGH_PRIORITY,  # same role used as the privileged group
-            # RBAC demo principals — substitute existing demo roles.
+            # RBAC demo principals: substitute existing demo roles.
             "group:acme_marketing_analytics": ROLE_HIGH_PRIORITY,
             "group:acme_data_engineering":    ROLE_ALL_PRIORITY,
         },
@@ -227,7 +227,7 @@ def deploy_source_policies(cur) -> None:
             "table:acme.tpch.rls_acl_mapping":      fq_sf_table("demo_rls_acl_mapping"),
             "table:acme.tpch.rls_priority_acl":     fq_sf_table("demo_rls_priority_acl"),
             "column:acme.tpch.orders.o_clerk":      f"{fq_sf_table('demo_orders')}.o_clerk",
-            # RBAC additions — function and schema targets.
+            # RBAC additions: function and schema targets.
             "function:acme.tpch.compute_customer_ltv":
                 f"{fq_sf_table('compute_customer_ltv')}",
             "scope:schema:acme.tpch_staging":
@@ -259,17 +259,17 @@ def deploy_source_policies(cur) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Phase 3 — Discover deployed policies on the Snowflake source
-# Phase 4 — Extract each into Tessera IR; validate
+# Phase 3: Discover deployed policies on the Snowflake source
+# Phase 4: Extract each into Tessera IR; validate
 # ---------------------------------------------------------------------------
 
 def discover_and_extract(cur) -> list[dict]:
-    section("Phase 3 — Discover policies on fresh Snowflake source")
+    section("Phase 3: Discover policies on fresh Snowflake source")
 
     sf = SnowflakeAdapter(config=AdapterConfig(extras={
         "snowflake_cursor":  cur,
     }))
-    # Walk both schemas — MIGRATION_DEMO and MIGRATION_DEMO_STAGING — so the
+    # Walk both schemas (MIGRATION_DEMO and MIGRATION_DEMO_STAGING) so the
     # schema-level grant scenario B deployed on MIGRATION_DEMO_STAGING is found.
     class _MergedDisc:
         artifacts: list = []
@@ -291,7 +291,7 @@ def discover_and_extract(cur) -> list[dict]:
         )
         print(f"  • [{art['kind']}] {art['name']}  →  {attach or '<no attachments>'}")
 
-    section("Phase 4 — Extract each into Tessera IR; validate")
+    section("Phase 4: Extract each into Tessera IR; validate")
 
     schema = json.loads(SCHEMA_PATH.read_text())
     shapes = Graph(); shapes.parse(str(SHAPES_PATH), format="turtle")
@@ -330,14 +330,14 @@ def discover_and_extract(cur) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Phase 5 — Provision Databricks target schema
-# Phase 6 — Emit UC DDL with rebinding
-# Phase 7 — Deploy UC DDL on Databricks
+# Phase 5: Provision Databricks target schema
+# Phase 6: Emit UC DDL with rebinding
+# Phase 7: Deploy UC DDL on Databricks
 # ---------------------------------------------------------------------------
 
 def provision_uc_target_and_deploy(extracted: list[dict]) -> list[tuple[str, list[str]]]:
     run = db_runner()
-    section("Phase 5 — Provision Databricks target schema")
+    section("Phase 5: Provision Databricks target schema")
 
     step(f"Drop & recreate {TARGET_CATALOG}.{TARGET_SCHEMA}")
     try:
@@ -384,7 +384,7 @@ def provision_uc_target_and_deploy(extracted: list[dict]) -> list[tuple[str, lis
         run(stmt)
         print(f"  OK: {stmt[:80]}…")
 
-    section("Phase 6 — Emit UC DDL from extracted Tessera IR")
+    section("Phase 6: Emit UC DDL from extracted Tessera IR")
 
     # Bindings map the Snowflake-side identifiers (as carried by the extracted IR)
     # to their Databricks-side counterparts in the fresh target schema.
@@ -400,7 +400,7 @@ def provision_uc_target_and_deploy(extracted: list[dict]) -> list[tuple[str, lis
             f"table:{fq_sf_table('demo_rls_acl_mapping')}": fq_uc_table("demo_rls_acl_mapping"),
             f"table:{fq_sf_table('demo_rls_priority_acl')}":fq_uc_table("demo_rls_priority_acl"),
             f"column:{fq_sf_table('demo_orders')}.o_clerk": f"{fq_uc_table('demo_orders')}.o_clerk",
-            # RBAC additions — function + staging schema + per-table within
+            # RBAC additions: function + staging schema + per-table within
             # the staging schema. (The Phase 1 "GRANT SELECT ON ALL TABLES IN
             # SCHEMA staging" materializes as a per-table grant on
             # STAGED_ORDERS, which discovery surfaces independently; the IR
@@ -429,7 +429,7 @@ def provision_uc_target_and_deploy(extracted: list[dict]) -> list[tuple[str, lis
             print(f"  emit: {head[:100]}")
         stmt_batches.append((policy["@id"], em.statements))
 
-    section("Phase 7 — Deploy UC DDL on Databricks")
+    section("Phase 7: Deploy UC DDL on Databricks")
     for policy_id, statements in stmt_batches:
         step(policy_id)
         for stmt in statements:
@@ -444,11 +444,11 @@ def provision_uc_target_and_deploy(extracted: list[dict]) -> list[tuple[str, lis
 
 
 # ---------------------------------------------------------------------------
-# Phase 8 — Verify behavior on Databricks target
+# Phase 8: Verify behavior on Databricks target
 # ---------------------------------------------------------------------------
 
 def verify_on_databricks() -> None:
-    section("Phase 8 — Verify behavior on Databricks target")
+    section("Phase 8: Verify behavior on Databricks target")
     run = db_runner()
 
     step(f"Row counts on {fq_uc_table('demo_orders')} (group row-vis applies)")
@@ -496,7 +496,7 @@ def verify_on_databricks() -> None:
                 seen = True
                 print(f"    {r[0]} {r[1]} on {r[2]} {r[3]}")
             if not seen:
-                print("    (no explicit grants — migrated DDL may have substituted into existing role bindings)")
+                print("    (no explicit grants; migrated DDL may have substituted into existing role bindings)")
         except Exception as e:
             print(f"    (query failed: {str(e).splitlines()[0]})")
 
@@ -506,7 +506,7 @@ def verify_on_databricks() -> None:
 # ---------------------------------------------------------------------------
 
 def cleanup() -> None:
-    section("Cleanup — drop demo schemas on both platforms")
+    section("Cleanup: drop demo schemas on both platforms")
 
     # Snowflake
     try:
@@ -550,7 +550,7 @@ def main() -> int:
         conn.close()
 
     if not extracted:
-        print("\n(no policies extracted — aborting before Databricks side)")
+        print("\n(no policies extracted; aborting before Databricks side)")
         return 1
 
     provision_uc_target_and_deploy(extracted)

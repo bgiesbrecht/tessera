@@ -1,4 +1,4 @@
-# Diagnostic — Snowflake `byDataset` Row-Visibility Exercise
+# Diagnostic: Snowflake `byDataset` Row-Visibility Exercise
 
 **Phase 2 + Phase 3 deliverable.** Verifies that the IR's `byDataset` selector + `PrincipalSetFromTable` class lower to a Snowflake row-access policy whose body is a correlated `EXISTS` over two ACL tables. Companion to `docs/exercises/snowflake-byDataset-row-visibility-inputs.md`.
 
@@ -25,16 +25,16 @@ Live execution against `ACME.TESSERA.SNOW_ORDERS_RLS_ACL` (1.5M rows from TPC-H)
 | 4a | Seed restored; `USE SECONDARY ROLES NONE` | Sees 1-URGENT + 2-HIGH | 600,434 rows | ✅ |
 | 4b | Seed restored; `USE SECONDARY ROLES ALL` | Identical to 4a (secondary-roles immune) | 600,434 rows | ✅ |
 
-**Scenario 4 is the key empirical claim**: the same protected table, same user, same seed data — row counts identical across `USE SECONDARY ROLES NONE` and `ALL`. The byDataset pattern gates on `CURRENT_USER()`, which is unaffected by `DEFAULT_SECONDARY_ROLES` or `USE SECONDARY ROLES`. This is the structural reason Snowflake's documentation recommends mapping-table authorization for non-trivial row-access policies, and the reason Tessera's `byDataset` selector aligns with that recommendation.
+**Scenario 4 is the key empirical claim**: the same protected table, same user, same seed data, with row counts identical across `USE SECONDARY ROLES NONE` and `ALL`. The byDataset pattern gates on `CURRENT_USER()`, which is unaffected by `DEFAULT_SECONDARY_ROLES` or `USE SECONDARY ROLES`. This is the structural reason Snowflake's documentation recommends mapping-table authorization for non-trivial row-access policies, and the reason Tessera's `byDataset` selector aligns with that recommendation.
 
-## 3. v0 IR finding — `resourceColumn` is conflated
+## 3. v0 IR finding: `resourceColumn` is conflated
 
 The IR's `ResourceSetFromTable.resourceColumn` field carries one identifier that must serve two distinct roles:
 
 1. The column name on the **ACL table** that the `EXISTS` subquery reads (`p.<resourceColumn>`).
 2. The column name on the **protected table** that the `ALTER TABLE ... ON (<col>)` clause binds to the policy parameter.
 
-These two columns are *usually* the same name by convention (the ACL mirrors the protected table's column), but the IR has no formal mechanism requiring or expressing this alignment. The exercise's seed data initially used `ORDERPRIORITY` for the ACL column and `O_ORDERPRIORITY` for the protected column — distinct names — which caused the emitted `ALTER TABLE ... ON (ORDERPRIORITY)` clause to fail with `invalid identifier 'ORDERPRIORITY'`. The exercise resolved this by renaming the ACL column to match the protected column (`O_ORDERPRIORITY`).
+These two columns are *usually* the same name by convention (the ACL mirrors the protected table's column), but the IR has no formal mechanism requiring or expressing this alignment. The exercise's seed data initially used `ORDERPRIORITY` for the ACL column and `O_ORDERPRIORITY` for the protected column (distinct names), which caused the emitted `ALTER TABLE ... ON (ORDERPRIORITY)` clause to fail with `invalid identifier 'ORDERPRIORITY'`. The exercise resolved this by renaming the ACL column to match the protected column (`O_ORDERPRIORITY`).
 
 **Disposition.** v1 candidate. The IR should either:
 
@@ -45,13 +45,13 @@ The Databricks ACL exercise had the same latent gap; it manifested only as adapt
 
 ## 4. Other findings
 
-**4.1 — Parameter-name collision.** The emitted row-access policy parameter is named `POLICY_INPUT_VALUE` rather than a column-derived name. This is required to avoid Snowflake resolving a bare identifier in the policy body to a column reference instead of the parameter, which would degenerate the predicate to `col = col` (always TRUE). The adapter's implementation pins this name; if Snowflake ever changes its identifier-resolution rules, the implementation continues to work because the alias is decoupled from any column name.
+**4.1 Parameter-name collision.** The emitted row-access policy parameter is named `POLICY_INPUT_VALUE` rather than a column-derived name. This is required to avoid Snowflake resolving a bare identifier in the policy body to a column reference instead of the parameter, which would degenerate the predicate to `col = col` (always TRUE). The adapter's implementation pins this name; if Snowflake ever changes its identifier-resolution rules, the implementation continues to work because the alias is decoupled from any column name.
 
-**4.2 — Capability profile update.** The Snowflake adapter's `DATASET_DRIVEN_PRINCIPALS` capability moves from `PARTIAL` to `PARTIAL (RowVisibility supported; ColumnVisibility still pending)` with a sharper rationale. The capability profile is updated in `adapters/snowflake/capability.py`.
+**4.2 Capability profile update.** The Snowflake adapter's `DATASET_DRIVEN_PRINCIPALS` capability moves from `PARTIAL` to `PARTIAL (RowVisibility supported; ColumnVisibility still pending)` with a sharper rationale. The capability profile is updated in `adapters/snowflake/capability.py`.
 
-**4.3 — No identity-binding required.** Unlike the role-based parity test (`live_snowflake.py`), this exercise required no `identity_bindings` entries in `AdapterConfig`. The principal binding comes from the ACL data itself (`'BGIESBRECHT'` in `RLS_ACL_MAPPING.USERNAME`), not from the IR's `principal:` IRIs. This is part of what makes the byDataset pattern operationally simpler — role taxonomy changes update the ACL table, not the policy DDL.
+**4.3 No identity-binding required.** Unlike the role-based parity test (`live_snowflake.py`), this exercise required no `identity_bindings` entries in `AdapterConfig`. The principal binding comes from the ACL data itself (`'BGIESBRECHT'` in `RLS_ACL_MAPPING.USERNAME`), not from the IR's `principal:` IRIs. This is part of what makes the byDataset pattern operationally simpler: role taxonomy changes update the ACL table, not the policy DDL.
 
-**4.4 — Failure modes confirmed.** Empty ACL mapping (scenario 3) produces zero rows. The `EXISTS` clause is fail-closed by construction; no implicit `ELSE` branch exists in the policy body. ACL table unavailability would produce the same fail-closed behavior (subquery cannot evaluate ⇒ predicate FALSE ⇒ row hidden), though this exercise did not test the unavailable-table case.
+**4.4 Failure modes confirmed.** Empty ACL mapping (scenario 3) produces zero rows. The `EXISTS` clause is fail-closed by construction; no implicit `ELSE` branch exists in the policy body. ACL table unavailability would produce the same fail-closed behavior (subquery cannot evaluate ⇒ predicate FALSE ⇒ row hidden), though this exercise did not test the unavailable-table case.
 
 ## 5. Cross-platform comparison
 
@@ -64,7 +64,7 @@ Same IR (`spec/v0/examples/snowflake-byDataset-row-visibility-policy.jsonld` ↔
 | Principal function | `current_user()` (email) | `CURRENT_USER()` (login name) |
 | Case sensitivity | Adapter emits `lower(trim(...))` normalization (per Databricks ACL exercise) | Relies on Snowflake's identifier folding (uppercase by default) |
 | ACL column-name convention | Diverges between ACL (`orderpriority`) and protected (`o_orderpriority`); adapter handles | Required to align (`O_ORDERPRIORITY` in both) for emission to succeed |
-| Secondary-roles / multi-role gotcha | N/A (Databricks groups are flat) | Immune by design — `CURRENT_USER()` ignores role activation |
+| Secondary-roles / multi-role gotcha | N/A (Databricks groups are flat) | Immune by design: `CURRENT_USER()` ignores role activation |
 
 The structural alignment of `byDataset` + `PrincipalSetFromTable` with Snowflake's recommended mapping-table pattern is now empirically validated, not merely argued.
 

@@ -1,14 +1,14 @@
-"""custom-ACL emission — IR → a wrapping secure view.
+"""custom-ACL emission: IR → a wrapping secure view.
 
 The custom-ACL adapter (ADR-032) is a *pattern* adapter, not a platform adapter.
-Its enforcement target is the customer's own convention — an ACL-table join
+Its enforcement target is the customer's own convention: an ACL-table join
 exposed through a wrapping view that is granted to consumers instead of the base
-table — which predates and sits alongside native RLS (ADR-003). There is no
+table. It predates and sits alongside native RLS (ADR-003). There is no
 platform primitive here: the VIEW *is* the enforcement mechanism.
 
 Coverage (v0):
     * RowVisibilityConstraint with a byDataset principal + exists-in-dataset
-      condition — the two-table ACL-join shape. Lowered to CREATE OR REPLACE VIEW
+      condition: the two-table ACL-join shape. Lowered to CREATE OR REPLACE VIEW
       wrapping the base table with the same EXISTS join the native adapters build
       inside their row-filter/row-access primitives.
     * Other policyKinds / selector kinds emit a structured diagnostic (not an
@@ -198,7 +198,7 @@ def _emit_acl_view(
 
     # Issue #13: ResourceSetFromTable.resourceColumn is conflated as both the ACL
     # table's value column and the protected table's discriminator column. The
-    # native adapters resolve this by aligning the two; the view does the same —
+    # native adapters resolve this by aligning the two; the view does the same:
     # `p.<col> = b.<col>`. Recorded, not silently swallowed.
     diagnostics.append(Diagnostic(
         severity=DiagnosticSeverity.INFO,

@@ -2,7 +2,7 @@
 
 Corpus discovery is git-tracked by default (option C), with a filesystem
 `--corpus DIR` override (option A). The key behaviors to pin:
-  * the default corpus is the git-tracked policy set — untracked drafts are
+  * the default corpus is the git-tracked policy set; untracked drafts are
     excluded until staged;
   * `.jsonld` / `.tessera.yaml` siblings dedup to one policy (prefer .jsonld);
   * the filesystem override globs a directory regardless of git.

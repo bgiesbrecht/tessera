@@ -13,8 +13,8 @@
 
 Attendees must have read, before the meeting:
 
-1. **Executive Summary** (one page) — `tessera-executive-summary.md`
-2. **Problem Statement & Solution Recommendation** (full) — `tessera-problem-and-recommendation.md`
+1. **Executive Summary** (one page): `tessera-executive-summary.md`
+2. **Problem Statement & Solution Recommendation** (full): `tessera-problem-and-recommendation.md`
 
 Specifically, attendees should arrive having formed an opinion on §2.7 of the full document. The meeting assumes the framing in §1 and §2 is broadly agreed; if an attendee disagrees with the framing itself, they should flag that to the chair at least 24 hours before the meeting so it can be addressed first.
 
@@ -77,7 +77,7 @@ Any objections to the framing itself are taken first or deferred to a separate s
 
 **Decision needed:** Confirm "support both, organization chooses" as the design constraint, or commit to a single model and document the reasoning.
 
-**Scope note:** This decision has the largest downstream consequences for governance processes, tooling deployment, and ownership boundaries — but is also the one most prone to being decided implicitly rather than deliberately. Worth the 20 minutes.
+**Scope note:** This decision has the largest downstream consequences for governance processes, tooling deployment, and ownership boundaries, but is also the one most prone to being decided implicitly rather than deliberately. Worth the 20 minutes.
 
 **Failure mode if not decided:** Each implementation choice gets re-litigated through this lens. Adapter design, deployment topology, and change-management workflow all depend on it.
 
@@ -87,7 +87,7 @@ Any objections to the framing itself are taken first or deferred to a separate s
 
 **Decision owner:** Governance lead
 
-**Question:** Who is the primary author of policies in the new system — data engineers, governance professionals, or business stakeholders?
+**Question:** Who is the primary author of policies in the new system: data engineers, governance professionals, or business stakeholders?
 
 **Recommended position:** Data engineers as primary authors; governance professionals as primary reviewers; business stakeholders as the source of intent that engineers encode. The authoring surface is designed for engineers (familiar with code and version control); review tooling is designed for governance and audit (familiar with policy semantics but not necessarily code).
 
@@ -129,13 +129,13 @@ Any objections to the framing itself are taken first or deferred to a separate s
 
 **Decision owner:** Platform leadership (jointly with Data Mesh / Governance leads)
 
-**Question:** Who within an adopting organization owns the portable representation and its evolution — a central platform team, the governance organization, or a federated model with one owner per data product?
+**Question:** Who within an adopting organization owns the portable representation and its evolution: a central platform team, the governance organization, or a federated model with one owner per data product?
 
-**Recommended position:** This is the question the project cannot answer for adopters; it is an organizational design decision specific to each adopter. The project's responsibility is to ensure the representation and tooling support all three ownership models without preferring one. For the project's *own* governance, federated ownership of the specification (with a central editor function) mirrors the Data Mesh philosophy the work is grounded in.
+**Recommended position:** The project cannot answer this for adopters; it is an organizational design decision specific to each adopter. The project's responsibility is to ensure the representation and tooling support all three ownership models without preferring one. For the project's *own* governance, federated ownership of the specification (with a central editor function) mirrors the Data Mesh philosophy the work is grounded in.
 
 **Decision needed:** Confirm "project supports all three ownership models, organizations choose their own," and separately decide the project's own internal governance model.
 
-**Why this is grouped with Item 2:** Items 2 and 6 are the two questions most likely to be conflated and most important not to conflate. Item 2 is about *where the policy lives*; Item 6 is about *who owns it*. They interact but they are not the same question.
+**Why this is grouped with Item 2:** Items 2 and 6 are the two questions most likely to be conflated. Item 2 is about *where the policy lives*; Item 6 is about *who owns it*. They interact but they are not the same question.
 
 **Failure mode if not decided:** The project either prescribes an ownership model (which adopters resist) or stays silent (which leaves adopters without guidance and produces inconsistent rollouts).
 

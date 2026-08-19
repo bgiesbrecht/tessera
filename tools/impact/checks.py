@@ -1,11 +1,11 @@
 """Change-impact checks (scoping doc §5).
 
 Shipped:
-    C1  fall-through coverage — a selector loses its last governing rule
-    C2  default-net removal   — the fallback itself weakens
-    C3  reachability          — a rule shadowed / un-shadowed under first-match
-    C5  dangling reference    — referential integrity, seeded by the change
-    C6  exposure polarity     — WIDEN / NARROW / INVERT / NEUTRAL per change
+    C1  fall-through coverage: a selector loses its last governing rule
+    C2  default-net removal: the fallback itself weakens
+    C3  reachability: a rule shadowed / un-shadowed under first-match
+    C5  dangling reference: referential integrity, seeded by the change
+    C6  exposure polarity: WIDEN / NARROW / INVERT / NEUTRAL per change
 
 Each check is a thin composition over the kernel (§4). Checks take a baseline
 corpus and a proposed corpus and emit selector-relative, confidence-tagged
@@ -21,7 +21,7 @@ from tools.impact.model import Corpus, Policy, Rule
 
 
 # ============================================================================
-# C6 — Exposure polarity (the headline check)
+# C6: Exposure polarity
 # ============================================================================
 
 
@@ -31,10 +31,10 @@ def check_c6_exposure_polarity(baseline: Corpus, proposed: Corpus) -> list[Findi
     Works per-policy (matched by @id). For each policy present in both corpora,
     compare rule lists position-wise plus set membership, and classify:
 
-      WIDEN   — the change exposes strictly more
-      NARROW  — the change exposes strictly less
-      INVERT  — an effect flips polarity, or a transform is swapped
-      NEUTRAL — provably no exposure change
+      WIDEN: the change exposes strictly more
+      NARROW: the change exposes strictly less
+      INVERT: an effect flips polarity, or a transform is swapped
+      NEUTRAL: provably no exposure change
 
     Added / removed whole policies are also classified (a new expose-bearing
     policy is WIDEN for its selector; a removed one NARROW, subject to §4.4).
@@ -115,17 +115,17 @@ def _diff_policy_c6(base: Policy, prop: Policy) -> list[Finding]:
     # Iterate in source declaration order (dicts preserve insertion order, which
     # is rule order from _index_by_selector) so report output is deterministic.
 
-    # Removed rules — in baseline order.
+    # Removed rules, in baseline order.
     for key in base_by_sel:
         if key not in prop_keys:
             findings.append(_removed_rule_finding(prop.id, base_by_sel[key]))
 
-    # Added rules — in proposed order.
+    # Added rules, in proposed order.
     for key in prop_by_sel:
         if key not in base_keys:
             findings.append(_added_rule_finding(prop.id, prop_by_sel[key]))
 
-    # Rules present in both — in proposed order.
+    # Rules present in both, in proposed order.
     for key in prop_by_sel:
         if key in base_keys:
             f = _changed_rule_finding(prop.id, base_by_sel[key], prop_by_sel[key])
@@ -207,7 +207,7 @@ def _changed_rule_finding(policy_id: str, base: Rule, prop: Rule) -> Finding | N
         prop_pol = kernel.effect_polarity(prop.effect)
         # Classification rule (scoping-doc §5-C6):
         #   * A full polarity flip between EXPOSE and RESTRICT (allow↔deny,
-        #     keep↔drop) is INVERT — the doc reserves INVERT for exactly this.
+        #     keep↔drop) is INVERT. The doc reserves INVERT for exactly this.
         #   * A change involving PARTIAL_RESTRICT (transform) on one side is
         #     directional on the exposure ordering EXPOSE > PARTIAL > RESTRICT:
         #     more exposure → WIDEN, less → NARROW (a transform relaxed to
@@ -236,7 +236,7 @@ def _changed_rule_finding(policy_id: str, base: Rule, prop: Rule) -> Finding | N
     b_cond, p_cond = base.condition, prop.condition
     if b_cond == p_cond:
         # Transformation swap on a transform rule -> INVERT (scoping-doc §9.4).
-        # There is no total order between two transformations — whether Hash is
+        # There is no total order between two transformations: whether Hash is
         # "more exposed" than Redact depends on the threat model, which the tool
         # cannot read from the policy text. Rather than fabricate a WIDEN/NARROW
         # direction, C6 flags the swap as INVERT ("changed; review it"). This is
@@ -338,14 +338,14 @@ def _tf(tf: dict | None) -> str:
 
 
 # ============================================================================
-# C5 — Dangling reference
+# C5: Dangling reference
 # ============================================================================
 
 
 def check_c5_dangling_reference(baseline: Corpus, proposed: Corpus) -> list[Finding]:
     """Referential-integrity check, seeded by the change (§5-C5).
 
-    The check examines only policies the change *touched* — those added in the
+    The check examines only policies the change *touched*, those added in the
     proposed corpus, or present in both but with differing content. Pre-existing
     issues in unchanged files are out of scope: this is change-impact analysis,
     not a whole-corpus linter (that is the Priority-5 linter's job).
@@ -363,7 +363,7 @@ def check_c5_dangling_reference(baseline: Corpus, proposed: Corpus) -> list[Find
     for pid, policy in proposed.policies.items():
         base = baseline.get(pid)
         if base is not None and base.raw == policy.raw:
-            continue  # unchanged policy — not part of this change
+            continue  # unchanged policy, not part of this change
         findings.extend(_c5_policy(policy))
     return findings
 
@@ -486,7 +486,7 @@ def _is_known_axis(axis_key: str) -> bool:
 
 
 # ============================================================================
-# C1 — Fall-through coverage
+# C1: Fall-through coverage
 # ============================================================================
 
 
@@ -507,7 +507,7 @@ def check_c1_fallthrough_coverage(baseline: Corpus, proposed: Corpus) -> list[Fi
     Per policy matched by @id, count the governing rules for each principal
     selector before and after. A selector dropping to zero rules changes
     coverage class for the principals matching it; the consequence is read from
-    the policy's declared defaultStrategy (ADR-013) — no population is resolved.
+    the policy's declared defaultStrategy (ADR-013). No population is resolved.
 
     PROVEN: the selector's rule count dropped to zero.
     CANDIDATE: the downstream fate under explicit-baseline-group depends on
@@ -526,7 +526,7 @@ def check_c1_fallthrough_coverage(baseline: Corpus, proposed: Corpus) -> list[Fi
 
 def _selector_rule_counts(policy: Policy) -> dict[str, int]:
     """Count governing rules per principal-selector key. The defaultBranch is
-    not counted — it has no principal (it applies to whoever matched no rule),
+    not counted, since it has no principal (it applies to whoever matched no rule),
     so it is not a governing rule *for* any selector."""
     counts: dict[str, int] = {}
     for r in policy.rules:
@@ -565,7 +565,7 @@ def _c1_finding(policy: Policy, sel_key: str) -> Finding:
 
 
 # ============================================================================
-# C2 — Default-net removal or weakening
+# C2: Default-net removal or weakening
 # ============================================================================
 
 # Ordering of default strategies by how much of a safety net they provide when
@@ -586,7 +586,7 @@ def check_c2_default_net(baseline: Corpus, proposed: Corpus) -> list[Finding]:
 
     Flags: defaultStrategy changing; the baselineGroup value changing; the
     defaultBranch being added or removed. All are direct comparisons of
-    policy-level default-handling fields against the ADR-013/014 invariants —
+    policy-level default-handling fields against the ADR-013/014 invariants:
     PROVEN, since they are structural properties of the declared policy.
     """
     findings: list[Finding] = []
@@ -698,20 +698,20 @@ def _policy_has_opaque_selector(policy: Policy) -> bool:
 
 
 # ============================================================================
-# C3 — Reachability / shadowing
+# C3: Reachability / shadowing
 # ============================================================================
 #
 # Under ordered first-match (ADR-015), a rule is unreachable ("shadowed") when
 # some earlier rule provably matches every principal-and-condition case the
 # later rule would. C3 reports two change deltas:
 #
-#   * a rule NEWLY shadowed by the change — dead policy introduced;
-#   * a rule NEWLY un-shadowed by the change — dormant policy silently
+#   * a rule NEWLY shadowed by the change: dead policy introduced;
+#   * a rule NEWLY un-shadowed by the change: dormant policy silently
 #     activated (the scoping doc flags this as the more dangerous direction).
 #
 # This is the check nearest the ADR-001 line. It reasons ONLY about selector
 # *expressions* subsuming one another (kernel.selector_subsumes) and condition
-# value-set containment (kernel.condition_value_superset) — never about which
+# value-set containment (kernel.condition_value_superset), never about which
 # concrete principals populate a selector. Shadowing that would depend on group
 # membership or a group-subset relation is unknowable and is deliberately not
 # claimed: opaque selectors never subsume (kernel), so a pair involving one
@@ -828,7 +828,7 @@ def _c3_unshadowed_finding(policy: Policy, key: str) -> Finding:
         subject=f"selector {sel}",
         consequence=(
             f"A previously-unreachable rule (selector {sel}) is now reachable "
-            f"under ordered first-match. Dormant policy has been activated — "
+            f"under ordered first-match. Dormant policy has been activated; "
             f"verify the newly-live effect is intended."
         ),
         confidence=Confidence.PROVEN,
@@ -838,14 +838,14 @@ def _c3_unshadowed_finding(policy: Policy, key: str) -> Finding:
 
 
 # ============================================================================
-# L1 — Dead-rule lint (whole-corpus, not change-seeded)
+# L1: Dead-rule lint (whole-corpus, not change-seeded)
 # ============================================================================
 #
 # C3 reports reachability *changes* between two corpus versions. L1 is the
 # standing lint counterpart: it reports every provably-dead rule in a single
 # corpus state, regardless of when it went dead. Same reachability mechanism
 # and the same ADR-001 guard (opaque selectors never subsume, so a dead-rule
-# claim is never membership-dependent); different framing — a health check on
+# claim is never membership-dependent); different framing, a health check on
 # the corpus as it stands, not a diff. This is what powers the "lint my whole
 # corpus for dead rules" mode.
 
@@ -855,7 +855,7 @@ def lint_dead_rules(corpus: Corpus) -> list[Finding]:
 
     For each policy, compute its shadowed-rule set and emit one PROVEN finding
     per dead rule, naming the earlier rule that shadows it. Unlike C3 this does
-    not diff versions — it audits the corpus as it currently stands.
+    not diff versions; it audits the corpus as it currently stands.
     """
     findings: list[Finding] = []
     for pid in sorted(corpus.ids()):
@@ -886,7 +886,7 @@ def _l1_dead_rule_finding(policy: Policy, idx: int, by_idx: int) -> Finding:
 
 
 # ============================================================================
-# C4 — Cross-policy overlap / conflict  (and L2, its standing counterpart)
+# C4: Cross-policy overlap / conflict  (and L2, its standing counterpart)
 # ============================================================================
 #
 # Two policies of the same policyKind whose attachment scopes provably overlap
@@ -898,7 +898,7 @@ def _l1_dead_rule_finding(policy: Policy, idx: int, by_idx: int) -> Finding:
 # C4 stays strictly static (the ADR-001 line): it proves scope-IRI containment
 # and attribute-axis subsumption from the policy text, and reports the overlap
 # plus the ADR-023 resolution rule. It does NOT compute which policy "wins" at
-# runtime — γ-with-refinement leaves that to the author, guided by the finding.
+# runtime; γ-with-refinement leaves that to the author, guided by the finding.
 #
 # Only these policyKinds are subject to the platform single-policy-per-target
 # constraint; RowVisibility filters compose (AND) rather than conflict, so
@@ -955,7 +955,7 @@ def _overlap_pairs(corpus: Corpus):
     Each entry is (key, pid_a, pid_b, kind, constraint, confidence, unknown,
     divergent), where key is a stable sorted-id string. A pair is included when
     two same-policyKind policies (of a kind subject to a single-policy platform
-    constraint) resolve to an overlapping target — because ADR-023's
+    constraint) resolve to an overlapping target, because ADR-023's
     `single-column-mask-per-column` / `single-row-filter-per-table` constraints
     are about MULTIPLICITY: the platform permits at most one such policy per
     target, so two overlapping ones conflict whether or not their effects
@@ -985,14 +985,14 @@ def _policies_conflict(a: Policy, b: Policy):
 
     Conflict requires: same conflict-prone policyKind, overlapping scope, and
     overlapping attribute-match (§4.2 + ADR-023). Effect divergence is NOT a
-    requirement — the platform constraints are about multiplicity (at most one
+    requirement: the platform constraints are about multiplicity (at most one
     mask per column / one row filter per table), so two overlapping same-kind
     policies conflict even with identical effects. Divergence is reported as
     information by the finding, not used to gate here.
 
     Confidence discipline (the ADR-001 line): overlap between two attribute
     *predicates* (both byScope) or between two *concrete* resources (both
-    byIdentity paths) is PROVEN — it follows from scope containment and ontology
+    byIdentity paths) is PROVEN: it follows from scope containment and ontology
     subsumption alone. But overlap between an attribute-constrained predicate
     and a concrete resource is only CANDIDATE: proving it would require knowing
     whether that specific resource carries the attribute tag, which is a
@@ -1100,7 +1100,7 @@ def _c4_overlap_finding(pair, *, introduced: bool | None) -> Finding:
     overlap_word = "provably overlap" if confidence is Confidence.PROVEN else "may overlap"
     # Divergence is not required for the conflict (multiplicity is), but it
     # tells the reader whether they are looking at two different masks/filters
-    # or a redundant duplicate — both of which the platform still rejects.
+    # or a redundant duplicate, both of which the platform still rejects.
     effect_note = "with divergent effects" if divergent else "with the same effect (duplicate coverage)"
     if introduced is True:
         lead = "Change introduces a cross-policy overlap:"
@@ -1119,7 +1119,7 @@ def _c4_overlap_finding(pair, *, introduced: bool | None) -> Finding:
         subject=f"{pid_a} ∩ {pid_b}",
         consequence=(
             f"{lead} {pid_a} and {pid_b} are both {kind} policies whose scopes and "
-            f"attribute-matches {overlap_word}, {effect_note} — the "
+            f"attribute-matches {overlap_word}, {effect_note}, against the "
             f"platform '{constraint}' constraint. {tail}"
         ),
         confidence=confidence,

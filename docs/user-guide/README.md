@@ -2,28 +2,28 @@
 
 This guide is the entry point for working with Tessera. Read whichever audience-shaped page below fits what you need; the [tutorial](./tutorial.md) is a complete end-to-end walkthrough for first-time readers.
 
-Tessera is a portable representation of data governance policy. It expresses *what* policies decide about data — in a vocabulary independent of any platform — and translates that meaning into native enforcement on Databricks, Snowflake, and other platforms via adapters. The value proposition is **semantic interoperability of policy**: agreeing once that "PII," "EU residency," "fraud-investigation purpose," "audit-log obligation" mean the same thing wherever they are enforced. For the architectural framing and what Tessera explicitly is *not*, read [`evaluating.md`](./evaluating.md) before going further.
+Tessera is a portable representation of data governance policy. It expresses *what* policies decide about data, in a vocabulary independent of any platform, and translates that meaning into native enforcement on Databricks, Snowflake, and other platforms via adapters. The value proposition is **semantic interoperability of policy**: agreeing once that "PII," "EU residency," "fraud-investigation purpose," "audit-log obligation" mean the same thing wherever they are enforced. For the architectural framing and what Tessera explicitly is *not*, read [`evaluating.md`](./evaluating.md) before going further.
 
 ## Choose your starting point
 
 | Who you are | Read first | Then |
 |---|---|---|
-| **Practitioner with an ACL table + masking situation** — you have YAML skills and a real governance problem; you don't need the semantic-web theory | [Scenario: ACL & masking](./scenarios/acl-and-masking.md) | [Authoring](./authoring.md) for vocabulary, [Operating](./operating.md) for deployment |
-| **Policy author** — you write `.tessera.yaml` files describing what governance the organization needs | [Tutorial](./tutorial.md) → [Authoring](./authoring.md) | The capability profiles linked from `operating.md` to know what your target platforms can and can't express |
-| **Operator / adopter** — you wire Tessera into a deployment pipeline (CI, configuration management, audit) | [Tutorial](./tutorial.md) → [Operating](./operating.md) | [Analyzing changes](./analyzing-changes.md) to review edits before deploy; [Authoring](./authoring.md) for the vocabulary you'll be lowering |
-| **Evaluator** — you're deciding whether Tessera fits | [Evaluating](./evaluating.md) | [Scenario: ACL & masking](./scenarios/acl-and-masking.md) for a concrete end-to-end |
-| **Future contributor** — you're extending Tessera (new adapter, new IR concept) | [Contributing](./contributing.md) | `DECISIONS.md` (ADRs) and [Operating](./operating.md) |
+| **Practitioner with an ACL table + masking situation**: you have YAML skills and a real governance problem; you don't need the semantic-web theory | [Scenario: ACL & masking](./scenarios/acl-and-masking.md) | [Authoring](./authoring.md) for vocabulary, [Operating](./operating.md) for deployment |
+| **Policy author**: you write `.tessera.yaml` files describing what governance the organization needs | [Tutorial](./tutorial.md) → [Authoring](./authoring.md) | The capability profiles linked from `operating.md` to know what your target platforms can and can't express |
+| **Operator / adopter**: you wire Tessera into a deployment pipeline (CI, configuration management, audit) | [Tutorial](./tutorial.md) → [Operating](./operating.md) | [Analyzing changes](./analyzing-changes.md) to review edits before deploy; [Authoring](./authoring.md) for the vocabulary you'll be lowering |
+| **Evaluator**: you're deciding whether Tessera fits | [Evaluating](./evaluating.md) | [Scenario: ACL & masking](./scenarios/acl-and-masking.md) for a concrete end-to-end |
+| **Future contributor**: you're extending Tessera (new adapter, new IR concept) | [Contributing](./contributing.md) | `DECISIONS.md` (ADRs) and [Operating](./operating.md) |
 
 ## Pages
 
-- [**Scenario: ACL & masking**](./scenarios/acl-and-masking.md) — practitioner-shaped tutorial for the common "ACL-table row visibility plus column masking" situation. Assumes YAML literacy; no semantic-web background required.
-- [**Scenario: Migrating Snowflake → Unity Catalog**](./scenarios/migrating-snowflake-to-uc.md) — discover three policies running on Snowflake, lift them into Tessera IR, emit Databricks DDL, deploy on UC, verify behavioral equivalence. End-to-end migration via the IR pivot.
-- [**Tutorial**](./tutorial.md) — write a policy, validate it, emit DDL through both adapters, deploy on Databricks and Snowflake, verify. More concept-focused; ~30 minutes end to end.
-- [**Authoring**](./authoring.md) — the policy vocabulary. Selectors, conditions, transformations, the Policy container, the recommended Snowflake authoring pattern.
-- [**Operating**](./operating.md) — adapter configuration, identity / resource / tag bindings, capability profiles, deployment patterns per platform, the Snowflake `DEFAULT_SECONDARY_ROLES` caveat.
-- [**Analyzing changes**](./analyzing-changes.md) — `tessera impact` / `tessera lint`: how a proposed change alters what the corpus decides, and standing corpus health checks. Read-only, advisory, static (never touches a platform).
-- [**Evaluating**](./evaluating.md) — scope, non-goals, honest limitations, posture.
-- [**Contributing**](./contributing.md) — how to extend Tessera. Adapter contract, ADR discipline, validation pipeline.
+- [**Scenario: ACL & masking**](./scenarios/acl-and-masking.md): practitioner-shaped tutorial for the common "ACL-table row visibility plus column masking" situation. Assumes YAML literacy; no semantic-web background required.
+- [**Scenario: Migrating Snowflake → Unity Catalog**](./scenarios/migrating-snowflake-to-uc.md): discover three policies running on Snowflake, lift them into Tessera IR, emit Databricks DDL, deploy on UC, verify behavioral equivalence. End-to-end migration via the IR pivot.
+- [**Tutorial**](./tutorial.md): write a policy, validate it, emit DDL through both adapters, deploy on Databricks and Snowflake, verify. More concept-focused; about 30 minutes end to end.
+- [**Authoring**](./authoring.md): the policy vocabulary. Selectors, conditions, transformations, the Policy container, the recommended Snowflake authoring pattern.
+- [**Operating**](./operating.md): adapter configuration, identity / resource / tag bindings, capability profiles, deployment patterns per platform, the Snowflake `DEFAULT_SECONDARY_ROLES` caveat.
+- [**Analyzing changes**](./analyzing-changes.md): `tessera impact` / `tessera lint`. How a proposed change alters what the corpus decides, and standing corpus health checks. Read-only, advisory, static (never touches a platform).
+- [**Evaluating**](./evaluating.md): scope, non-goals, honest limitations, posture.
+- [**Contributing**](./contributing.md): how to extend Tessera. Adapter contract, ADR discipline, validation pipeline.
 
 Scenarios live under `scenarios/`. More can be added as additional customer shapes emerge.
 
@@ -52,7 +52,7 @@ tessera extract   --adapter unity-catalog --catalog C --schema S [--name N] [--o
 tessera reconcile --adapter unity-catalog --catalog C --schema S --intended path-or-dir/
 ```
 
-`impact` and `lint` are the change-impact tool; see [`analyzing-changes.md`](./analyzing-changes.md). Both are static and advisory — they read policy files and never connect to a platform.
+`impact` and `lint` are the change-impact tool; see [`analyzing-changes.md`](./analyzing-changes.md). Both are static and advisory: they read policy files and never connect to a platform.
 
 Connection details accept `--profile` / `--warehouse-id` (Databricks) or `--account` / `--user` / `--warehouse` / `--database` / `--auth-file` (Snowflake), and read the same values from `TESSERA_DB_*` / `TESSERA_SF_*` env vars when CLI args are absent. The Snowflake auth file defaults to `~/snowflake_auth.txt`.
 
@@ -66,6 +66,6 @@ The `--config` bindings file is YAML carrying `identity_bindings`, `resource_bin
 
 ## What this guide does not duplicate
 
-- ADRs — `DECISIONS.md` is the authoritative log of design decisions. The user guide references ADRs by number; it does not restate them.
-- The technical design — `docs/technical-design-v0.2.md` is the spec-level reference. The user guide explains *how to use* the spec; the technical design explains *what the spec is*.
-- The README — the README is the front door for someone landing on the repo cold. This guide is for someone who's decided to actually use Tessera and needs operational depth.
+- ADRs. `DECISIONS.md` is the authoritative log of design decisions. The user guide references ADRs by number; it does not restate them.
+- The technical design. `docs/technical-design-v0.2.md` is the spec-level reference. The user guide explains *how to use* the spec; the technical design explains *what the spec is*.
+- The README. The README is the front door for someone landing on the repo cold. This guide is for someone who has decided to actually use Tessera and needs operational depth.

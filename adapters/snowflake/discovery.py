@@ -1,4 +1,4 @@
-"""Snowflake adapter — discovery and extraction.
+"""Snowflake adapter: discovery and extraction.
 
 Discovery inventories deployed policies on a target schema. Extraction lifts
 one of those discovered artifacts back into Tessera IR.
@@ -107,7 +107,7 @@ def discover_schema(cursor, database: str, schema: str) -> DiscoveryResult:
             meta = dict(zip(desc, row))
             fname = meta.get("name")
             args = meta.get("arguments") or ""
-            # arguments is typically "NAME(SIG) RETURN RET_TYPE" — extract the
+            # arguments is typically "NAME(SIG) RETURN RET_TYPE". Extract the
             # (SIG) portion (between the first '(' and its matching ')').
             sig = ""
             paren_open = args.find("(")
@@ -329,7 +329,7 @@ def _extract_snowflake_access_grant(artifact: dict[str, Any]) -> ExtractionResul
         )
     selector, key, prefix = selector_info
 
-    # Strip Snowflake function signature when constructing the IR resource ref —
+    # Strip Snowflake function signature when constructing the IR resource ref:
     # the IR carries the function name; the signature is a Snowflake artifact.
     bare_object = object_name.split("(", 1)[0] if object_kind == "FUNCTION" else object_name
 

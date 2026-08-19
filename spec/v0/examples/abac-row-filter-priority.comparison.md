@@ -1,4 +1,4 @@
-# Phase 3 Comparison — ABAC Row-Filter (priority) (stub)
+# Phase 3 Comparison: ABAC Row-Filter (priority) (stub)
 
 **Companion artifacts:**
 - `abac-row-filter-priority.tessera.yaml` / `.jsonld`
@@ -16,23 +16,23 @@
 
 The Phase 2 artifacts express the three-branch row-visibility intent using the post-ABAC vocabulary and an adopter-namespaced axis. Phase 3 deploys the SQL emission and observes:
 
-1. **Behavioral correctness** — three scenarios across group membership states match the expected priorities.
-2. **Cross-policy combination for row filters** — does Databricks reject multiple row filters on the same table, analogous to the multi-mask error from the column-mask exercise?
+1. **Behavioral correctness.** Three scenarios across group membership states match the expected priorities.
+2. **Cross-policy combination for row filters.** Does Databricks reject multiple row filters on the same table, analogous to the multi-mask error from the column-mask exercise?
 3. **Structural comparison** against Brice's existing implementation, shared after Phase 2.
 
 ---
 
 ## 2. Behavioral observation (Phase 3)
 
-### 2.1 Test scenarios — results
+### 2.1 Test scenarios: results
 
 Deployed 2026-05-19 against `acme.tpch.orders_abac` on Azure workspace `adb-984752964297111`. Brice's group memberships verified live via `is_account_group_member`.
 
 | Scenario | Brice's membership | Expected priorities | Observed | Match |
 |---|---|---|---|---|
 | 3 | Neither restrictive group | `3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW` | Same (4,499,708 rows; 60% of unfiltered 7,500,000) | ✓ |
-| 1 | Member of `acme_all_priority_ops` | All five | **Pending Brice's toggle** | — |
-| 2 | Member of `acme_high_priority_ops` only | `1-URGENT`, `2-HIGH` | **Pending Brice's toggle** | — |
+| 1 | Member of `acme_all_priority_ops` | All five | **Pending Brice's toggle** | n/a |
+| 2 | Member of `acme_high_priority_ops` only | `1-URGENT`, `2-HIGH` | **Pending Brice's toggle** | n/a |
 
 Per-priority breakdown for Scenario 3 confirms exact source-distribution match for the visible priorities:
 
@@ -44,13 +44,13 @@ Per-priority breakdown for Scenario 3 confirms exact source-distribution match f
 | `4-NOT SPECIFIED` | 1,501,281 | 1,501,281 | ✓ |
 | `5-LOW` | 1,499,717 | 1,499,717 | ✓ |
 
-Scenarios 1 and 2 require Brice to add himself to the respective restrictive group with the standard 2–4 minute account-group cache lag. The exercise's design point (Mechanism B with three-branch CASE) is already validated by Scenario 3 — the principal-not-matched fall-through branch (the ELSE) is the one whose correctness was most in question, since Mechanism B's branching logic depends on the CASE traversal order. Scenarios 1 and 2 are confirmation that the WHEN branches above the ELSE also work.
+Scenarios 1 and 2 require Brice to add himself to the respective restrictive group with the standard 2–4 minute account-group cache lag. The exercise's design point (Mechanism B with three-branch CASE) is already validated by Scenario 3. The principal-not-matched fall-through branch (the ELSE) is the one whose correctness was most in question, since Mechanism B's branching logic depends on the CASE traversal order. Scenarios 1 and 2 are confirmation that the WHEN branches above the ELSE also work.
 
-### 2.2 Bonus observation — column mask + row filter compose correctly
+### 2.2 Bonus observation: column mask + row filter compose correctly
 
 `o_clerk` continues to return `'CLERK-REDACTED'` for non-privileged principals on rows that survive the row filter. The two ABAC policies (`tessera__abac_column_mask_clerk_redact` + `tessera__abac_row_filter_priority`) layer correctly: the row filter narrows which rows are visible; the column mask redacts the `o_clerk` value on those visible rows. No conflict, no error, no surprises.
 
-This is an orthogonal-composition success — two different ABAC mechanisms on the same table, both applying simultaneously. Distinct from the multi-mask conflict observed in the prior column-mask exercise (which was *two* column masks competing on the *same* column).
+This is an orthogonal-composition success: two different ABAC mechanisms on the same table, both applying simultaneously. Distinct from the multi-mask conflict observed in the prior column-mask exercise (which was *two* column masks competing on the *same* column).
 
 `SHOW POLICIES ON CATALOG acme` confirms both attached:
 
@@ -73,7 +73,7 @@ The observation discriminates among possible cross-policy combination resolution
 
 ## 3. Structural comparison against the existing implementation
 
-Existing implementation shared by Brice on 2026-05-19 (after Phase 2 commit; blind-derivation property held). Brice's submission included two versions — a "stale buffer" first draft with a table-level `WHEN has_tag_value('abac_scope', 'orders_demo')` clause, and a corrected version that omits the WHEN clause. The corrected version is canonical for the comparison; the first draft's design surface is captured separately in §3.3.
+Existing implementation shared by Brice on 2026-05-19 (after Phase 2 commit; blind-derivation property held). Brice's submission included two versions: a "stale buffer" first draft with a table-level `WHEN has_tag_value('abac_scope', 'orders_demo')` clause, and a corrected version that omits the WHEN clause. The corrected version is canonical for the comparison; the first draft's design surface is captured separately in §3.3.
 
 ### 3.1 Line-by-line: Tessera vs. existing
 
@@ -82,9 +82,9 @@ Existing implementation shared by Brice on 2026-05-19 (after Phase 2 commit; bli
 | UDF function name | `filter_priority_abac` | `tessera__abac_row_filter_priority__filter` | **Accepted divergence**. |
 | UDF parameter | `orderpriority STRING` | `priority STRING` | **Accepted divergence**. |
 | `RETURNS BOOLEAN` | Explicit | Explicit | **Match.** |
-| WHEN branch 1 — `all_priority_ops` THEN TRUE | Yes | Yes | **Match** verbatim. |
-| WHEN branch 2 — `high_priority_ops` THEN `IN ('1-URGENT', '2-HIGH')` | Yes | Yes | **Match** verbatim. |
-| ELSE branch | `NOT IN ('1-URGENT', '2-HIGH')` | `IN ('3-MEDIUM', '4-NOT SPECIFIED', '5-LOW')` | **Real divergence — same observable behavior on current data, different intent under data evolution.** See §3.2. |
+| WHEN branch 1: `all_priority_ops` THEN TRUE | Yes | Yes | **Match** verbatim. |
+| WHEN branch 2: `high_priority_ops` THEN `IN ('1-URGENT', '2-HIGH')` | Yes | Yes | **Match** verbatim. |
+| ELSE branch | `NOT IN ('1-URGENT', '2-HIGH')` | `IN ('3-MEDIUM', '4-NOT SPECIFIED', '5-LOW')` | **Real divergence: same observable behavior on current data, different intent under data evolution.** See §3.2. |
 | `GRANT EXECUTE ON FUNCTION` | **Absent** | **Present** | **Real divergence**, same as prior exercises (issue #10). |
 | Policy name | `priority_rls` | `tessera__abac_row_filter_priority` | **Accepted divergence**. |
 | Policy attachment scope | `ON SCHEMA acme.tpch` | `ON CATALOG acme` | **Real divergence.** See §3.4. |
@@ -96,7 +96,7 @@ Existing implementation shared by Brice on 2026-05-19 (after Phase 2 commit; bli
 | `MATCH COLUMNS has_tag_value('abac_column', 'orderpriority') AS alias` | Same (`AS pri`) | Same (`AS priority_col`) | **Match** on form; alias names differ. |
 | `USING COLUMNS (alias)` | Same (`(pri)`) | Same (`(priority_col)`) | **Match.** |
 
-The substantive structural match is **very tight**. The Tessera derivation independently reached the same Mechanism-B shape — UDF with CASE branches, broad `TO account users`, `MATCH COLUMNS` + `USING COLUMNS`. Two findings of real consequence (the ELSE branch form and the scope choice) plus one platform-design surface the Tessera IR doesn't yet model (§3.3).
+The structural match is tight. The Tessera derivation independently reached the same Mechanism-B shape: UDF with CASE branches, broad `TO account users`, `MATCH COLUMNS` + `USING COLUMNS`. Two findings (the ELSE branch form and the scope choice) plus one platform-design surface the Tessera IR doesn't yet model (§3.3).
 
 ### 3.2 ELSE branch form: `NOT IN` vs explicit enumeration (recurring finding)
 
@@ -140,14 +140,14 @@ defaultBranch:
 
 The choice is policy-author intent, not an IR limitation. The recurring observation across two exercises now suggests a small documentation addition: the Tessera inputs template could prompt the author to choose between enumeration (more restrictive under data evolution) and negation (more permissive). Not a v1 spec finding; just a UX recommendation.
 
-### 3.3 Two-axis attribute matching (table-level + column-level) — new finding
+### 3.3 Two-axis attribute matching (table-level + column-level): new finding
 
 Brice's submission included **two versions** of the policy DDL:
 
 - The *first draft* (before "stale buffer") had `FOR TABLES WHEN has_tag_value('abac_scope', 'orders_demo') MATCH COLUMNS has_tag_value('abac_column', 'orderpriority') AS pri`.
 - The *corrected final* omits the WHEN clause: `FOR TABLES MATCH COLUMNS has_tag_value('abac_column', 'orderpriority') AS pri`.
 
-The setup script still applies the `abac_scope = orders_demo` tag to the table even in the final version. The intent — visible in Brice's *Assumptions* section — is to support a pattern where:
+The setup script still applies the `abac_scope = orders_demo` tag to the table even in the final version. The intent, visible in Brice's *Assumptions* section, is to support a pattern where:
 
 - Tables that should be "in scope" for ABAC management get tagged `abac_scope = orders_demo` (a *table-level* tag).
 - Columns within those tables that drive specific policies get tagged `abac_column = ...` (a *column-level* tag).
@@ -187,7 +187,7 @@ appliesTo:
 
 - The `abac_scope` tag is applied to the table in setup, not in the policy. It exists as metadata that another policy *could* use even though `priority_rls` currently doesn't.
 - Brice's *Assumptions* section explicitly describes the intent ("Tag the table so the schema-scoped policies only apply to this demo table").
-- For real customers deploying ABAC alongside legacy mechanisms, the table-tag-narrowing pattern is the safe-migration recommendation — they tag the new ABAC-managed tables, and ABAC policies narrow via `WHEN` to avoid affecting legacy tables.
+- For real customers deploying ABAC alongside legacy mechanisms, the table-tag-narrowing pattern is the safe-migration recommendation: they tag the new ABAC-managed tables, and ABAC policies narrow via `WHEN` to avoid affecting legacy tables.
 
 **Proposed candidate naming:** `policy-two-axis-attribute-matching` (or similar). v1 design surface; not blocking the Stage 4 ABAC additions but a natural follow-on.
 
@@ -197,13 +197,13 @@ appliesTo:
 
 Same as the ABAC column-mask exercise's §3.4. Brice consistently chooses `ON SCHEMA acme.tpch`. Tessera's Phase 1 inputs defaulted to catalog scope and the derivation followed. Both valid; Brice's is narrower.
 
-**Pattern observation across exercises:** When the inputs don't specify scope explicitly, the natural-language hint ("a row-visibility policy on `acme.tpch.orders_abac`") suggests *table* scope; Brice generalizes to *schema* scope; my interpretation generalized to *catalog* scope. The three are valid for different reasons — table is narrowest, catalog is broadest, schema is the sensible middle. The Phase 1 inputs template for future ABAC exercises should make the scope choice explicit so the divergence stops recurring.
+**Pattern observation across exercises:** When the inputs don't specify scope explicitly, the natural-language hint ("a row-visibility policy on `acme.tpch.orders_abac`") suggests *table* scope; Brice generalizes to *schema* scope; my interpretation generalized to *catalog* scope. The three are valid for different reasons: table is narrowest, catalog is broadest, schema is the sensible middle. The Phase 1 inputs template for future ABAC exercises should make the scope choice explicit so the divergence stops recurring.
 
 ### 3.5 GRANT EXECUTE asymmetry (recurring finding)
 
 Same as all prior exercises. Brice's impl omits `GRANT EXECUTE ON FUNCTION`; the Tessera derivation emits it defensively. Issue #10 (`policy-execute-grants`) remains the canonical place this lives.
 
-### 3.6 ABAC + legacy mechanism coexistence — platform context worth recording
+### 3.6 ABAC + legacy mechanism coexistence: platform context worth recording
 
 Brice's *Assumptions* section captures real platform behavior:
 
@@ -230,43 +230,43 @@ Same as prior exercises:
 ### 3.8 What the existing implementation has that Tessera does not capture
 
 - **The `abac_scope` table-level tag and the design pattern around it** (§3.3). The new v1 candidate.
-- **Brice's design commentary** in the *Assumptions* and prose. Tessera's IR carries machine-readable structure but not human-targeted prose explaining design choices. The diagnostic/comparison documents serve some of this purpose at the artifact level; nothing equivalent exists at the policy-file level. Not a finding — Tessera's IR being prose-free is correct — but worth noting that the existing impl carries more design context than the IR alone.
-- **The `NOT IN` ELSE form as the author's actual idiom.** Tessera captured the inputs' enumeration form; Brice's actual preference is negation. Not a Tessera gap — both forms are expressible — but a UX observation.
+- **Brice's design commentary** in the *Assumptions* and prose. Tessera's IR carries machine-readable structure but not human-targeted prose explaining design choices. The diagnostic/comparison documents serve some of this purpose at the artifact level; nothing equivalent exists at the policy-file level. Not a finding (Tessera's IR being prose-free is correct), but the existing impl carries more design context than the IR alone.
+- **The `NOT IN` ELSE form as the author's actual idiom.** Tessera captured the inputs' enumeration form; Brice's actual preference is negation. Not a Tessera gap (both forms are expressible), but a UX observation.
 
 ---
 
 ## 4. Lessons for v0
 
-### 4.1 v0 spec changes for Stage 4 — proceed as planned
+### 4.1 v0 spec changes for Stage 4: proceed as planned
 
 Phase 3 deployment (Scenario 3) and structural comparison did not surface design problems with ADRs 018–021. The ABAC vocabulary holds up: `byScope` attached cleanly; `matching.attributes` translated to the verified `MATCH COLUMNS` predicate; the structured TransformationInstance / Boolean-UDF emission worked. Stage 4 can proceed.
 
 ### 4.2 Findings carried from Phase 2 (in the diagnostic)
 
-- **Axis-naming gap (`acme:rowDiscriminator`)** — v1 candidate; choice between adding a well-known axis or documenting adopter-extensibility.
-- **Condition-operand reference (`column:$matched`)** — v1 candidate; formalize a reserved identifier.
-- **Mechanism A vs B collapses for multi-branch row filter** — observation; document in technical design.
+- **Axis-naming gap (`acme:rowDiscriminator`).** V1 candidate; choice between adding a well-known axis or documenting adopter-extensibility.
+- **Condition-operand reference (`column:$matched`).** V1 candidate; formalize a reserved identifier.
+- **Mechanism A vs B collapses for multi-branch row filter.** Observation; document in technical design.
 
 ### 4.3 New findings from the structural comparison
 
 - **`policy-two-axis-attribute-matching` (new v1 candidate, §3.3).** The platform supports table-level matching (WHEN) plus column-level matching (MATCH COLUMNS); Tessera's `matching.attributes` is single-axis. The two-axis shape is worth designing.
-- **ELSE branch idiom — enumeration vs negation (§3.2).** Recurring finding from the original group exercise. Both forms expressible in Tessera; the inputs template could prompt the author to choose explicitly. UX observation, not a spec change.
+- **ELSE branch idiom: enumeration vs negation (§3.2).** Recurring finding from the original group exercise. Both forms expressible in Tessera; the inputs template could prompt the author to choose explicitly. UX observation, not a spec change.
 - **Schema vs catalog scope (§3.4).** Recurring; the Phase 1 inputs template should make scope explicit so the divergence stops recurring across exercises.
 - **ABAC + legacy mechanism conflict (§3.6).** Platform context; folds into the existing `column-mask-conflict-detection` v1 candidate by generalizing to row filters and cross-mechanism cases.
 
 ### 4.4 Recurring findings reinforced
 
-- **GRANT EXECUTE asymmetry** — same pattern as all prior exercises (issue #10).
-- **Cosmetic divergences accepted** — function names, alias names, comment content all diverge cosmetically; semantically equivalent.
+- **GRANT EXECUTE asymmetry.** Same pattern as all prior exercises (issue #10).
+- **Cosmetic divergences accepted.** Function names, alias names, comment content all diverge cosmetically; semantically equivalent.
 
 ---
 
 ## 5. Recommended actions
 
-1. ✓ **Deploy Tessera-derived SQL** — done 2026-05-19.
-2. ✓ **Scenario 3 observation** — done; passes.
-3. ✓ **Brice shares existing implementation** — done; §3 populated.
-4. **Scenarios 1 and 2 (optional)** — empirical verification of the WHEN branches above the ELSE in the CASE expression. Structural argument from §3.1 is already strong; empirical confirmation is icing.
+1. ✓ **Deploy Tessera-derived SQL.** Done 2026-05-19.
+2. ✓ **Scenario 3 observation.** Done; passes.
+3. ✓ **Brice shares existing implementation.** Done; §3 populated.
+4. **Scenarios 1 and 2 (optional).** Empirical verification of the WHEN branches above the ELSE in the CASE expression. Structural argument from §3.1 is already strong; empirical confirmation is icing.
 5. **File new v1-candidate issue: `policy-two-axis-attribute-matching`** (from §3.3).
 6. **Update Phase 1 inputs template** to prompt the author about ELSE form (enumeration vs negation) and scope choice (table vs schema vs catalog).
 7. **Continue or extend the prior `column-mask-conflict-detection` v1 candidate** to cover row filters and cross-mechanism conflicts (§3.6).

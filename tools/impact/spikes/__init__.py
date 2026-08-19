@@ -1,4 +1,4 @@
-"""Exploratory spikes for the change-impact tool — NOT production checks.
+"""Exploratory spikes for the change-impact tool. NOT production checks.
 
 These prototypes probe whether richer techniques (graph queries over the corpus;
 enumerating the abstract request space) buy us more than the shipped C1–C6 / L1

@@ -3,7 +3,7 @@
 Snowflake's policy primitives are row-access policies and masking policies
 attached to objects, optionally driven by object tags. The capability surface
 overlaps substantially with Unity Catalog but differs in several specifics that
-matter for IR translation — most notably, Snowflake uses session roles, not
+matter for IR translation. Most notably, Snowflake uses session roles, not
 account-level group membership, as the canonical principal-binding axis.
 """
 
@@ -35,12 +35,12 @@ SNOWFLAKE_PROFILE = CapabilityProfile(
             "emission, currently a deferred design question pending an exercise that drives "
             "it. Per BCR-1692 (rolled out Aug 2024 → Mar 2025), Snowflake defaults new users "
             "to `DEFAULT_SECONDARY_ROLES = ('ALL')`, which is consistent with the adapter's "
-            "emission choice — secondary roles activate, IS_ROLE_IN_SESSION sees them, "
+            "emission choice: secondary roles activate, IS_ROLE_IN_SESSION sees them, "
             "permission-scope semantics hold.\n"
             "(2) Snowflake roles form an inheritance hierarchy, unlike Databricks' flat "
             "group membership: if HIGH inherits PUBLIC, a user with HIGH active sees both "
             "HIGH's branch and PUBLIC's branch. The same IR therefore produces different "
-            "effective row-set arithmetic on the two platforms — `IS_ROLE_IN_SESSION` "
+            "effective row-set arithmetic on the two platforms: `IS_ROLE_IN_SESSION` "
             "behaves transitively in Snowflake but `is_account_group_member` does not in "
             "Databricks. Author accordingly.",
         ),
@@ -67,7 +67,7 @@ SNOWFLAKE_PROFILE = CapabilityProfile(
             "Row filtering: CREATE ROW ACCESS POLICY with a CASE ladder over IS_ROLE_IN_SESSION + a predicate on "
             "the discriminator column, then ALTER TAG ... SET ROW ACCESS POLICY ... ON (<discriminator> VARCHAR); "
             "the tag is set on the TABLE, and the ON clause must name the real column (the emitter derives it from "
-            "the matching attribute value) — both facts discovered in live verification. The (axis, value) → "
+            "the matching attribute value). Both facts were discovered in live verification. The (axis, value) → "
             "(tag_key, tag_value) mapping is per-environment config.tag_taxonomy (ADR-021); the tag key should be "
             "schema-qualified. Platform constraints surface as diagnostics: a tag holds at most one row-access "
             "policy, and masking vs row-access are mutually exclusive on the same tag.",
@@ -76,10 +76,10 @@ SNOWFLAKE_PROFILE = CapabilityProfile(
             CapabilitySupport.PARTIAL,
             "PrincipalSetFromTable lowers to a correlated EXISTS subquery inside the row-access policy body, "
             "joining the IR's mapping table to the IR's resource-ACL table on the shared codename column. "
-            "Live-verified on 2026-05-19 against ACME.TESSERA.SNOW_ORDERS_RLS_ACL — all four scenarios "
+            "Live-verified on 2026-05-19 against ACME.TESSERA.SNOW_ORDERS_RLS_ACL: all four scenarios "
             "(seed, additive grant, removal, secondary-roles immunity) pass. This is the pattern Snowflake "
             "documents for data-driven entitlement (membership is a relation, not a role): see "
-            "docs.snowflake.com/en/user-guide/security-row-using — 'A row access policy condition can reference "
+            "docs.snowflake.com/en/user-guide/security-row-using: 'A row access policy condition can reference "
             "a mapping table to filter the query result set... use a mapping table to determine the revenue "
             "values a sales manager can see in a specified sales region.' Gating on CURRENT_USER() makes the "
             "policy orthogonal to role activation, including the DEFAULT_SECONDARY_ROLES=('ALL') default. "

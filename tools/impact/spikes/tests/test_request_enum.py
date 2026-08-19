@@ -45,7 +45,7 @@ def test_widening_a_condition_opens_one_request():
 
 def test_semantically_inert_reorder_produces_no_flips():
     # Swapping two rules with disjoint principals AND disjoint conditions cannot
-    # change any decision under first-match — the enumeration proves it.
+    # change any decision under first-match; the enumeration proves it.
     base = _load("group-row-visibility-policy-a.jsonld")
     prop = copy.deepcopy(base)
     prop["rules"][1], prop["rules"][2] = prop["rules"][2], prop["rules"][1]

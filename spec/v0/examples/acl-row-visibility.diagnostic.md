@@ -1,4 +1,4 @@
-# Diagnostic Report — ACL-Table Row Visibility
+# Diagnostic Report: ACL-Table Row Visibility
 
 **Companion artifacts:**
 - `acl-row-visibility-policy.tessera.yaml` / `.jsonld`
@@ -9,7 +9,7 @@
 **Spec version:** v0, post-ADR-014 / ADR-015.
 **Target platform:** Databricks Unity Catalog.
 
-This report is the honest accounting required by §2.4 of the exercise framing: which elements of the policy are fully enforced, which are partially enforced, which are unenforced — plus the v0 IR gaps the exercise surfaces and a per-mechanism timing disclosure per the §5.2 timing-disclosure principle from the technical design.
+This report is the honest accounting required by §2.4 of the exercise framing: which elements of the policy are fully enforced, which are partially enforced, which are unenforced, plus the v0 IR gaps the exercise surfaces and a per-mechanism timing disclosure per the §5.2 timing-disclosure principle from the technical design.
 
 ---
 
@@ -17,7 +17,7 @@ This report is the honest accounting required by §2.4 of the exercise framing: 
 
 The Tessera-derived Policy compiles to a Unity Catalog row filter function that should produce the visibility specified by the policy intent. The SQL emission uses `EXISTS` against a two-table join through `rls_acl_mapping` and `rls_priority_acl`, with case-insensitive whitespace-trimmed matching on the principal column. Three v0 IR gaps surfaced during the derivation, plus one mechanism-specific timing observation. None of the gaps blocks the exercise from completing; all are recorded as v1 candidates (v0 immutability is no longer admissible per ADR-014's closing note).
 
-The pattern exercises `byDataset` / `PrincipalSetFromTable` for the first time in this project's worked examples. The gaps surfaced are properties of the v0 vocabulary's expressiveness, not of the framework's correctness — the SQL emission is correct; the IR carries less of the pattern's structure than would be ideal.
+The pattern exercises `byDataset` / `PrincipalSetFromTable` for the first time in this project's worked examples. The gaps surfaced are properties of the v0 vocabulary's expressiveness, not of the framework's correctness. The SQL emission is correct; the IR carries less of the pattern's structure than would be ideal.
 
 ---
 
@@ -26,8 +26,8 @@ The pattern exercises `byDataset` / `PrincipalSetFromTable` for the first time i
 | Policy element | Category | Notes |
 |---|---|---|
 | Resource binding (`acme.tpch.orders_rls_acl`) | **Fully enforced** | `ALTER TABLE … SET ROW FILTER` attaches the filter to the protected table. |
-| Principal selector — single-table portion (`rls_acl_mapping`) | **Fully enforced** | The `byDataset` selector and `PrincipalSetFromTable` carry the principal-to-codename mapping; the SQL emits the corresponding lookup. |
-| Principal selector — codename indirection (`rls_priority_acl`) | **Partially enforced** | v0 `PrincipalSetFromTable` models a single ACL table. The second table reference lives in the `existsInDataset` condition operand as a best-effort representation; the adapter must compile the join from this structural shape plus its knowledge of the pattern. SQL emission is correct, IR is under-specified. See §4.1. |
+| Principal selector: single-table portion (`rls_acl_mapping`) | **Fully enforced** | The `byDataset` selector and `PrincipalSetFromTable` carry the principal-to-codename mapping; the SQL emits the corresponding lookup. |
+| Principal selector: codename indirection (`rls_priority_acl`) | **Partially enforced** | v0 `PrincipalSetFromTable` models a single ACL table. The second table reference lives in the `existsInDataset` condition operand as a best-effort representation; the adapter must compile the join from this structural shape plus its knowledge of the pattern. SQL emission is correct, IR is under-specified. See §4.1. |
 | Case-insensitive, whitespace-trimmed match | **Unenforced at the IR level; enforced by the adapter** | The IR does not declare a normalization modifier on `PrincipalSetFromTable`. The adapter applies `lower(trim(…))` based on convention from the inputs (§3.2). The match correctness is preserved; the policy file does not record the intent. See §4.2. |
 | `existsInDataset` condition operator | **Partially enforced** | The operator is in the v0 condition algebra, but its operand shape is under-specified. The adapter compiles a reasonable structural reading of the operand into the EXISTS clause. See §4.3. |
 | `defaultStrategy: none` | **Fully enforced** | Single-rule Policy with fail-closed default. A principal with no ACL chain matches no rule and sees no rows. |
@@ -54,7 +54,7 @@ The pattern exercises `byDataset` / `PrincipalSetFromTable` for the first time i
 | 5.9 | Cross-tenant / cross-region | **N/A** | Out of scope. |
 | 5.10 | Silent failure modes | **Surfaced, not enforced** | The diagnostic surfaces these explicitly; the SQL behavior is correct, but the policy text gives no warning when these failure modes activate. |
 
-### 3.1 Note on 5.10 — silent failure modes
+### 3.1 Note on 5.10: silent failure modes
 
 Three failure modes are silent in the current pattern:
 
@@ -62,17 +62,17 @@ Three failure modes are silent in the current pattern:
 - **Codenames in `rls_acl_mapping` not present in `rls_priority_acl`.** The join produces no rows for that codename; the user sees nothing from it. No warning.
 - **Priorities in the protected table not covered by any codename in `rls_priority_acl`.** No user ever sees rows with that priority. No warning.
 
-These are characteristic of data-driven access patterns. A v1 candidate would be **ACL integrity checks** at policy-load time — comparing the ACL tables' contents against the protected table's column values and surfacing orphaned codenames or unreachable priority values. v0 has no facility for this.
+These are characteristic of data-driven access patterns. A v1 candidate would be **ACL integrity checks** at policy-load time: comparing the ACL tables' contents against the protected table's column values and surfacing orphaned codenames or unreachable priority values. v0 has no facility for this.
 
 ---
 
 ## 4. v0 IR gaps surfaced
 
-These are findings the exercise produced. Per the inputs §8 ("On v0 vs v1 candidates"), they are recorded as **v1 candidates**, not v0 corrections — the v0 immutability bar came down with ADR-014.
+These are findings the exercise produced. Per the inputs §8 ("On v0 vs v1 candidates"), they are recorded as **v1 candidates**, not v0 corrections. The v0 immutability bar came down with ADR-014.
 
 ### 4.1 PrincipalSetFromTable models a single ACL table; two-table joins are under-specified
 
-The v0 `PrincipalSetFromTable` carries `table`, `principalColumn`, `resourceColumn`, `permissionColumn`, `permissionValue` — all fields of a single ACL table. The ACL pattern in this exercise uses two tables joined on a codename column: the principal-to-codename mapping (`rls_acl_mapping`) and the codename-to-priority mapping (`rls_priority_acl`). v0 has no IR primitive for "principal set computed from a join of multiple ACL tables."
+The v0 `PrincipalSetFromTable` carries `table`, `principalColumn`, `resourceColumn`, `permissionColumn`, `permissionValue`, all fields of a single ACL table. The ACL pattern in this exercise uses two tables joined on a codename column: the principal-to-codename mapping (`rls_acl_mapping`) and the codename-to-priority mapping (`rls_priority_acl`). v0 has no IR primitive for "principal set computed from a join of multiple ACL tables."
 
 The artifact's workaround is to carry the second table in the `existsInDataset` condition operand. This works as a structural hint for the adapter, but it leaves the *join semantics across the principal selector and condition layers* implicit. An adapter that doesn't already know the codename-indirection pattern would not be able to compile correct SQL from the IR alone.
 
@@ -90,7 +90,7 @@ principal:
 
 Or, more general: an explicit `join` structure within `PrincipalSetFromTable` that names additional tables and their join columns. The exact shape is design work; the principle is "carry the full join structure in the IR rather than leaving the second leg to adapter convention."
 
-This would also clarify the `existsInDataset` operator's role — it would describe the existence test against the full computed principal set, not against a separate secondary table.
+This would also clarify the `existsInDataset` operator's role. It would describe the existence test against the full computed principal set, not against a separate secondary table.
 
 ### 4.2 No case-insensitive / whitespace-trim match modifier on PrincipalSetFromTable
 
@@ -105,7 +105,7 @@ This is a real expressiveness gap: a policy reviewer reading the YAML cannot tel
 The v0 ontology and context define `existsInDataset` as a condition operator paired with `byDataset` selectors. The intended semantics is "exists a row in the referenced dataset matching the join predicate." But:
 
 - The operator's operand shape is not formalized in the v0 ontology or schema. The artifact carries a `ResourceSetFromTable` as the operand with `principalColumn` and `resourceColumn` doing double duty (the former matches a column from the principal selector's set; the latter matches against the protected row's column). This is a reasonable structural choice but it isn't canonical.
-- The join binding — *which* column of the principal selector matches *which* column of the operand dataset — is not explicit. The adapter must infer from naming conventions.
+- The join binding (*which* column of the principal selector matches *which* column of the operand dataset) is not explicit. The adapter must infer from naming conventions.
 
 **Candidate v1 shape:** a formal `existsInDataset` operand schema declaring `dataset` and `join` (a list of (from-column, to-column) pairs binding the principal selector's columns to the dataset's). The operator becomes structurally complete.
 
@@ -131,17 +131,17 @@ A future Databricks adapter capability profile would declare these two timing ch
 
 | Requirement | Status |
 |---|---|
-| Row filter that Unity Catalog accepts via `ALTER TABLE … SET ROW FILTER` | ✓ — `acl-row-visibility.databricks.sql` produces a `CREATE FUNCTION` + `ALTER TABLE` pair structurally identical to the group exercise's accepted form. |
-| Reference the two ACL tables verbatim, with verbatim column names | ✓ — `acme.tpch.rls_acl_mapping` and `acme.tpch.rls_priority_acl` named directly; `username`, `code_name`, `orderpriority` named directly. |
-| Case-insensitive, whitespace-trimmed match on the principal column | ✓ — `lower(trim(m.username)) = lower(trim(current_user()))` in the EXISTS body. |
-| `EXISTS` semantics for the join | ✓ — the SQL uses `EXISTS (SELECT 1 FROM … WHERE …)`. |
-| Fail-closed for principals without ACL entries | ✓ — single-rule Policy with `defaultStrategy: none`; principals matching no rule see no rows. The SQL's EXISTS returns FALSE for unmapped users. |
+| Row filter that Unity Catalog accepts via `ALTER TABLE … SET ROW FILTER` | ✓. `acl-row-visibility.databricks.sql` produces a `CREATE FUNCTION` + `ALTER TABLE` pair structurally identical to the group exercise's accepted form. |
+| Reference the two ACL tables verbatim, with verbatim column names | ✓. `acme.tpch.rls_acl_mapping` and `acme.tpch.rls_priority_acl` named directly; `username`, `code_name`, `orderpriority` named directly. |
+| Case-insensitive, whitespace-trimmed match on the principal column | ✓. `lower(trim(m.username)) = lower(trim(current_user()))` in the EXISTS body. |
+| `EXISTS` semantics for the join | ✓. the SQL uses `EXISTS (SELECT 1 FROM … WHERE …)`. |
+| Fail-closed for principals without ACL entries | ✓. single-rule Policy with `defaultStrategy: none`; principals matching no rule see no rows. The SQL's EXISTS returns FALSE for unmapped users. |
 
 ---
 
 ## 7. Non-functional observation
 
-The ACL join runs at query time on every read against the protected table. This is a real cost that scales with the size of `rls_acl_mapping` and `rls_priority_acl`. For the demo (a few rows each), the cost is negligible. For production, the cost is a non-trivial operational property of the pattern. Tessera correctly does not try to model this in the IR — performance is mechanism-specific — but a production-grade adapter capability profile should disclose the per-query cost characteristic alongside the timing characteristic in §5.
+The ACL join runs at query time on every read against the protected table. This is a real cost that scales with the size of `rls_acl_mapping` and `rls_priority_acl`. For the demo (a few rows each), the cost is negligible. For production, the cost is a non-trivial operational property of the pattern. Tessera correctly does not try to model this in the IR (performance is mechanism-specific), but a production-grade adapter capability profile should disclose the per-query cost characteristic alongside the timing characteristic in §5.
 
 This observation is out of scope per inputs §0.1 (demo only) but recorded as a known property of the pattern.
 
@@ -154,7 +154,7 @@ This observation is out of scope per inputs §0.1 (demo only) but recorded as a 
 - **Group-based principal selection.** Tested in the prior exercise; not exercised here.
 - **Obligations, transformations, purpose binding, classifications.** All declared not applicable in inputs §4.
 
-The exercise's exercised surface is intentionally narrow — it complements the group exercise's coverage rather than duplicating it.
+The exercise's exercised surface is intentionally narrow. It complements the group exercise's coverage rather than duplicating it.
 
 ---
 

@@ -1,6 +1,6 @@
 """Kernel unit tests (scoping doc §4).
 
-These pin the lattice relations — the only things the tool asserts as PROVEN.
+These pin the lattice relations: the only things the tool asserts as PROVEN.
 They are deliberately explicit about the honest negatives (flat-axis
 non-subsumption; undeclared classes; opaque selectors), because those are the
 guarantees that keep the tool on the correct side of the ADR-001 line.

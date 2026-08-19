@@ -2,7 +2,7 @@
 
 **A portable representation of data governance policy for multi-platform environments.**
 
-Tessera lets you express what your data governance policies *mean* — who can see what, under what conditions, for what purpose — once, in a form that is independent of any single data platform. The same policy artifact can be translated into native enforcement on Databricks Unity Catalog, on Snowflake, or on custom enforcement patterns built inside your organization. Different systems hold matching tokens that prove they enforce the same thing.
+Tessera lets you express what your data governance policies *mean* (who can see what, under what conditions, for what purpose) once, in a form that is independent of any single data platform. The same policy artifact can be translated into native enforcement on Databricks Unity Catalog, on Snowflake, or on custom enforcement patterns built inside your organization. Different systems hold matching tokens that prove they enforce the same thing.
 
 The name is from the Latin *tessera*: a small token, often split in two between parties to a covenant, where each half later matches the other and proves the agreement. That is what this project does for policy across platforms.
 
@@ -12,10 +12,10 @@ The name is from the Latin *tessera*: a small token, often split in two between 
 
 Tessera is a specification, a vocabulary, and a set of reference adapters. Together they let an organization:
 
-- **Express governance policies in a portable, intent-preserving form.** Classification, purpose, principal, conditions, obligations — captured in a shared vocabulary that means the same thing on every platform.
+- **Express governance policies in a portable, intent-preserving form.** Classification, purpose, principal, conditions, and obligations, all captured in a shared vocabulary that means the same thing on every platform.
 - **Translate policies into native enforcement** on Unity Catalog, Snowflake, and customer-specific enforcement patterns, through purpose-built adapters.
 - **Extract existing policies from a platform back into the portable form**, so an organization with thousands of policies already in place doesn't have to hand-author them again.
-- **Review, version-control, and audit policies** as a primary artifact — not as a secondary translation of platform DDL.
+- **Review, version-control, and audit policies** as a primary artifact, not a secondary translation of platform DDL.
 
 Tessera delivers **semantic interoperability of policy**: an agreement, encoded in tooling, that "PII," "fraud investigation purpose," "EU residency," and "audit-log obligation" mean the same thing wherever they are enforced.
 
@@ -28,7 +28,7 @@ Tessera delivers **semantic interoperability of policy**: an agreement, encoded 
 
 ## Who Tessera is for
 
-Tessera is useful if you run data on more than one platform — typically Databricks alongside Snowflake — and you face one or more of these problems:
+Tessera is useful if you run data on more than one platform (typically Databricks alongside Snowflake) and face one or more of these problems:
 
 - The same governance rule has to be authored, maintained, and audited separately in each platform, and the two implementations drift over time.
 - Migration of workloads between platforms is blocked or slowed by the cost of manually rewriting governance policies.
@@ -41,17 +41,17 @@ If you run a single platform and that platform's governance meets your needs, Te
 
 Current version: **0.14.1** (see `VERSION`, `CHANGELOG.md`).
 
-Both reference adapters are real and exercise the full ADR-024 cycle — `emit` / `discover` / `extract` / `reconcile` — on Databricks Unity Catalog and on Snowflake. Three policy shapes are implemented across both platforms: `RowVisibilityConstraint` (`byIdentity`, `byScope`, `byDataset`), `ColumnVisibilityConstraint` (`Redact`), and `AccessGrantConstraint` (table, function, schema-fan-out). ABAC `byScope` (tag-driven) now emits on both platforms — UC via `MATCH COLUMNS has_tag_value(...)`, Snowflake via tag-based masking / row-access policy attachment (#31). Bidirectional migration between the two platforms is demonstrated end-to-end in `adapters/tests/live_migration_demo.py` and its reverse-direction sibling, with verification queries confirming the same policy intent enforces the same way on both sides.
+Both reference adapters are real and exercise the full ADR-024 cycle (`emit` / `discover` / `extract` / `reconcile`) on Databricks Unity Catalog and on Snowflake. Three policy shapes are implemented across both platforms: `RowVisibilityConstraint` (`byIdentity`, `byScope`, `byDataset`), `ColumnVisibilityConstraint` (`Redact`), and `AccessGrantConstraint` (table, function, schema-fan-out). ABAC `byScope` (tag-driven) emits on both platforms: UC via `MATCH COLUMNS has_tag_value(...)`, Snowflake via tag-based masking / row-access policy attachment (#31). Bidirectional migration between the two platforms is demonstrated end-to-end in `adapters/tests/live_migration_demo.py` and its reverse-direction sibling, with verification queries confirming the same policy intent enforces the same way on both sides.
 
-A third adapter, **custom-ACL** (`adapters/custom_acl/`, ADR-032), proves the peer-adapter claim (ADR-003) with a non-native target: it lowers a `byDataset` `RowVisibilityConstraint` to a wrapping secure view (the view *is* the enforcement — the reference customer's own ACL-table pattern), and its `extract` lifts a hand-built ACL view back to IR — the selective-migration on-ramp that lets an existing pattern be re-emitted onto a native platform.
+A third adapter, **custom-ACL** (`adapters/custom_acl/`, ADR-032), proves the peer-adapter claim (ADR-003) with a non-native target. It lowers a `byDataset` `RowVisibilityConstraint` to a wrapping secure view, where the view itself is the enforcement (the reference customer's own ACL-table pattern), and its `extract` lifts a hand-built ACL view back to IR. That is the selective-migration on-ramp: an existing pattern can be re-emitted onto a native platform.
 
-A fourth adapter, **Oracle** (`adapters/oracle/`, ADR-033), is a third native platform with a materially different mechanism set — Virtual Private Database (`DBMS_RLS`) for row visibility, Data Redaction (`DBMS_REDACT`) for column masking, and `GRANT` for access — proving the IR is portable well beyond the UC/Snowflake shape. Live-verified 2026-08-17 on Oracle 23ai Free (VPD row visibility and Data Redaction both enforce as designed).
+A fourth adapter, **Oracle** (`adapters/oracle/`, ADR-033), is a third native platform with a different mechanism set: Virtual Private Database (`DBMS_RLS`) for row visibility, Data Redaction (`DBMS_REDACT`) for column masking, and `GRANT` for access. The IR is therefore portable well beyond the UC/Snowflake shape. Live-verified 2026-08-17 on Oracle 23ai Free (VPD row visibility and Data Redaction both enforce as designed).
 
-**Change-impact analysis** (`tools/impact/`, `tessera impact` / `tessera lint`) reports how a proposed change to a policy corpus alters what it decides about data — coverage gaps, dead or newly-live rules, cross-policy mask conflicts, and exposure widening/narrowing — before anything is emitted. It is static and advisory: it reasons about the policy text, never connecting to a platform or evaluating who is in which group (the ADR-001 line), and labels each finding as provable or membership-dependent. See [`docs/user-guide/analyzing-changes.md`](docs/user-guide/analyzing-changes.md).
+**Change-impact analysis** (`tools/impact/`, `tessera impact` / `tessera lint`) reports how a proposed change to a policy corpus alters what it decides about data (coverage gaps, dead or newly-live rules, cross-policy mask conflicts, exposure widening or narrowing) before anything is emitted. It is static and advisory: it reasons about the policy text, never connecting to a platform or evaluating who is in which group (the ADR-001 line), and labels each finding as provable or membership-dependent. See [`docs/user-guide/analyzing-changes.md`](docs/user-guide/analyzing-changes.md).
 
-The IR — JSON-LD context, OWL ontology, JSON Schema, SHACL shapes — lives in `spec/v0/`. Per ADR-017, the v0 immutability bar is **suspended** until external dependency exists (a third-party adapter, a customer corpus, downstream tooling): additions continue to land in v0, each captured as an ADR. The published GitHub Pages URLs under `bgiesbrecht.github.io/tessera/spec/v0/` will not change once external consumers exist.
+The IR (JSON-LD context, OWL ontology, JSON Schema, SHACL shapes) lives in `spec/v0/`. Per ADR-017, the v0 immutability bar is **suspended** until external dependency exists (a third-party adapter, a customer corpus, downstream tooling): additions continue to land in v0, each captured as an ADR. The published GitHub Pages URLs under `bgiesbrecht.github.io/tessera/spec/v0/` will not change once external consumers exist.
 
-For a demo-ready tour of what's working today, read [`docs/showcase.md`](docs/showcase.md). For where the project is going — shipped, in flight, deferred, and out of scope — read [`docs/ROADMAP.md`](docs/ROADMAP.md). For per-version detail, read `CHANGELOG.md`. Twenty of thirty-one tracked issues remain open; the breakdown is in `docs/issue-drafts/README.md`.
+For a demo-ready tour of what's working today, read [`docs/showcase.md`](docs/showcase.md). For where the project is going (shipped, in flight, deferred, out of scope), read [`docs/ROADMAP.md`](docs/ROADMAP.md). For per-version detail, read `CHANGELOG.md`. Twenty of thirty-one tracked issues remain open; the breakdown is in `docs/issue-drafts/README.md`.
 
 Known limitations at 0.14.1:
 
@@ -126,7 +126,7 @@ Three forms exist:
 │   ├── contract/                          ← Adapter ABC, Capability, AdapterConfig, reconcile
 │   ├── unity_catalog/                     ← Databricks adapter (full cycle)
 │   ├── snowflake/                         ← Snowflake adapter (full cycle)
-│   ├── oracle/                            ← Oracle adapter — VPD / Data Redaction / GRANT (ADR-033)
+│   ├── oracle/                            ← Oracle adapter: VPD / Data Redaction / GRANT (ADR-033)
 │   ├── custom_acl/                        ← custom ACL-table + view pattern adapter (ADR-032)
 │   └── tests/                             ← parity tests + live demo scripts
 └── tools/
@@ -135,26 +135,26 @@ Three forms exist:
     └── cli/                               ← unified `tessera` CLI
 ```
 
-Per ADR-017, the contents of `spec/v0/` are not yet frozen — additions land in v0 (each captured as an ADR) until external dependency exists. See `CHANGELOG.md` for what changed at each version.
+Per ADR-017, the contents of `spec/v0/` are not yet frozen. Additions land in v0 (each captured as an ADR) until external dependency exists. See `CHANGELOG.md` for what changed at each version.
 
 ## How to read the documents
 
 Routing by goal:
 
-- **"What does Tessera actually do today?"** — `docs/showcase.md`. The 5–10 minute demo-anchored tour. Start here if you're new.
-- **"Should we adopt this?"** — `docs/user-guide/evaluating.md`, then `docs/executive-summary.md` and `docs/problem-and-recommendation.md`.
-- **"How do I write a policy?"** — `docs/user-guide/tutorial.md`, then `docs/user-guide/authoring.md`, then the scenarios under `docs/user-guide/scenarios/`.
-- **"How do I deploy and reconcile?"** — `docs/user-guide/operating.md`.
-- **"How does the IR work? Why is it shaped this way?"** — `docs/technical-design-v0.2.md` (the current technical specification), then the relevant ADRs in `DECISIONS.md`.
-- **"Why does Tessera use RDF/OWL/SHACL?"** — `docs/w3c-overview.md`.
-- **"How do I build an adapter or extend the framework?"** — `docs/user-guide/contributing.md`, the adapter contract in `adapters/contract/`, ADR-024.
-- **"Show me something runnable."** — `adapters/tests/live_migration_demo.py` (Snowflake → Databricks, end to end); the reverse-direction sibling; the worked-example artifacts in `spec/v0/examples/`.
+- **"What does Tessera actually do today?"** Start with `docs/showcase.md`, a 5–10 minute demo-anchored tour.
+- **"Should we adopt this?"** `docs/user-guide/evaluating.md`, then `docs/executive-summary.md` and `docs/problem-and-recommendation.md`.
+- **"How do I write a policy?"** `docs/user-guide/tutorial.md`, then `docs/user-guide/authoring.md`, then the scenarios under `docs/user-guide/scenarios/`.
+- **"How do I deploy and reconcile?"** `docs/user-guide/operating.md`.
+- **"How does the IR work? Why is it shaped this way?"** `docs/technical-design-v0.2.md` (the current technical specification), then the relevant ADRs in `DECISIONS.md`.
+- **"Why does Tessera use RDF/OWL/SHACL?"** `docs/w3c-overview.md`.
+- **"How do I build an adapter or extend the framework?"** `docs/user-guide/contributing.md`, the adapter contract in `adapters/contract/`, ADR-024.
+- **"Show me something runnable."** `adapters/tests/live_migration_demo.py` (Snowflake → Databricks, end to end); the reverse-direction sibling; the worked-example artifacts in `spec/v0/examples/`.
 
 `DECISIONS.md` is the authoritative record: every decision that shapes the project lives there as a numbered ADR. When other documents conflict with an ADR, the ADR wins and the document gets fixed.
 
 ## Foundational decisions
 
-The project is grounded in **27 recorded ADRs** (see `DECISIONS.md` for the complete record and rationale). The decisions that most shape how a reader should understand the project:
+The project is grounded in **33 recorded ADRs** (see `DECISIONS.md` for the complete record and rationale). The ADRs a reader should know:
 
 **Posture and framing**
 - **ADR-001** Value proposition is semantic interoperability across platforms, not migration. Migration is a derived benefit.
@@ -180,13 +180,13 @@ The project is grounded in **27 recorded ADRs** (see `DECISIONS.md` for the comp
 
 ## Posture toward the platforms
 
-Tessera takes a principled and explicit position with respect to the platforms it interoperates with:
+Tessera's position on the platforms it interoperates with:
 
 - **Databricks (Unity Catalog).** The Unity Catalog adapter is the most thoroughly developed adapter because that is the platform the project author knows best. Unity Catalog is treated as the source of truth for governance *inside* a Databricks environment; nothing in Tessera contradicts that.
 - **Snowflake.** The Snowflake adapter is built against the public surface of the Snowflake platform, as any partner integration would be. The project does not coordinate with Snowflake and does not exclude it.
 - **Other platforms.** Adapters for other platforms (BigQuery, Redshift, on-premise warehouses, custom enforcement patterns) are first-class peers of the two named adapters. The IR layer is platform-neutral by design and the adapter contract treats them all the same.
 
-This neutrality at the IR layer is structural: a project that privileges one platform in its canonical representation would defeat the point of the project, which is to make policy meaning portable.
+This neutrality at the IR layer is structural. A project that privileges one platform in its canonical representation would defeat its own point: making policy meaning portable.
 
 ## Contributing
 

@@ -49,7 +49,7 @@ Rules applied:
 5. The canonical `@context` URL is prepended at the new root.
 
 Flat-form YAML (the older "JSON-LD-as-YAML" shape) is passed through largely
-unchanged — its `@context`, `@type`, `@id`, `policyKind` etc. are already in
+unchanged; its `@context`, `@type`, `@id`, `policyKind` etc. are already in
 JSON-LD form. Only normalization is to ensure `@context` is the canonical URL
 (in case of a missing or local reference).
 """
@@ -81,7 +81,7 @@ _TYPED_NEST_KEYS = {
 }
 
 
-# YAML parser configured for round-trip semantics — ruamel.yaml round-trip mode
+# YAML parser configured for round-trip semantics (ruamel.yaml round-trip mode
 # preserves comments and structure, even though v1 of the converter discards
 # them on output. Choosing round-trip mode now keeps comment preservation a
 # one-step addition rather than a refactor later.

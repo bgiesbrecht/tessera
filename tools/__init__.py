@@ -1,1 +1,1 @@
-"""Tessera tooling — converters, linters, future CLI."""
+"""Tessera tooling: converters, linters, future CLI."""

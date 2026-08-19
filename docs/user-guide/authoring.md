@@ -2,11 +2,11 @@
 
 This page is the authoring reference. It assumes you've worked through [`tutorial.md`](./tutorial.md). Where the tutorial walked one policy end to end, this page covers the vocabulary you'll reach for when writing policies of your own.
 
-The canonical form is JSON-LD (ADR-004), but you author in YAML (`.tessera.yaml` files). The YAML maps mechanically to JSON-LD via the JSON-LD context at `spec/v0/context.jsonld`. A v1 converter is available — run `python -m tools.converter <file.tessera.yaml> --out <file.jsonld>` or call `from tools.converter import yaml_to_jsonld` from Python. The converter handles envelope-form YAML (the practitioner shape `policy: { id, kind, ... }`) and JSON-LD-shaped YAML alike. Comment preservation in YAML round-trips and the reverse direction (JSON-LD → YAML) are deferred to v2.
+The canonical form is JSON-LD (ADR-004), but you author in YAML (`.tessera.yaml` files). The YAML maps mechanically to JSON-LD via the JSON-LD context at `spec/v0/context.jsonld`. A v1 converter is available: run `python -m tools.converter <file.tessera.yaml> --out <file.jsonld>` or call `from tools.converter import yaml_to_jsonld` from Python. The converter handles envelope-form YAML (the practitioner shape `policy: { id, kind, ... }`) and JSON-LD-shaped YAML alike. Comment preservation in YAML round-trips and the reverse direction (JSON-LD → YAML) are deferred to v2.
 
 ## A note on this page's voice (ADR-027)
 
-This reference is **descriptive**, not prescriptive. It describes what each selector, effect, and transformation represents — and where a platform's own documentation makes a recommendation (e.g., Snowflake on `IS_ROLE_IN_SESSION` vs. mapping tables for different scenarios), this page cites it. It does not synthesize cross-platform authoring recommendations Tessera has no authoritative basis to make. *That which can be defined can be represented*: the IR's job is to represent whatever well-defined intent you want to express, faithfully across platforms. Where the IR can't yet represent something definable, that's a gap to file an issue against — not a constraint on you. See ADR-027 for the full reasoning.
+This reference is **descriptive**, not prescriptive. It describes what each selector, effect, and transformation represents. Where a platform's own documentation makes a recommendation (e.g., Snowflake on `IS_ROLE_IN_SESSION` vs. mapping tables for different scenarios), this page cites it. It does not synthesize cross-platform authoring recommendations Tessera has no authoritative basis to make. *That which can be defined can be represented*: the IR's job is to represent whatever well-defined intent you want to express, faithfully across platforms. Where the IR can't yet represent something definable, that's a gap to file an issue against, not a constraint on you. See ADR-027 for the full reasoning.
 
 ## Top-level structure — the Policy container
 
@@ -49,7 +49,7 @@ policy:
 | `negated-complement` | A fallback branch applies to everyone matching no rule | `defaultBranch: {effect, transformation}` |
 | `none` | Fail-closed: no rule match ⇒ no access | — |
 
-The choice is *intent*, not just observable behavior. Two policies that produce the same query results may carry different `defaultStrategy` values — and the difference is real, captured for downstream tooling and audit.
+The choice is *intent*, not just observable behavior. Two policies that produce the same query results may carry different `defaultStrategy` values, and the difference is real: it is captured for downstream tooling and audit.
 
 ## Selectors
 
@@ -67,7 +67,7 @@ principal:
   resource: group:acme_high_priority_ops
 ```
 
-The simplest selector. The IRI is platform-neutral; the adapter resolves it via `identity_bindings` (for principals) or `resource_bindings` (for resources) — see [`operating.md`](./operating.md).
+The simplest selector. The IRI is platform-neutral; the adapter resolves it via `identity_bindings` (for principals) or `resource_bindings` (for resources); see [`operating.md`](./operating.md).
 
 ### `byClassification` — semantic-attribute reference
 
@@ -91,7 +91,7 @@ principal:
     resourceColumn: code_name
 ```
 
-The principal set is computed at query time by joining a mapping table. Used for ACL-table patterns (the Databricks `acl-row-visibility-*` and Snowflake `snowflake-byDataset-row-visibility-*` exercises). On Snowflake, this is the pattern documented for data-driven entitlement — see § Snowflake authoring guidance below for when it fits and when `byIdentity` fits instead.
+The principal set is computed at query time by joining a mapping table. Used for ACL-table patterns (the Databricks `acl-row-visibility-*` and Snowflake `snowflake-byDataset-row-visibility-*` exercises). On Snowflake, this is the pattern documented for data-driven entitlement; see the Snowflake authoring guidance below for when it fits and when `byIdentity` fits instead.
 
 ### `byScope` — ABAC scoped attachment
 
@@ -164,7 +164,7 @@ Per-rule outcome:
 | `keep-matching-rows` | (Row visibility) Include matching rows |
 | `drop-matching-rows` | (Row visibility) Exclude matching rows |
 
-**Effect-driven transformation constraint (ADR-022):** `transformation` is required if and only if `effect: transform`. The schema enforces this — a `RowVisibilityConstraint` rule with `effect: keep-matching-rows` cannot carry a `transformation`, and a `ColumnVisibilityConstraint` rule with `effect: transform` must carry one.
+**Effect-driven transformation constraint (ADR-022):** `transformation` is required if and only if `effect: transform`. The schema enforces this: a `RowVisibilityConstraint` rule with `effect: keep-matching-rows` cannot carry a `transformation`, and a `ColumnVisibilityConstraint` rule with `effect: transform` must carry one.
 
 ## Transformations
 
@@ -210,7 +210,7 @@ Tessera models attributes via the `AttributeAxis` class (ADR-018). Four well-kno
 | `regulatoryRegime` | Flat | `GDPR`, `HIPAA`, `PCI_DSS`, `SOX`, `CCPA` |
 | `businessDomain` | Flat | `CRM`, `Finance`, `HR`, `Engineering`, `MarketingDomain` |
 
-Each axis is itself extensible — adopters can introduce additional values in their own namespace. The hierarchical `sensitivity` axis additionally supports subsumption (`PII` ⊑ `Confidential`); flat axes treat values as discrete IRIs.
+Each axis is itself extensible: adopters can introduce additional values in their own namespace. The hierarchical `sensitivity` axis additionally supports subsumption (`PII` ⊑ `Confidential`); flat axes treat values as discrete IRIs.
 
 Use attribute axes in:
 - `appliesTo` with `byScope` + `matching:` (apply policy to all PII columns in catalog X)
@@ -219,7 +219,7 @@ Use attribute axes in:
 
 ## Snowflake authoring guidance
 
-Pick the selector that matches what the policy actually decides — **not** policy complexity. Snowflake's [Use row access policies](https://docs.snowflake.com/en/user-guide/security-row-using) documents three patterns and recommends different ones for different scenarios. Earlier versions of this guide framed `byDataset` as Snowflake's blanket preferred pattern for "non-trivial" policies; that framing was wrong and is corrected here.
+Pick the selector that matches what the policy actually decides, **not** policy complexity. Snowflake's [Use row access policies](https://docs.snowflake.com/en/user-guide/security-row-using) documents three patterns and recommends different ones for different scenarios. Earlier versions of this guide framed `byDataset` as Snowflake's blanket preferred pattern for "non-trivial" policies; that framing was wrong and is corrected here.
 
 ### Role-discrimination → `byIdentity`
 
@@ -230,7 +230,7 @@ When the policy decision is *"does this user have role X?"*, Snowflake explicitl
 
 Tessera's `byIdentity` lowers to `IS_ROLE_IN_SESSION` on Snowflake, matching that recommendation. Snowflake's `DEFAULT_SECONDARY_ROLES = ('ALL')` default (BCR-1692, rolled out 2024) is **consistent with** this emission rather than a defeat condition: secondary roles activate, `IS_ROLE_IN_SESSION` sees them, permission-scope semantics hold. The platform default and the adapter's emission align. (ADR-024's postscript and [`operating.md`](./operating.md) § Role-discrimination semantics record this correction.)
 
-If your policy author intends *primary-role-only* semantics — "only when explicitly acting as role X" — that is a different intent the IR does not currently express. Tracked as issue [#14](https://github.com/bgiesbrecht/tessera/issues/14).
+If your policy author intends *primary-role-only* semantics ("only when explicitly acting as role X"), that is a different intent the IR does not currently express. Tracked as issue [#14](https://github.com/bgiesbrecht/tessera/issues/14).
 
 ### Data-driven entitlement → `byDataset`
 
@@ -239,7 +239,7 @@ When the policy decision is *"does this ACL/mapping table assign this user to th
 > "A row access policy condition can reference a mapping table to filter the query result set... For example, use a mapping table to determine the revenue values a sales manager can see in a specified sales region."
 > — [Use row access policies](https://docs.snowflake.com/en/user-guide/security-row-using)
 
-This is the real Tessera customer engagement (ADR-003): hundreds of policies expressed as ACL rows. Tessera's `byDataset` selector with `PrincipalSetFromTable` lowers to this pattern. The policy body gates on `CURRENT_USER()` against the ACL, which is orthogonal to role activation — so `DEFAULT_SECONDARY_ROLES` is not part of the design question. Same IR runs on both platforms; only the adapter emission differs.
+This is the real Tessera customer engagement (ADR-003): hundreds of policies expressed as ACL rows. Tessera's `byDataset` selector with `PrincipalSetFromTable` lowers to this pattern. The policy body gates on `CURRENT_USER()` against the ACL, orthogonal to role activation, so `DEFAULT_SECONDARY_ROLES` is not part of the design question. Same IR runs on both platforms; only the adapter emission differs.
 
 Snowflake's performance caveat:
 
@@ -289,7 +289,7 @@ policy:
       effect: keep-matching-rows
 ```
 
-**Caveat — `resourceColumn` is currently conflated** (v1 candidate; see `spec/v0/examples/snowflake-byDataset-row-visibility.diagnostic.md` §3). For the policy to emit cleanly on Snowflake, the `resourceColumn` of the `ResourceSetFromTable` must match the column name on the protected table that the row-access policy binds to. v1 may split this into separate `aclColumn` + `boundColumn` fields. For now, name the columns to match.
+**Caveat: `resourceColumn` is currently conflated** (v1 candidate; see `spec/v0/examples/snowflake-byDataset-row-visibility.diagnostic.md` §3). For the policy to emit cleanly on Snowflake, the `resourceColumn` of the `ResourceSetFromTable` must match the column name on the protected table that the row-access policy binds to. v1 may split this into separate `aclColumn` + `boundColumn` fields. For now, name the columns to match.
 
 ## When to use which selector
 

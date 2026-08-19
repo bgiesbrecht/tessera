@@ -1,6 +1,6 @@
 # Tessera — Decision Log
 
-This document records decisions that shape the Federated Governance Policy project. Each decision is recorded once, dated, and not revised — superseding decisions are recorded as new entries that explicitly reference the entry they supersede.
+This document records decisions that shape the Federated Governance Policy project. Each decision is recorded once, dated, and not revised. A superseding decision is a new entry that explicitly references the entry it supersedes.
 
 All technical and stakeholder documents in this project must be consistent with the decisions recorded here. When a document conflicts with a recorded decision, the decision takes precedence and the document is revised.
 
@@ -19,9 +19,9 @@ Initial framing of the project leaned toward migration (moving workloads between
 
 ### Decision
 
-The project's primary value proposition is **semantic interoperability of governance policy** across heterogeneous data platforms — a shared meaning for governance concepts (PII, purpose, jurisdiction, obligations, etc.) that means the same thing wherever it is enforced.
+The project's primary value proposition is **semantic interoperability of governance policy** across heterogeneous data platforms: a shared meaning for governance concepts (PII, purpose, jurisdiction, obligations, etc.) that means the same thing wherever it is enforced.
 
-Migration is a derived benefit, framed as the most acute case of the same capability, not as the headline.
+Migration is a derived benefit, framed as the most acute case of the same capability rather than as the headline.
 
 The project is adjacent to but does not deliver:
 
@@ -177,7 +177,7 @@ The DSL (FGP-L authoring language) is designed *after* the IR has stabilized thr
 The following technical questions are recorded as open. They will be resolved as the work proceeds and converted into ADRs at that time.
 
 - **Condition algebra extensibility:** Closed (no per-adopter extensions) or open with registration?
-- **Dataset-selector resolution timing:** Emit-time materialization vs. query-time join — adapter's choice or spec-mandated?
+- **Dataset-selector resolution timing:** Emit-time materialization vs. query-time join: adapter's choice or spec-mandated?
 - **Obligation enforcement model:** Single IR concept with adapter capability declaration, or distinct IR concepts per enforceability class?
 - **Action vocabulary extensibility:** Closed per vocabulary version, open with registration, or fully open?
 - **Operational interoperability scope:** How (and whether) policies follow data through Delta Sharing, Iceberg, federated queries.
@@ -191,7 +191,7 @@ The following technical questions are recorded as open. They will be resolved as
 
 ### Context
 
-The project was developed under the working name FGP (Federated Governance Policy). FGP was always understood to be a placeholder — functional but bland, an acronym whose expansion did not signal what the project does. Naming was deferred until the architecture and framing had stabilized enough to choose a name that fit the work rather than the other way around.
+The project was developed under the working name FGP (Federated Governance Policy). FGP was always understood to be a placeholder: functional but bland, an acronym whose expansion did not signal what the project does. Naming was deferred until the architecture and framing had stabilized enough to choose a name that fit the work rather than the other way around.
 
 With ADRs 001–007 accepted, the framing is now stable: semantic interoperability of policy across platforms, with adapters carrying meaning between governance estates that would otherwise drift.
 
@@ -199,7 +199,7 @@ With ADRs 001–007 accepted, the framing is now stable: semantic interoperabili
 
 The project is named **Tessera**.
 
-The name is from the Latin *tessera*: a small token, often split between parties to a covenant, where matching halves later prove the agreement. The metaphor maps directly to the project's function — different platforms hold matching tokens of meaning, and the matching is what proves they enforce the same policy.
+The name is from the Latin *tessera*: a small token, often split between parties to a covenant, where matching halves later prove the agreement. The metaphor maps directly to the project's function. Different platforms hold matching tokens of meaning, and the matching is what proves they enforce the same policy.
 
 Specific sub-decisions:
 
@@ -238,7 +238,7 @@ The project comprises both specification artifacts (vocabulary, IR schema, conte
 
 ### Decision
 
-**Apache 2.0 for the entire project** — both specification and code.
+**Apache 2.0 for the entire project**: both specification and code.
 
 The reasoning:
 
@@ -285,7 +285,7 @@ The repository is owned by an individual account, consistent with the skunkworks
 
 ### Context
 
-The Tessera vocabulary, context document, and ontology need stable, dereferenceable URLs. These URLs appear in every Tessera policy file (via the `tessera:` prefix expansion and the `@context` reference) and are difficult to change later — a change requires either a v0 → v1 cut of the entire specification, or coordinated rewrites across every customer's policy files.
+The Tessera vocabulary, context document, and ontology need stable, dereferenceable URLs. These URLs appear in every Tessera policy file (via the `tessera:` prefix expansion and the `@context` reference) and are difficult to change later: a change requires either a v0 → v1 cut of the entire specification, or coordinated rewrites across every customer's policy files.
 
 Four options were considered:
 
@@ -338,7 +338,7 @@ The `vocab` path segment is distinct from the `ontology.ttl` and `context.jsonld
 
 After initial setup, the repository was briefly made private and then returned to public. The episode surfaced a constraint not explicit in ADR-011: the canonical namespace URL (`https://bgiesbrecht.github.io/tessera/spec/v0/...`) only resolves anonymously when the repository is public.
 
-GitHub Pages on private repositories requires a paid plan and serves content only to authenticated users with repository read access. Anonymous fetches — by RDF reasoners, JSON-LD validators, third-party tooling, or any consumer that does not authenticate to GitHub — fail.
+GitHub Pages on private repositories requires a paid plan and serves content only to authenticated users with repository read access. Anonymous fetches (by RDF reasoners, JSON-LD validators, third-party tooling, or any consumer that does not authenticate to GitHub) fail.
 
 ### Decision
 
@@ -353,7 +353,7 @@ The Tessera repository is **public**, and remains public as long as the publishe
 ### Consequences
 
 - The repository remains public; any future change to private status requires a deliberate decision recorded as a new ADR superseding this one.
-- If the project ever requires a temporary private phase (embargo before an announcement, sensitive customer engagement, etc.), the corresponding plan must account for namespace-URL resolution — either by accepting that URLs will not resolve during the private phase, by mirroring spec files to a public location, or by routing through a custom domain on an independent host.
+- If the project ever requires a temporary private phase (embargo before an announcement, sensitive customer engagement, etc.), the corresponding plan must account for namespace-URL resolution: either by accepting that URLs will not resolve during the private phase, by mirroring spec files to a public location, or by routing through a custom domain on an independent host.
 - Customers and tools can safely fetch the published URLs without authentication.
 
 ### Note on the alternative
@@ -378,15 +378,15 @@ Two semantically distinct mechanisms produce the same observable behavior:
 
 Both patterns are common. Real policies depend on one or the other for different reasons: the baseline-group pattern has cleaner audit semantics ("did this principal have baseline access at time T?"); the negated-complement pattern works in environments without a universal group concept.
 
-Treating them as indistinguishable — both compile to similar SQL — flattens an important semantic distinction. The IR's job is to capture intent, not just observable behavior, and the choice between these two mechanisms is intent.
+Treating them as indistinguishable (both compile to similar SQL) flattens a semantic distinction. The IR's job is to capture intent, not just observable behavior, and the choice between these two mechanisms is intent.
 
 ### Decision
 
 A new field, `defaultStrategy`, is added to the `PolicyConstraint` class in the IR. It is optional. Its value is one of three named individuals:
 
-- `tessera:explicitBaselineGroup` — the policy asserts a specific group is the universal baseline. A companion field, `baselineGroup`, names the group. The framework treats the rule keyed off this group as the default branch.
-- `tessera:negatedComplement` — the policy asserts no baseline group. The default branch applies to principals who do not match any of the other affirmative-grant rules. The framework treats the negation as inherent to the policy structure.
-- `tessera:none` — the policy has no default branch. Principals who do not match any rule see nothing. This is the framework's fail-closed disposition stated explicitly.
+- `tessera:explicitBaselineGroup`: the policy asserts a specific group is the universal baseline. A companion field, `baselineGroup`, names the group. The framework treats the rule keyed off this group as the default branch.
+- `tessera:negatedComplement`: the policy asserts no baseline group. The default branch applies to principals who do not match any of the other affirmative-grant rules. The framework treats the negation as inherent to the policy structure.
+- `tessera:none`: the policy has no default branch. Principals who do not match any rule see nothing. This is the framework's fail-closed disposition stated explicitly.
 
 When the field is omitted, the framework treats the policy as `tessera:none` (fail-closed). This matches existing behavior and does not break policies authored before this addition.
 
@@ -417,12 +417,12 @@ This ADR does not introduce a general policy-rule-priority or rule-combining-alg
 
 ### Context
 
-The first worked example (group-based row visibility, completed 2026-05-18) surfaced a structural gap in v0: the IR has no explicit multi-branch policy primitive. Multi-branch policies — including the simple three-rule group-membership policy that drove this exercise — were represented as a JSON-LD `@graph` of multiple `RowVisibilityConstraint` instances, with `defaultStrategy` and `baselineGroup` duplicated across every constraint in the graph. The diagnostic flagged this as the most consequential of four gaps. The Phase 3 comparison categorized it as a v1 candidate (issue [#1](https://github.com/bgiesbrecht/tessera/issues/1)).
+The first worked example (group-based row visibility, completed 2026-05-18) surfaced a structural gap in v0: the IR has no explicit multi-branch policy primitive. Multi-branch policies, including the three-rule group-membership policy that drove this exercise, were represented as a JSON-LD `@graph` of multiple `RowVisibilityConstraint` instances, with `defaultStrategy` and `baselineGroup` duplicated across every constraint in the graph. The diagnostic flagged this as one of four gaps. The Phase 3 comparison categorized it as a v1 candidate (issue [#1](https://github.com/bgiesbrecht/tessera/issues/1)).
 
 A design sketch (`docs/v1-candidates/policy-container.md`) worked the question through. The conclusion was that holding the container for a v1 cut would have larger downstream costs than fixing it now:
 
 - Every v0 tool built between now and v1 (JSON Schema, SHACL shapes, converter, first adapter) would encode the `@graph` workaround. Each would need revision at v1 cut.
-- v0 customers who adopt the workaround in their own files would face a migration cliff at v1. The project would either ship a migration tool — committing to migration infrastructure that wouldn't otherwise be necessary — or strand early adopters.
+- v0 customers who adopt the workaround in their own files would face a migration cliff at v1. The project would either ship a migration tool (committing to migration infrastructure that wouldn't otherwise be necessary) or strand early adopters.
 - Both alternatives are worse than backport.
 
 ADR-013 set the precedent: pre-publication v0 corrections are admissible while no external consumer has built against v0. That window is still open.
@@ -437,7 +437,7 @@ Specific sub-decisions:
 - New properties on Policy: `tessera:rules` (ordered list of rule sub-objects), `tessera:policyKind` (discriminator referencing the existing constraint class hierarchy), `tessera:defaultBranch` (slimmer rule applying when no other rule matches under `negated-complement`).
 - `defaultStrategy`, `baselineGroup`, and `appliesTo` have their domains extended to include Policy. They remain on `PolicyConstraint` for backward compatibility but are deprecated at that level.
 - The `@graph`-of-constraints shape used in the worked example before this ADR is deprecated as a multi-branch representation. The converter accepts both shapes during the v0 lifecycle (it normalizes to Policy form internally). At v1 cut, only the Policy shape will be accepted.
-- The combining algebra for ordered rules is recorded in a separate decision: ADR-015. The two are logically distinct — the container is structural; the algebra is semantic — and conflating them would obscure the second.
+- The combining algebra for ordered rules is recorded in a separate decision: ADR-015. The two are logically distinct (the container is structural; the algebra is semantic), and conflating them would obscure the second.
 
 The full design is in `docs/v1-candidates/policy-container.md` (which becomes the implementation reference now that backport is decided; it is not renamed because the design content remains accurate and the v1-candidates directory may accumulate other sketches).
 
@@ -452,9 +452,7 @@ The full design is in `docs/v1-candidates/policy-container.md` (which becomes th
 
 ### When backport would have been the wrong call
 
-Recording this so future backport decisions inherit the framework, in the same spirit as ADR-013's "no external consumer yet" note.
-
-If external dependencies on v0 existed at this point — customer policy files referencing the v0 context URL in production, adapters compiled against the v0 schema and deployed, third-party tooling depending on the v0 shape — backport would not be the right call. The cost of breaking external consumers exceeds the cost of carrying a known workaround forward; in that situation, the right path is v1 with a migration tool, with v0 frozen in its imperfect state.
+If external dependencies on v0 existed at this point (customer policy files referencing the v0 context URL in production, adapters compiled against the v0 schema and deployed, third-party tooling depending on the v0 shape), backport would not be the right call. The cost of breaking external consumers exceeds the cost of carrying a known workaround forward; in that situation, the right path is v1 with a migration tool, with v0 frozen in its imperfect state.
 
 The principle: pre-publication corrections are admissible; post-adoption corrections are not. The window between them is real and finite. ADR-013 and ADR-014 are within the window; ADR-014 is its likely endpoint.
 
@@ -492,11 +490,11 @@ Multi-rule Policies use **ordered first-match** semantics. Rules are evaluated i
 
 ### Foreclosures
 
-Recording these explicitly so future readers see them as choices, not oversights:
+These are choices, not oversights:
 
 - **Deny-overrides and permit-overrides are not supported as combining algorithms within a single Policy.** These XACML-style algorithms are appropriate when multiple independently-authored policies must be reconciled at decision time. Tessera Policies are coherent authored artifacts; multiple-rule combination within one Policy is the author's responsibility, expressed via ordering, not the framework's responsibility to resolve via algebra. If multi-policy combination becomes a need (cross-policy interaction at evaluation time), it is a separate design problem requiring its own treatment, likely in v2 or later.
 - **Non-deterministic combination is not supported.** First-match is deterministic by ordering. Algorithms that allow multiple rules to contribute to a single decision (e.g., "the strictest effect wins among matching rules") are not in scope. The framework does not blend rule effects.
-- **Declared-per-policy combining algorithm is not supported in v0.** A `combiningAlgorithm` field on Policy would allow customers to choose among algorithms. Deliberately deferred — adding the field now would commit the project to designing and validating multiple algorithms before the corpus has demonstrated they are needed. v0 ships with first-match only; later versions may revisit.
+- **Declared-per-policy combining algorithm is not supported in v0.** A `combiningAlgorithm` field on Policy would allow customers to choose among algorithms. Deliberately deferred: adding the field now would commit the project to designing and validating multiple algorithms before the corpus has demonstrated they are needed. v0 ships with first-match only; later versions may revisit.
 
 ### Consequences
 
@@ -518,7 +516,7 @@ The first column-masking exercise (`acme.tpch.orders.o_clerk` redacted to `'cler
 
 A policy intent like "redact `o_clerk` to `'clerk-redacted'`" cannot be expressed in v0 as currently shaped. The fact-of-redacting can be expressed; the *what to redact to* cannot. Likewise, SSN-style masking ("show last 4") and hashing with a specified algorithm have no place to put their parameters.
 
-This is an *addition* — v0 is silent on the matter, not wrong about it. The immutability commitment from ADR-014 covers corrections to existing shapes, not additions of new capability. New optional capability is a minor version bump, not a structural revision.
+This is an *addition*: v0 is silent on the matter, not wrong about it. The immutability commitment from ADR-014 covers corrections to existing shapes, not additions of new capability. New optional capability is a minor version bump, not a structural revision.
 
 ### Decision
 
@@ -536,18 +534,18 @@ The `type` field discriminates which transformation is being applied. Additional
 
 ### Parameter shapes per transformation (v0 scope)
 
-**`Redact`** — replaces the column value with a literal.
+**`Redact`**: replaces the column value with a literal.
 
 - `replacement` (required): the literal to substitute. JSON-encodable value. Strings, numbers, booleans, and `null` are all valid. The adapter is responsible for type-compatibility with the column at emission time; if `replacement` is type-incompatible with the column, emission fails with a diagnostic, not silent coercion.
 
-**`Mask`** — replaces the column value with a fixed character, optionally preserving a prefix or suffix.
+**`Mask`**: replaces the column value with a fixed character, optionally preserving a prefix or suffix.
 
 - `maskChar` (optional, default `'X'`): the character used for the masked positions. Single character.
 - `preserveFirst` (optional, default `0`): non-negative integer. The first N characters of the value pass through unchanged.
 - `preserveLast` (optional, default `0`): non-negative integer. The last N characters of the value pass through unchanged.
 - Behavior: if both `preserveFirst` and `preserveLast` are set, both apply; the masked region is the characters between them. If the sum of `preserveFirst` and `preserveLast` is greater than or equal to the value's character length, the value is returned unchanged (forgiving rather than failing). Character counts are over Unicode code points, not bytes.
 
-**`Hash`** — replaces the column value with a hash digest.
+**`Hash`**: replaces the column value with a hash digest.
 
 - `algorithm` (optional, default `'sha256'`): one of `'sha256'`, `'sha512'`, `'sha1'`. Algorithms outside this set require a v1 spec extension.
 - Salted hashing is **deferred to v1**, pending a secret-reference vocabulary that v0 does not include. A policy author who needs salted hashing should use `Tokenize` if the platform supports it, or wait for v1.
@@ -560,7 +558,7 @@ A policy author wishing to use `Tokenize` or `Bucketize` in v0 may declare them 
 
 ### Why a uniform structured form (option α) rather than polymorphic (option β)
 
-Option β allowed `transformation` to be either a class-name string (for parameterless transformations) or a structured object (for parameterized ones). Option α — the chosen design — requires structured form always, even for parameterless transformations.
+Option β allowed `transformation` to be either a class-name string (for parameterless transformations) or a structured object (for parameterized ones). Option α (the chosen design) requires structured form always, even for parameterless transformations.
 
 Reasoning:
 
@@ -598,11 +596,11 @@ ADR-014's defensive note applies here too: this addition is acceptable because n
 
 ADR-014's closing note stated: *"The expectation now is that no further v0 corrections will be made — the v0 immutability bar comes down with this commit chain. Subsequent IR changes require a v1 cut at `spec/v1/`."*
 
-That statement was anticipatory. It assumed publication of v0 would coincide with external adoption of v0 — that the commit chain landing ADR-014 was the moment after which v0 was depended upon by someone outside the project.
+That statement was anticipatory. It assumed publication of v0 would coincide with external adoption of v0: that the commit chain landing ADR-014 was the moment after which v0 was depended upon by someone outside the project.
 
 In fact, no external consumer has built against v0 at any point. The published URLs at `https://bgiesbrecht.github.io/tessera/spec/v0/...` resolve, but resolving and being depended upon are different things. ADR-016 (transformation parameterization) landed after ADR-014's stated bar, and a substantial structural addition (ABAC support via attribute axes, scoped policy attachment, and composable selectors) is now under design and intended for v0.
 
-Continuing to amend v0 while claiming the immutability bar came down with ADR-014 produces a contradiction in the decision log. The honest framing is that the immutability bar was tied to a calendar event that did not occur, and the bar's actual condition — external dependency — has not been met.
+Continuing to amend v0 while claiming the immutability bar came down with ADR-014 produces a contradiction in the decision log. The honest framing is that the immutability bar was tied to a calendar event that did not occur, and the bar's actual condition (external dependency) has not been met.
 
 ### Decision
 
@@ -637,7 +635,7 @@ Thresholds 1, 2, and 4 are quality thresholds the project aims to cross before t
 
 ### Note on this kind of correction
 
-ADR-014's overreach was anticipating immutability before external dependency made it real. The lesson recorded here for future ADRs: claims about when a project's malleability ends should be conditioned on observable events, not on calendar moments. ADR-014's stated bar was a date; this ADR's stated bar is a condition. The condition is the better discipline.
+ADR-014 anticipated immutability before external dependency made it real. Claims about when a project's malleability ends should be conditioned on observable events, not on calendar moments. ADR-014's stated bar was a date; this ADR's stated bar is a condition.
 
 ---
 
@@ -648,7 +646,7 @@ ADR-014's overreach was anticipating immutability before external dependency mad
 
 ### Context
 
-The existing `Classification` hierarchy in v0 handles the single-axis hierarchical case well — `PII ⊂ PersonalData` carries useful subsumption inference. What it does not handle is the orthogonal-dimensions case: a column may simultaneously be `sensitivity: PII`, `dataSubject: EUResident`, `regulatoryRegime: GDPR`, and `businessDomain: CRM` — four independent axes, each with its own value vocabulary.
+The existing `Classification` hierarchy in v0 handles the single-axis hierarchical case well. `PII ⊂ PersonalData` carries useful subsumption inference. What it does not handle is the orthogonal-dimensions case: a column may simultaneously be `sensitivity: PII`, `dataSubject: EUResident`, `regulatoryRegime: GDPR`, and `businessDomain: CRM`: four independent axes, each with its own value vocabulary.
 
 The ABAC scoping document (`docs/v1-candidates/abac-and-attribute-axes.md` §2) establishes that real-world classification across Databricks ABAC, Snowflake tagging, and W3C DPV consistently treats these as separate dimensions, not as a single hierarchy. Forcing them into one hierarchy produces combinatorial class names (`MarketingTeamGDPREmailPII`) that age badly.
 
@@ -707,7 +705,7 @@ This ADR does not introduce coordination labels (`team`, `cost-center`, `environ
 
 ### Context
 
-Tessera v0 attaches policies to specific resources via `appliesTo` with a `byIdentity` selector — the policy says "this applies to `acme.tpch.orders`." This is fine for table-specific policies but does not express ABAC's defining behavior: a policy attaches at a *level* in the resource hierarchy (catalog, schema, table) and automatically applies to anything within that scope matching its conditions.
+Tessera v0 attaches policies to specific resources via `appliesTo` with a `byIdentity` selector: the policy says "this applies to `acme.tpch.orders`." This is fine for table-specific policies but does not express ABAC's defining behavior: a policy attaches at a *level* in the resource hierarchy (catalog, schema, table) and automatically applies to anything within that scope matching its conditions.
 
 A single ABAC policy can protect every PII column in a catalog without enumerating tables. The IR needs a primitive for this.
 
@@ -738,11 +736,11 @@ The Tessera context defines URI prefixes for catalogs, schemas, tables, and colu
 - `table:` → applies to all columns within the table.
 - `column:` → applies only to the specific column (equivalent to today's `byIdentity` selector targeting a column).
 
-Inference avoids redundancy — the `kind` is recoverable from the IRI and does not need to live as a separate policy field.
+Inference avoids redundancy: the `kind` is recoverable from the IRI and does not need to live as a separate policy field.
 
 ### Inheritance is implicit and downward
 
-A policy at catalog scope applies to schemas, tables, and columns within that catalog. The adapter handles platform-specific inheritance details (Databricks does not propagate tags from table to column by default; Snowflake does for certain tag types — these are mechanism differences, not policy differences).
+A policy at catalog scope applies to schemas, tables, and columns within that catalog. The adapter handles platform-specific inheritance details (Databricks does not propagate tags from table to column by default; Snowflake does for certain tag types; these are mechanism differences, not policy differences).
 
 ### Scope exclusion is distinct from principal exclusion
 
@@ -752,7 +750,7 @@ The `except` facility is included in v0 because both Databricks ABAC and Snowfla
 
 ### Deferred: cross-policy combining algorithm
 
-ABAC's multi-policy aspect — multiple policies attached at overlapping scopes — raises a question ADR-015 explicitly did not answer: what happens when two policies both apply to the same resource? Snowflake has explicit ordering rules; Databricks ABAC evaluates dynamically; the two differ.
+ABAC's multi-policy aspect (multiple policies attached at overlapping scopes) raises a question ADR-015 explicitly did not answer: what happens when two policies both apply to the same resource? Snowflake has explicit ordering rules; Databricks ABAC evaluates dynamically; the two differ.
 
 **ADR-019 does not prescribe a cross-policy combining algorithm.** The decision is held until the worked exercise (scoping doc §9 Stage 3) produces evidence. The three resolution paths under consideration are documented in scoping doc §8 Q3:
 
@@ -821,7 +819,7 @@ matching:
 
 ### Implicit-AND shortcut
 
-The most common case — conjunction over a small set of attributes — would read significantly worse in the canonical form than in shorthand. The schema accepts an implicit-conjunction shortcut:
+The most common case, conjunction over a small set of attributes, would read significantly worse in the canonical form than in shorthand. The schema accepts an implicit-conjunction shortcut:
 
 ```yaml
 matching:
@@ -856,7 +854,7 @@ The composition algebra is closed in v0 (and/or/not). The condition algebra (ADR
 
 Adapters need to translate between platform-specific identifiers and Tessera's semantic vocabulary. The translation is per-environment because adopters use different tag taxonomies, identity providers, and naming conventions. The mapping is bidirectional: emission lowers Tessera identifiers to platform-specific ones; extraction lifts platform-specific identifiers back.
 
-Tessera has had one instance of this pattern from the beginning — **identity binding** (ADR-002, where principals in the IR are mapped to platform-native principals per-environment). The ABAC work introduces a second: **tag-taxonomy mapping** (Databricks governed-tag keys/values ↔ Tessera attribute axes/values; ADR-018). More instances are likely as the framework grows — classification-name mapping, group-hierarchy mapping, possibly more.
+Tessera has had one instance of this pattern from the beginning: **identity binding** (ADR-002, where principals in the IR are mapped to platform-native principals per-environment). The ABAC work introduces a second: **tag-taxonomy mapping** (Databricks governed-tag keys/values ↔ Tessera attribute axes/values; ADR-018). More instances are likely as the framework grows: classification-name mapping, group-hierarchy mapping, possibly more.
 
 Rather than treating each instance as a one-off, this ADR establishes the **adapter configuration mapping pattern** as the general shape, with tag-taxonomy and identity-binding as the first two named instances.
 
@@ -870,7 +868,7 @@ Configuration lives in adapter-side files (`adapters/<name>/configuration.yaml` 
 
 ### Two well-known instance kinds in v0
 
-**`identityBindings`** — per-adapter mapping between Tessera principal IRIs and platform-native principals. Pre-existing pattern (ADR-002), now formalized.
+**`identityBindings`**: per-adapter mapping between Tessera principal IRIs and platform-native principals. Pre-existing pattern (ADR-002), now formalized.
 
 ```yaml
 identityBindings:
@@ -880,7 +878,7 @@ identityBindings:
     platformUser: brice.giesbrecht@databricks.com
 ```
 
-**`tagTaxonomy`** — per-adapter mapping between Tessera attribute axes/values and platform-native tag keys/values. New with ABAC.
+**`tagTaxonomy`**: per-adapter mapping between Tessera attribute axes/values and platform-native tag keys/values. New with ABAC.
 
 ```yaml
 tagTaxonomy:
@@ -931,7 +929,7 @@ This separation is structural, not cosmetic. Conflating them would violate the �
 
 ADR-016 introduced structured transformations: a `TransformationInstance` with `type` plus per-type parameters, referenced from policy rules. The decision text correctly framed `transformation` as the parameter shape carried *when a rule applies a transformation*. The technical-design §4.2.2 text and the JSON Schema implementation, however, took a tighter position: they required `transformation` on every rule in a `ColumnVisibilityConstraint` policy.
 
-The column-mask worked example (`spec/v0/examples/column-mask-orders-clerk-*`) surfaced the gap. The natural Tessera shape for two-branch column masking is one rule with `effect: allow` (pass-through for a privileged group) plus a `defaultBranch` with `effect: transform` and a `Redact` transformation (for everyone else). The pass-through rule has no transformation to declare because no transformation is applied — but the schema rejects it.
+The column-mask worked example (`spec/v0/examples/column-mask-orders-clerk-*`) surfaced the gap. The natural Tessera shape for two-branch column masking is one rule with `effect: allow` (pass-through for a privileged group) plus a `defaultBranch` with `effect: transform` and a `Redact` transformation (for everyone else). The pass-through rule has no transformation to declare because no transformation is applied, but the schema rejects it.
 
 The constraint as written is over-tight. The right rule is **effect-driven**, not policy-kind-driven: a rule (or `defaultBranch`) carries `transformation` iff its `effect` is `transform`.
 
@@ -958,8 +956,8 @@ The previous policy-kind-driven conditional (every `ColumnVisibilityConstraint` 
 
 ### Consequences
 
-- **`spec/v0/schema.json`** — the policy-level `if/then/else` requiring `transformation` for all `ColumnVisibilityConstraint` rules is replaced with a per-rule `allOf` conditional on `effect`. The same conditional applies to the `defaultBranch`. The freestanding `policyConstraint` shape's `@type`-based conditional becomes an `effect`-based one.
-- **`docs/technical-design-v0.2.md` §4.2.2** — the transformation bullet changes from "Required for `ColumnVisibilityConstraint` rules; forbidden otherwise" to "Required when `effect: transform`; forbidden otherwise." §4.2.3 (freestanding `PolicyConstraint`) inherits the same constraint.
+- **`spec/v0/schema.json`**: the policy-level `if/then/else` requiring `transformation` for all `ColumnVisibilityConstraint` rules is replaced with a per-rule `allOf` conditional on `effect`. The same conditional applies to the `defaultBranch`. The freestanding `policyConstraint` shape's `@type`-based conditional becomes an `effect`-based one.
+- **`docs/technical-design-v0.2.md` §4.2.2**: the transformation bullet changes from "Required for `ColumnVisibilityConstraint` rules; forbidden otherwise" to "Required when `effect: transform`; forbidden otherwise." §4.2.3 (freestanding `PolicyConstraint`) inherits the same constraint.
 - **The column-mask worked-example artifacts** (`spec/v0/examples/column-mask-orders-clerk-*`) validate cleanly after the schema correction lands.
 - **The ontology (`spec/v0/ontology.ttl`)** does not change. The constraint was never an ontology axiom; it was a schema implementation choice.
 
@@ -967,7 +965,7 @@ The previous policy-kind-driven conditional (every `ColumnVisibilityConstraint` 
 
 The original constraint over-implemented ADR-016. The decision text said "transformations are parameterized via `TransformationInstance`"; the implementation said "every ColumnVis rule must have one." Those are not the same statement, and the implementation should mirror the decision, not impose tighter constraints than the decision justified.
 
-This is a useful pattern to record for future ADR implementations: when translating an ADR's decision into schema or code, double-check that the implementation's constraints match the ADR's declared scope. The column-mask exercise surfaced this gap because it produced the first artifact whose natural shape exceeded the over-tight constraint's bounds. The framework's "exercises drive design" principle catches these on the first valid example; the cost of correction now is small.
+When translating an ADR's decision into schema or code, check that the implementation's constraints match the ADR's declared scope. The column-mask exercise surfaced this gap because it produced the first artifact whose natural shape exceeded the over-tight constraint's bounds. The "exercises drive design" principle catches these on the first valid example, so the cost of correction now is small.
 
 ---
 
@@ -980,9 +978,9 @@ This is a useful pattern to record for future ADR implementations: when translat
 
 ADR-019 (`byScope` + scoped attachment) deliberately did **not** prescribe a cross-policy combining algorithm. The decision named three candidate resolutions:
 
-- **α** — Tessera defers to platform conventions; adapters handle combination per-platform.
-- **β** — Tessera adopts a single combining algorithm (deny-overrides, permit-overrides, declared priority) and requires adapters to enforce it.
-- **γ** — Tessera declares it adapter-configurable per capability profile.
+- **α**: Tessera defers to platform conventions; adapters handle combination per-platform.
+- **β**: Tessera adopts a single combining algorithm (deny-overrides, permit-overrides, declared priority) and requires adapters to enforce it.
+- **γ**: Tessera declares it adapter-configurable per capability profile.
 
 The ABAC column-mask worked exercise (`spec/v0/examples/abac-column-mask-*`, Phase 3 observation 2026-05-19) produced the discriminating empirical result: **Databricks ABAC rejects multi-mask evaluation** when two column-mask policies resolve to the same column. The full error:
 
@@ -1005,12 +1003,12 @@ Tessera adopts **γ-with-refinement**: cross-policy combination is adapter-confi
 
 Specifically:
 
-1. **The IR remains expressive.** Authors may declare multiple policies whose effective resource sets overlap. This is legitimate authored intent — for example, a redaction policy and a hashing policy on the same PII columns reflecting two different downstream consumers' needs. The IR does not preemptively reject this configuration.
+1. **The IR remains expressive.** Authors may declare multiple policies whose effective resource sets overlap. This is legitimate authored intent: for example, a redaction policy and a hashing policy on the same PII columns reflecting two different downstream consumers' needs. The IR does not preemptively reject this configuration.
 
 2. **The adapter capability profile declares platform constraints** as machine-readable vocabulary. Initial v0 vocabulary:
-   - `single-column-mask-per-column` — at most one ColumnVis policy may resolve to any given column on the platform.
-   - `single-row-filter-per-table` — at most one RowVis policy may resolve to any given table on the platform.
-   - `cross-mechanism-conflict-blocked` — ABAC policies and legacy `SET MASK` / `SET ROW FILTER` on the same column/table compose only if they resolve to the same function; otherwise the platform blocks access.
+   - `single-column-mask-per-column`: at most one ColumnVis policy may resolve to any given column on the platform.
+   - `single-row-filter-per-table`: at most one RowVis policy may resolve to any given table on the platform.
+   - `cross-mechanism-conflict-blocked`: ABAC policies and legacy `SET MASK` / `SET ROW FILTER` on the same column/table compose only if they resolve to the same function; otherwise the platform blocks access.
 
    Databricks declares all three. Other platforms (Snowflake, custom adapters) declare their own constraints; the vocabulary is open per ADR-021's adapter-configuration pattern.
 
@@ -1021,7 +1019,7 @@ Specifically:
 ### Why γ-with-refinement and not pure α or β
 
 - **Pure α** (defer to platform) would leave Tessera silent about conflicts that the platform will reject. The author would learn about conflicts only at runtime, after deployment. This contradicts the framework's "diagnostics at emit time" principle (technical design §5.3).
-- **Pure β** (pick an algorithm) would commit Tessera to enforcing a combining semantics — say, deny-overrides — that may not match any platform's actual behavior. Customers would write policies expecting one algorithm and the platform would enforce another. This is worse than silence.
+- **Pure β** (pick an algorithm) would commit Tessera to enforcing a combining semantics (say, deny-overrides) that may not match any platform's actual behavior. Customers would write policies expecting one algorithm and the platform would enforce another. This is worse than silence.
 - **γ-with-refinement** names the platform's constraint without inventing one. The IR is honest about what the platform supports; the adapter is honest about what it can emit; the author is honest about what conflicts they're carrying. Each layer does its job.
 
 This framing also generalizes: as Tessera grows additional adapters with different constraints, each adapter declares its own capability vocabulary; the IR remains neutral; the framework's "meaning over mechanism" principle is preserved.
@@ -1030,9 +1028,9 @@ This framing also generalizes: as Tessera grows additional adapters with differe
 
 - **Adapter capability profile vocabulary** (per ADR-021) gains the three initial entries above. The Databricks adapter (when built) declares all three; future adapters declare their own.
 - **Adapter emission contract** (technical design §5) now explicitly requires a conflict-detection phase before SQL generation. The Tessera CLI / linter / converter surfaces detected conflicts as structured findings before any DDL is emitted.
-- **The capability-profile vocabulary itself remains open.** ADR-021's pattern (well-known instance kinds + adopter extensibility) applies here too. Future findings — for example, a platform that rejects multiple obligations on the same policy — extend the vocabulary; no new ADR per constraint kind.
+- **The capability-profile vocabulary itself remains open.** ADR-021's pattern (well-known instance kinds + adopter extensibility) applies here too. Future findings (for example, a platform that rejects multiple obligations on the same policy) extend the vocabulary; no new ADR per constraint kind.
 - **ADR-019's deferred decision is closed by this ADR.** ADR-019's "α / β / γ" framing now refers to this ADR for the canonical resolution.
-- **ADR-007's "policy-combining algorithm" open question is partially closed.** The specific case of cross-policy *conflict* on the same effective resource set is now resolved (Tessera defers to adapters; adapters declare and emit diagnostics). Cross-policy combination across *orthogonal* effects (column mask + row filter on the same table, for example) is a different question — addressed by the platform's natural composition, not by Tessera's IR — and remains correct under the v0 design.
+- **ADR-007's "policy-combining algorithm" open question is partially closed.** The specific case of cross-policy *conflict* on the same effective resource set is now resolved (Tessera defers to adapters; adapters declare and emit diagnostics). Cross-policy combination across *orthogonal* effects (column mask + row filter on the same table, for example) is a different question, addressed by the platform's natural composition rather than by Tessera's IR, and remains correct under the v0 design.
 
 ### What this ADR does not do
 
@@ -1042,9 +1040,9 @@ This framing also generalizes: as Tessera grows additional adapters with differe
 
 ### Note on the empirical-grounding pattern
 
-ADR-019 was honest about deferring this decision until evidence arrived. The evidence arrived in the ABAC column-mask exercise; the row-filter exercise generalized it. The framework's discipline of "exercises drive design, not speculation" produced a sharper resolution than ADR-019 could have chosen up-front — the γ-with-refinement framing required knowing what the platform actually does, and that knowledge required deployment, not just documentation.
+ADR-019 was honest about deferring this decision until evidence arrived. The evidence arrived in the ABAC column-mask exercise; the row-filter exercise generalized it. The framework's discipline of "exercises drive design, not speculation" produced a sharper resolution than ADR-019 could have chosen up-front: the γ-with-refinement framing required knowing what the platform actually does, and that knowledge required deployment, not just documentation.
 
-The lesson worth recording: deferring a design decision until empirical observation can ground it is a real practice, not just a procrastination. ADR-019's deferral was correct; ADR-023's resolution is sharper for having waited.
+Deferring a design decision until empirical observation can ground it is a real practice, not procrastination. ADR-019's deferral was correct; ADR-023's resolution is sharper for having waited.
 
 ---
 
@@ -1055,7 +1053,7 @@ The lesson worth recording: deferring a design decision until empirical observat
 
 ### Context
 
-ADR-003 established that adapters are peers and that each adapter is responsible for four activities — discovery, extraction, emission, reconciliation — plus a capability profile declaring which IR concepts the platform supports. The technical design (§5) elaborated this in prose. But until a concrete adapter implementation exists, the contract between the IR and the platforms remains a sketch: the interface boundary, the result types, the configuration injection point, and the diagnostic vocabulary are all underspecified.
+ADR-003 established that adapters are peers and that each adapter is responsible for four activities (discovery, extraction, emission, reconciliation) plus a capability profile declaring which IR concepts the platform supports. The technical design (§5) elaborated this in prose. But until a concrete adapter implementation exists, the contract between the IR and the platforms remains a sketch: the interface boundary, the result types, the configuration injection point, and the diagnostic vocabulary are all underspecified.
 
 Two adapter scaffolds were built simultaneously (Unity Catalog and Snowflake) precisely to pressure-test the contract. If only one adapter existed, the contract would inevitably specialize to that platform's idioms. With two implementations of the same interface emitting from the same IR, the contract has to express the platform-neutral surface explicitly.
 
@@ -1063,18 +1061,18 @@ Two adapter scaffolds were built simultaneously (Unity Catalog and Snowflake) pr
 
 The adapter contract is defined by the types in `adapters/contract/`:
 
-- **`Adapter` ABC** — an abstract base class with four methods (`emit`, `discover`, `extract`, `reconcile`) and a `capability_profile` property. Adapters subclass `Adapter` and override what they implement; default implementations of the three non-emission methods return `NotImplemented`-style diagnostics so that callers can probe an adapter's surface without dispatching on adapter identity.
-- **`AdapterConfig`** — per-environment configuration mapping IR concepts to platform mechanisms. This is the implementation of ADR-021's adapter-configuration-mapping pattern. Concrete fields: `identity_bindings` (PrincipalRef IRI → platform principal id) and `tag_taxonomy` ((axis, value) → (tag key, tag value)). An `extras` dict carries per-adapter conventions (warehouse, default schema) without polluting the typed surface.
-- **`CapabilityProfile`** — per-adapter declaration of supported / partial / unsupported entries keyed by a closed `Capability` enum. The enum is normative: adding a value is a contract change. Diagnostic emission cites capability entries by enum value, so the gap between two platforms is comparable across adapters.
-- **`EmissionResult`, `DiscoveryResult`, `ExtractionResult`, `ReconciliationResult`** — every adapter method returns a structured Result, never a raw string or dict. Results carry `diagnostics: list[Diagnostic]` alongside their payload. Callers attach the diagnostic stream to whatever downstream surface (CLI output, JSON report, IDE annotation) is appropriate.
-- **`Diagnostic`** — severity (info / warning / error), short code (e.g., `UNIMPLEMENTED_POLICY_KIND`), human-readable message, optional location pointer into the source policy. Adapters declare their codes; cross-adapter code naming converges by convention, not enforcement.
+- **`Adapter` ABC**: an abstract base class with four methods (`emit`, `discover`, `extract`, `reconcile`) and a `capability_profile` property. Adapters subclass `Adapter` and override what they implement; default implementations of the three non-emission methods return `NotImplemented`-style diagnostics so that callers can probe an adapter's surface without dispatching on adapter identity.
+- **`AdapterConfig`**: per-environment configuration mapping IR concepts to platform mechanisms. This is the implementation of ADR-021's adapter-configuration-mapping pattern. Concrete fields: `identity_bindings` (PrincipalRef IRI → platform principal id) and `tag_taxonomy` ((axis, value) → (tag key, tag value)). An `extras` dict carries per-adapter conventions (warehouse, default schema) without polluting the typed surface.
+- **`CapabilityProfile`**: per-adapter declaration of supported / partial / unsupported entries keyed by a closed `Capability` enum. The enum is normative: adding a value is a contract change. Diagnostic emission cites capability entries by enum value, so the gap between two platforms is comparable across adapters.
+- **`EmissionResult`, `DiscoveryResult`, `ExtractionResult`, `ReconciliationResult`**: every adapter method returns a structured Result, never a raw string or dict. Results carry `diagnostics: list[Diagnostic]` alongside their payload. Callers attach the diagnostic stream to whatever downstream surface (CLI output, JSON report, IDE annotation) is appropriate.
+- **`Diagnostic`**: severity (info / warning / error), short code (e.g., `UNIMPLEMENTED_POLICY_KIND`), human-readable message, optional location pointer into the source policy. Adapters declare their codes; cross-adapter code naming converges by convention, not enforcement.
 
-Emission lowers a parsed JSON-LD policy dict to platform-native DDL/SQL statements. **Adapters never execute** — execution is the caller's responsibility (the calling tool layers in the SDK, the Snowflake connector, audit-log handling, dry-run flags, etc.). This separation keeps adapters testable without platform credentials and keeps the contract synchronous and pure.
+Emission lowers a parsed JSON-LD policy dict to platform-native DDL/SQL statements. **Adapters never execute**: execution is the caller's responsibility (the calling tool layers in the SDK, the Snowflake connector, audit-log handling, dry-run flags, etc.). This separation keeps adapters testable without platform credentials and keeps the contract synchronous and pure.
 
 ### Rationale
 
 - **Two implementations from day one.** Building Unity Catalog alone would have produced a contract specialized to Databricks idioms (account groups, governed tags). The Snowflake scaffold immediately pressured the principal-binding axis (roles, not groups), the policy-attachment DDL (row-access policy vs row filter), and the naming convention (schema-qualified policy objects in Snowflake; function-named filters in Databricks). The `AdapterConfig.identity_bindings` mapping emerged from this pressure.
-- **Structured Results, not raw output.** Returning a bare list of SQL strings was rejected because it forecloses on capability-gap reporting, partial extraction confidence, and reconciliation diff output. The Result types are simple dataclasses — auditable, serializable, testable.
+- **Structured Results, not raw output.** Returning a bare list of SQL strings was rejected because it forecloses on capability-gap reporting, partial extraction confidence, and reconciliation diff output. The Result types are simple dataclasses: auditable, serializable, testable.
 - **Closed `Capability` enum.** A free-form string vocabulary for capability declarations would let each adapter invent its own gap names, defeating the cross-adapter comparison the profile is meant to support. The enum is small (eight entries today); future additions are deliberate.
 - **Emission separated from execution.** The same scaffold runs in unit tests with no platform credentials and in integration tests against real workspaces. Callers compose execution with their own logging, retry, dry-run, and audit policy without negotiating with the adapter.
 
@@ -1093,22 +1091,22 @@ Emission lowers a parsed JSON-LD policy dict to platform-native DDL/SQL statemen
 
 ### Note on ordering
 
-ADR-024 lands together with the first concrete scaffolds (commit on 2026-05-19). Future adapters — `custom-acl/` per ADR-003's third-target customer — inherit the contract as it stands today; if their platform surfaces concepts that strain the current shape, those strains land as new ADRs amending or extending this one, not as silent edits.
+ADR-024 lands together with the first concrete scaffolds (commit on 2026-05-19). Future adapters (`custom-acl/` per ADR-003's third-target customer) inherit the contract as it stands today; if their platform surfaces concepts that strain the current shape, those strains land as new ADRs amending or extending this one, not as silent edits.
 
 ### Findings from the first live cross-platform exercise (2026-05-19)
 
 The scaffold was exercised end-to-end against both target platforms on the same day it landed. The same `spec/v0/examples/group-row-visibility-policy-a.jsonld` was lowered through both adapters and the resulting DDL was executed against:
 
-- **Databricks** — `acme.tpch.orders` (7.5M rows from `samples.tpch.orders`).
-- **Snowflake** — `ACME.TESSERA.SNOW_ORDERS` (1.5M rows from `SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS`).
+- **Databricks**: `acme.tpch.orders` (7.5M rows from `samples.tpch.orders`).
+- **Snowflake**: `ACME.TESSERA.SNOW_ORDERS` (1.5M rows from `SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS`).
 
-Three findings worth recording — none reshape the contract but each refines the platform-specific surface:
+Three findings, none reshaping the contract, each refining the platform-specific surface:
 
 1. **Resource bindings are a real config gap.** The same IR target (`table:acme.tpch.orders`) lowers to two different platform identifiers (`acme.tpch.orders` on Databricks; `ACME.TESSERA.SNOW_ORDERS` on Snowflake). `AdapterConfig.resource_bindings` was added during the live exercise as the natural counterpart to `identity_bindings`. The pattern (ADR-021) already supported this implicitly; the live run made it concrete.
 
 2. **Snowflake's role hierarchy is not flat group membership.** Snowflake roles inherit from each other (HIGH inherits PUBLIC ⇒ HIGH-active users satisfy PUBLIC's predicates). Databricks account groups are flat: `is_account_group_member('A')` and `is_account_group_member('B')` are independent. IR authors targeting both platforms see different effective row-set arithmetic from the same IR. This is now noted in the Snowflake adapter's capability profile.
 
-3. **Snowflake role-discrimination semantics — two distinct primitives, adapter chooses one (see issue #14).** Initial framing of the live-test observation as "DEFAULT_SECONDARY_ROLES = ('ALL') collapses policy discrimination" was sloppy. Snowflake offers two intentionally-distinct primitives: `CURRENT_ROLE()` (primary-role-only; strict semantics, useful for audit/compliance) and `IS_ROLE_IN_SESSION(X)` (any active role; permission-scope semantics, matches standard RBAC). The adapter currently emits `IS_ROLE_IN_SESSION` for byIdentity principal selectors, matching Snowflake's documented recommendation. Under that emission, `DEFAULT_SECONDARY_ROLES = ('ALL')` (the platform default since BCR-1692) is consistent and correct — secondary roles activate, the predicate sees them, permission-scope semantics hold. The "discrimination collapse" observation only manifests when a policy author *expects* primary-role-only semantics (Intent A) but the adapter *emits* permission-scope semantics (Intent B); that is an authoring/emission mismatch, not a platform misfeature. Verified empirically: `SHOW PARAMETERS LIKE '%SECONDARY%' IN SESSION` returns no rows (it is a user property, not a session parameter); `DESCRIBE USER` exposes `DEFAULT_SECONDARY_ROLES = ["ALL"]`. Operational implication for Tessera: be deliberate about which discrimination semantic the policy carries. The byDataset path sidesteps this entirely by gating on `CURRENT_USER()`, which is orthogonal to role activation; the byIdentity path inherits the adapter's current Intent B emission choice. Whether to extend the IR to express the Intent A vs Intent B distinction is deferred to a future exercise — see issue #14. This finding also sharpens the proposed `verify` adapter responsibility: only platform structural assumptions (table exists, column types match) are true verify territory; policy intent ambiguities are resolved at authoring time, not by adapter verification.
+3. **Snowflake role-discrimination semantics: two distinct primitives, adapter chooses one (see issue #14).** Initial framing of the live-test observation as "DEFAULT_SECONDARY_ROLES = ('ALL') collapses policy discrimination" was sloppy. Snowflake offers two intentionally-distinct primitives: `CURRENT_ROLE()` (primary-role-only; strict semantics, useful for audit/compliance) and `IS_ROLE_IN_SESSION(X)` (any active role; permission-scope semantics, matches standard RBAC). The adapter currently emits `IS_ROLE_IN_SESSION` for byIdentity principal selectors, matching Snowflake's documented recommendation. Under that emission, `DEFAULT_SECONDARY_ROLES = ('ALL')` (the platform default since BCR-1692) is consistent and correct: secondary roles activate, the predicate sees them, and permission-scope semantics hold. The "discrimination collapse" observation only manifests when a policy author *expects* primary-role-only semantics (Intent A) but the adapter *emits* permission-scope semantics (Intent B); that is an authoring/emission mismatch, not a platform misfeature. Verified empirically: `SHOW PARAMETERS LIKE '%SECONDARY%' IN SESSION` returns no rows (it is a user property, not a session parameter); `DESCRIBE USER` exposes `DEFAULT_SECONDARY_ROLES = ["ALL"]`. Operational implication for Tessera: be deliberate about which discrimination semantic the policy carries. The byDataset path sidesteps this entirely by gating on `CURRENT_USER()`, which is orthogonal to role activation; the byIdentity path inherits the adapter's current Intent B emission choice. Whether to extend the IR to express the Intent A vs Intent B distinction is deferred to a future exercise (see issue #14). This finding also sharpens the proposed `verify` adapter responsibility: only platform structural assumptions (table exists, column types match) are true verify territory; policy intent ambiguities are resolved at authoring time, not by adapter verification.
 
 These findings are pinned in `adapters/snowflake/capability.py` (entry: `ROW_VISIBILITY`). The scripts that produced them (`adapters/tests/live_snowflake.py`, `adapters/tests/live_databricks.py`) are committed alongside the scaffold and re-runnable for regression checks.
 
@@ -1121,7 +1119,7 @@ These findings are pinned in `adapters/snowflake/capability.py` (entry: `ROW_VIS
 
 ### Context
 
-The v0 well-known action vocabulary in `spec/v0/ontology.ttl` enumerates `Read`, `Write`, `Delete`, `Share`, `Sample`, and `Aggregate`. The table-grants worked exercise (Scenario C — gating who may invoke `acme.tpch.compute_customer_ltv`) required expressing "principal P may invoke business-logic function F." None of the existing six actions express that intent; the closest, `Read`, conflates retrieving rows with invoking computation.
+The v0 well-known action vocabulary in `spec/v0/ontology.ttl` enumerates `Read`, `Write`, `Delete`, `Share`, `Sample`, and `Aggregate`. The table-grants worked exercise (Scenario C, gating who may invoke `acme.tpch.compute_customer_ltv`) required expressing "principal P may invoke business-logic function F." None of the existing six actions express that intent; the closest, `Read`, conflates retrieving rows with invoking computation.
 
 The migration use case (ADR-003's reference customer engagement) requires lifting Databricks `GRANT EXECUTE ON FUNCTION` statements and Snowflake `GRANT EXECUTE` / `GRANT USAGE ON FUNCTION` statements into IR with no information loss. Without an `Execute` action, the corpus cannot round-trip through Tessera.
 
@@ -1143,12 +1141,12 @@ The two categories require different design treatment: the first is policy inten
 
 `Execute` is added to v0 as the seventh well-known action across the four spec files:
 
-- `spec/v0/ontology.ttl` — `tessera:Execute a tessera:Action ; rdfs:label "Execute"@en ; rdfs:comment "Invoke a callable Resource (typically a user-defined function or stored procedure). Scoped to policy intent (gating who can invoke business-logic resources); platform-mechanism uses of EXECUTE (e.g., the grants required to attach a UDF to an enforcement policy) are adapter scaffolding, not modeled in the IR."@en .`
-- `spec/v0/context.jsonld` — `"Execute": "tessera:Execute"` short-name binding alongside the existing actions.
-- `spec/v0/schema.json` — `Execute` and `tessera:Execute` added to the `action` enum, with the inline description noting the addition's empirical grounding.
-- `spec/v0/shapes.ttl` — `tessera:Execute` added to both PolicyShape and PolicyConstraintShape `sh:in` action enumerations.
+- `spec/v0/ontology.ttl`: `tessera:Execute a tessera:Action ; rdfs:label "Execute"@en ; rdfs:comment "Invoke a callable Resource (typically a user-defined function or stored procedure). Scoped to policy intent (gating who can invoke business-logic resources); platform-mechanism uses of EXECUTE (e.g., the grants required to attach a UDF to an enforcement policy) are adapter scaffolding, not modeled in the IR."@en .`
+- `spec/v0/context.jsonld`: `"Execute": "tessera:Execute"` short-name binding alongside the existing actions.
+- `spec/v0/schema.json`: `Execute` and `tessera:Execute` added to the `action` enum, with the inline description noting the addition's empirical grounding.
+- `spec/v0/shapes.ttl`: `tessera:Execute` added to both PolicyShape and PolicyConstraintShape `sh:in` action enumerations.
 
-The semantic-vs-mechanism boundary is explicit in the ontology comment: `Execute` is for policy intent (Glean's category 1). Mechanism uses (Glean's category 2) remain adapter scaffolding, modeled neither in the IR nor in capability profiles — the adapter handles them as part of emit-and-deploy hygiene, parallel to how `GRANT SELECT` on a newly-created table is adapter scaffolding (`feedback_glean_for_databricks_semantics` memory note).
+The semantic-vs-mechanism boundary is explicit in the ontology comment: `Execute` is for policy intent (Glean's category 1). Mechanism uses (Glean's category 2) remain adapter scaffolding, modeled neither in the IR nor in capability profiles. The adapter handles them as part of emit-and-deploy hygiene, parallel to how `GRANT SELECT` on a newly-created table is adapter scaffolding (`feedback_glean_for_databricks_semantics` memory note).
 
 ### Rationale
 
@@ -1183,28 +1181,28 @@ ADR-025 lands alongside the table-grants exercise's Phase 2 commit on 2026-05-19
 
 ### Context
 
-v0 enumerated four `policyKind` discriminators: `AccessConstraint`, `RowVisibilityConstraint`, `ColumnVisibilityConstraint`, and `DistributionConstraint`. All four are *restriction-shaped* — each declares limits on what is seen, distributed, or accessed.
+v0 enumerated four `policyKind` discriminators: `AccessConstraint`, `RowVisibilityConstraint`, `ColumnVisibilityConstraint`, and `DistributionConstraint`. All four are *restriction-shaped*: each declares limits on what is seen, distributed, or accessed.
 
 The table-grants worked exercise (2026-05-19; `spec/v0/examples/table-grants-scenario-{a,b,c}.*`) surfaced a real gap: affirmative grants like `GRANT SELECT ON TABLE foo TO group_bar` have no natural `policyKind` in v0. Phase 2 squeezed them into `RowVisibilityConstraint` with `effect: allow`, which validates structurally but is semantically misleading on three concrete axes (the diagnostic's §3.4 enumerates them):
 
 1. **Reader comprehension.** A `.tessera.yaml` file with `kind: RowVisibilityConstraint` that's actually a table-level grant misleads readers about its intent.
-2. **Tooling dispatch.** Adapters typically dispatch on `policyKind` to choose between row-filter emission, column-mask emission, and other shapes. A "RowVisibilityConstraint with effect: allow on a table" forces the adapter to internally detect the affirmative-grant shape and emit `GRANT` SQL — dispatchable but not natural.
-3. **Migration extraction.** Lifting a `SHOW GRANTS ON TABLE` row into IR has no honest `policyKind` to assign — `RowVisibilityConstraint` is structurally wrong (no row visibility involved); `ColumnVisibilityConstraint` is also wrong. The IR was missing the concept.
+2. **Tooling dispatch.** Adapters typically dispatch on `policyKind` to choose between row-filter emission, column-mask emission, and other shapes. A "RowVisibilityConstraint with effect: allow on a table" forces the adapter to internally detect the affirmative-grant shape and emit `GRANT` SQL, dispatchable but not natural.
+3. **Migration extraction.** Lifting a `SHOW GRANTS ON TABLE` row into IR has no honest `policyKind` to assign: `RowVisibilityConstraint` is structurally wrong (no row visibility involved); `ColumnVisibilityConstraint` is also wrong. The IR was missing the concept.
 
 ### Decision
 
 Add `tessera:AccessGrantConstraint` as the fifth `policyKind`, across all four v0 spec files:
 
-- `spec/v0/ontology.ttl` — `tessera:AccessGrantConstraint` declared as `rdfs:subClassOf tessera:PolicyConstraint` with a comment explaining the affirmative-grant semantic and the contrast with restriction-shaped constraints.
-- `spec/v0/context.jsonld` — `"AccessGrantConstraint": "tessera:AccessGrantConstraint"` short-name binding alongside the existing four kinds.
-- `spec/v0/schema.json` — `AccessGrantConstraint` and `tessera:AccessGrantConstraint` added to both `policyKind` enums (the Policy container's and the freestanding-PolicyConstraint enum).
-- `spec/v0/shapes.ttl` — `tessera:AccessGrantConstraint` added to the PolicyShape's `sh:in` policyKind enumeration.
+- `spec/v0/ontology.ttl`: `tessera:AccessGrantConstraint` declared as `rdfs:subClassOf tessera:PolicyConstraint` with a comment explaining the affirmative-grant semantic and the contrast with restriction-shaped constraints.
+- `spec/v0/context.jsonld`: `"AccessGrantConstraint": "tessera:AccessGrantConstraint"` short-name binding alongside the existing four kinds.
+- `spec/v0/schema.json`: `AccessGrantConstraint` and `tessera:AccessGrantConstraint` added to both `policyKind` enums (the Policy container's and the freestanding-PolicyConstraint enum).
+- `spec/v0/shapes.ttl`: `tessera:AccessGrantConstraint` added to the PolicyShape's `sh:in` policyKind enumeration.
 
 The three table-grants exercise YAMLs migrate from `kind: RowVisibilityConstraint` to `kind: AccessGrantConstraint`. The JSON-LDs regenerate cleanly through the v1 converter. All 11 worked-example policies (validation regression set) still pass JSON Schema and SHACL.
 
 ### Semantic shape
 
-An `AccessGrantConstraint` policy reads as: "the principals matching the rules' principal selectors are authorized to perform the policy's `action` on the policy's resource." Rules carry `effect: allow` (or `effect: deny` for explicit denial). No `transformation` field (the policy is not value-shaping). `defaultStrategy` is optional — affirmative grants are additive, so principals matching no rule fall through to whatever other policies or platform defaults apply.
+An `AccessGrantConstraint` policy reads as: "the principals matching the rules' principal selectors are authorized to perform the policy's `action` on the policy's resource." Rules carry `effect: allow` (or `effect: deny` for explicit denial). No `transformation` field (the policy is not value-shaping). `defaultStrategy` is optional: affirmative grants are additive, so principals matching no rule fall through to whatever other policies or platform defaults apply.
 
 Example:
 
@@ -1222,7 +1220,7 @@ policy:
 ### Rationale
 
 - **Empirically grounded.** The table-grants exercise's diagnostic §3.4 documented the awkwardness concretely; the resolution lands as a small spec addition (parallel in size to ADR-025's `Execute` addition).
-- **Migration completeness (per Brice's framing 2026-05-19).** Tessera's primary driving activity is migration — lifting an existing platform's policy corpus into IR and re-emitting on another platform. RBAC table grants are the most common shape in real corpora; the IR has to express them cleanly, not via a misleading squeeze. ADR-003's reference customer engagement explicitly drives this.
+- **Migration completeness (per Brice's framing 2026-05-19).** Tessera's primary driving activity is migration: lifting an existing platform's policy corpus into IR and re-emitting on another platform. RBAC table grants are the most common shape in real corpora; the IR has to express them cleanly, not via a misleading squeeze. ADR-003's reference customer engagement explicitly drives this.
 - **`effect: allow` and `effect: deny` already exist** in the rule effect enum. No new effects required. The IR vocabulary is purely additive.
 - **Suspended-immutability framing (ADR-017) admits this addition** while v0 remains pre-external-dependency. Same posture as ADR-022 (transformation effect-driven) and ADR-025 (`Execute` action): empirically-grounded small additions land in v0 without breaking existing policies.
 
@@ -1251,9 +1249,9 @@ policy:
 
 Two consecutive correction passes hit the same failure mode:
 
-1. **2026-05-19 secondary-roles reframe.** The initial framing of Snowflake's `DEFAULT_SECONDARY_ROLES = ('ALL')` default (BCR-1692) as a "gotcha" that "silently collapses policy discrimination" was sloppy. The default is consistent with `IS_ROLE_IN_SESSION` permission-scope semantics — secondary roles activate, the predicate sees them, the result is correct under what Snowflake documents. Reframed in ADR-024's postscript, `adapters/snowflake/capability.py` ROW_VISIBILITY entry, and `docs/user-guide/operating.md`.
+1. **2026-05-19 secondary-roles reframe.** The initial framing of Snowflake's `DEFAULT_SECONDARY_ROLES = ('ALL')` default (BCR-1692) as a "gotcha" that "silently collapses policy discrimination" was sloppy. The default is consistent with `IS_ROLE_IN_SESSION` permission-scope semantics: secondary roles activate, the predicate sees them, and the result is correct under what Snowflake documents. Reframed in ADR-024's postscript, `adapters/snowflake/capability.py` ROW_VISIBILITY entry, and `docs/user-guide/operating.md`.
 
-2. **2026-05-20 Snowflake-guidance reframe.** The user-guide and capability profile had drifted into claiming that Snowflake recommends mapping tables (Tessera's `byDataset`) for "non-trivial" row-access policies — with a fabricated section title ("Mapping table placement") and a directional "prefer `byDataset` over `byIdentity`" recommendation. Verification against Snowflake's actual docs (`/en/user-guide/security-row-using`, `/en/user-guide/security-row-intro`, `/en/guides-overview-govern`) showed: Snowflake recommends `IS_ROLE_IN_SESSION` for role-discrimination scenarios, documents the mapping-table pattern as a fit for data-driven entitlement (not as a complexity ladder), and explicitly favors simple patterns over mapping tables on performance grounds. Reframed across seven authoritative documents and the capability profile (commit `97ff1d5`).
+2. **2026-05-20 Snowflake-guidance reframe.** The user-guide and capability profile had drifted into claiming that Snowflake recommends mapping tables (Tessera's `byDataset`) for "non-trivial" row-access policies, with a fabricated section title ("Mapping table placement") and a directional "prefer `byDataset` over `byIdentity`" recommendation. Verification against Snowflake's actual docs (`/en/user-guide/security-row-using`, `/en/user-guide/security-row-intro`, `/en/guides-overview-govern`) showed: Snowflake recommends `IS_ROLE_IN_SESSION` for role-discrimination scenarios, documents the mapping-table pattern as a fit for data-driven entitlement (not as a complexity ladder), and explicitly favors simple patterns over mapping tables on performance grounds. Reframed across seven authoritative documents and the capability profile (commit `97ff1d5`).
 
 Both passes hit the same shape: Tessera's documentation drifted from *describing* what the IR represents and what each platform documents, into *prescribing* an authoring preference Tessera invented. The drift is not accidental. A multi-platform framework operating between governance estates (ADR-002) is constantly tempted to harmonize authoring shape across platforms by recommending one over another. That harmonization is the wrong move: it makes Tessera prescriptive in a way that contradicts its actual posture.
 
@@ -1261,7 +1259,7 @@ Both passes hit the same shape: Tessera's documentation drifted from *describing
 
 **Tessera is descriptive, not prescriptive, in its policy authoring guidance.**
 
-The framework's job is to be expressive enough that any well-defined policy intent can be represented in the IR and lowered to the target platform's primitives. *That which can be defined can be represented.* Where the IR cannot represent a definable intent, that is a gap to track and fill — not a constraint on authors.
+The framework's job is to be expressive enough that any well-defined policy intent can be represented in the IR and lowered to the target platform's primitives. *That which can be defined can be represented.* Where the IR cannot represent a definable intent, that is a gap to track and fill, not a constraint on authors.
 
 ### What this means in practice
 
@@ -1273,7 +1271,7 @@ The framework's job is to be expressive enough that any well-defined policy inte
 
 4. **Capability profiles describe emission and platform implications.** They do not editorialize about authoring preferences. "Emitted via X; subject to platform behavior Y; cite documentation Z" is the shape. "Authors should prefer this over that" is not.
 
-5. **Selector-fit is descriptive, not normative.** Statements like "byDataset fits when the underlying decision is data-driven entitlement" are descriptive — they describe what the selector represents. Statements like "Tessera recommends byDataset for non-trivial policies on Snowflake" are normative — they prescribe an authoring preference Tessera has no basis to recommend.
+5. **Selector-fit is descriptive, not normative.** Statements like "byDataset fits when the underlying decision is data-driven entitlement" are descriptive: they describe what the selector represents. Statements like "Tessera recommends byDataset for non-trivial policies on Snowflake" are normative: they prescribe an authoring preference Tessera has no basis to recommend.
 
 ### Rationale
 
@@ -1285,7 +1283,7 @@ The framework's job is to be expressive enough that any well-defined policy inte
 ### Relationship to prior ADRs
 
 - **ADR-001.** ADR-027 sharpens what "semantic interoperability" means: representational range, not authoring discipline.
-- **ADR-002.** The skunkworks posture is fragile in part because the project does not coordinate with Snowflake (ADR-002) — which means Tessera has no authoritative basis to recommend Snowflake authoring patterns Snowflake itself does not document. ADR-027 makes this implicit constraint explicit.
+- **ADR-002.** The skunkworks posture is fragile in part because the project does not coordinate with Snowflake (ADR-002), so Tessera has no authoritative basis to recommend Snowflake authoring patterns Snowflake itself does not document. ADR-027 makes this implicit constraint explicit.
 - **ADR-005.** Standards reuse: where W3C ODRL/DPV defines a concept, Tessera aligns rather than reinvents. ADR-027 extends the same discipline to platform-side recommendations: where Snowflake or Databricks documents a recommendation, Tessera cites it rather than restates or rephrases.
 - **ADR-024.** The adapter-contract postscript records the empirical motivation from the first correction pass. ADR-027 abstracts the recurring principle.
 
@@ -1314,11 +1312,11 @@ The framework's job is to be expressive enough that any well-defined policy inte
 
 ### Context
 
-Attribute-axis values (`sensitivity: PII`, `dataSubject: EUResident`) are meant to be terms in a controlled vocabulary — `tessera:PII` is a declared `Classification` subclass; the ontology carries the subsumption hierarchy (`PHI ⊂ PII ⊂ PersonalData`) that lets a policy matching `PII` cover a resource tagged `PHI`. For that reasoning to work, an authored value must resolve to a vocabulary IRI.
+Attribute-axis values (`sensitivity: PII`, `dataSubject: EUResident`) are meant to be terms in a controlled vocabulary. `tessera:PII` is a declared `Classification` subclass, and the ontology carries the subsumption hierarchy (`PHI ⊂ PII ⊂ PersonalData`) that lets a policy matching `PII` cover a resource tagged `PHI`. For that reasoning to work, an authored value must resolve to a vocabulary IRI.
 
-A change-impact spike (2026-08-05, `tools/impact/spikes/graph_surface.py`) exposed that it did not, for one axis. Loading the corpus as RDF and querying attribute subsumption via a SPARQL property path returned nothing usable, because the `sensitivity` term was defined in `spec/v0/context.jsonld` as `"@type": "@id"`. An `@id`-typed value resolves against the *document base*, so a bare `sensitivity: PIIClerk` expanded to junk (`file:///…/PIIClerk`) rather than to a `vocab#` IRI — and worse, a `subClassOf*` query then matched only reflexively (identical values), giving the false appearance of subsumption reasoning while the ontology contributed nothing.
+A change-impact spike (2026-08-05, `tools/impact/spikes/graph_surface.py`) exposed that it did not, for one axis. Loading the corpus as RDF and querying attribute subsumption via a SPARQL property path returned nothing usable, because the `sensitivity` term was defined in `spec/v0/context.jsonld` as `"@type": "@id"`. An `@id`-typed value resolves against the *document base*, so a bare `sensitivity: PIIClerk` expanded to junk (`file:///…/PIIClerk`) rather than to a `vocab#` IRI. Worse, a `subClassOf*` query then matched only reflexively (identical values), giving the false appearance of subsumption reasoning while the ontology contributed nothing.
 
-The other three axes (`dataSubject`, `regulatoryRegime`, `businessDomain`) were already `"@type": "@vocab"` and resolved bare terms to the vocabulary namespace correctly. `sensitivity` was the lone holdout — an inconsistency, not a design intent.
+The other three axes (`dataSubject`, `regulatoryRegime`, `businessDomain`) were already `"@type": "@vocab"` and resolved bare terms to the vocabulary namespace correctly. `sensitivity` was the lone holdout, an inconsistency rather than a design intent.
 
 No external consumer exists (ADR-017's immutability bar is suspended), so this is corrected as a clean break rather than a compatibility-preserving addition.
 
@@ -1326,16 +1324,16 @@ No external consumer exists (ADR-017's immutability bar is suspended), so this i
 
 **Attribute-axis values are vocabulary IRIs, and the authoring rule is: a bare term belongs to Tessera's vocabulary; an explicit namespace prefix belongs to the adopter.**
 
-1. **Mechanism.** Two coordinated context changes: (a) all attribute-axis properties are `"@type": "@vocab"` — `sensitivity` is changed from `"@type": "@id"` to match the other three axes, which already were; and (b) a top-level `"@vocab"` set to the Tessera vocabulary namespace. Together these make a bare value default to `tessera:` — `sensitivity: PII` ⇒ `tessera:PII` (a declared term) and `sensitivity: Typo` ⇒ `tessera:Typo` (a well-formed IRI validation can flag, not document-base junk) — "default to the CURIE if none is specified" — while an explicit prefix (`acme:PIIClerk`) or absolute IRI is preserved. (`@type: @vocab` alone resolves *declared* terms like `PII`; the top-level `@vocab` is what catches *undeclared* bare terms.)
-2. **Bare = Tessera.** An unprefixed attribute value is, by definition, a term in Tessera's vocabulary. Well-known values (`PII`, `PHI`, `Financial`, `Confidential`, `GDPR`, …) resolve to declared ontology classes and participate in subsumption. A bare value that is *not* declared resolves to a well-formed `vocab#` IRI that validation can flag as "not a known Classification" — a feature, not junk.
+1. **Mechanism.** Two coordinated context changes: (a) all attribute-axis properties are `"@type": "@vocab"`, so `sensitivity` changes from `"@type": "@id"` to match the other three axes, which already were; and (b) a top-level `"@vocab"` set to the Tessera vocabulary namespace. Together these make a bare value default to `tessera:`: `sensitivity: PII` ⇒ `tessera:PII` (a declared term) and `sensitivity: Typo` ⇒ `tessera:Typo` (a well-formed IRI validation can flag, not document-base junk), while an explicit prefix (`acme:PIIClerk`) or absolute IRI is preserved. (`@type: @vocab` alone resolves *declared* terms like `PII`; the top-level `@vocab` is what catches *undeclared* bare terms.)
+2. **Bare = Tessera.** An unprefixed attribute value is, by definition, a term in Tessera's vocabulary. Well-known values (`PII`, `PHI`, `Financial`, `Confidential`, `GDPR`, …) resolve to declared ontology classes and participate in subsumption. A bare value that is *not* declared resolves to a well-formed `vocab#` IRI that validation can flag as "not a known Classification": a feature, not junk.
 3. **Prefix = adopter.** Adopter-specific values carry an explicit namespace prefix (`acme:PIIClerk`). This enforces the ADR-018 adopter-extension model at the syntax level: organization-specific specializations live under the organization's namespace, not Tessera's. Prefixed values are IRIs (so structural validation passes) and are correctly excluded from Tessera-vocabulary subsumption (the adopter's ontology, which Tessera does not hold, would carry their hierarchy).
-4. **Readability is preserved.** Authors keep writing `sensitivity: PII` — the rule makes that *mean* `tessera:PII` canonically; it does not force verbose `tessera:` prefixes on well-known values.
+4. **Readability is preserved.** Authors keep writing `sensitivity: PII`: the rule makes that *mean* `tessera:PII` canonically; it does not force verbose `tessera:` prefixes on well-known values.
 
 ### Consequences
 
 - `spec/v0/context.jsonld`: `sensitivity` becomes `"@type": "@vocab"`.
 - `spec/v0/examples/`: the two ABAC column-mask examples used a bare `PIIClerk`, described in their own comments as an adopter stand-in "used only because no adopter namespace is established." They now use `acme:PIIClerk`, matching that stated intent and this rule. Generated JSON-LD regenerated. Worked-example prose that names "PIIClerk" as a *concept* is left intact (it describes the concept, not the namespaced token).
-- The change-impact tool: no code change (the kernel already strips prefixes). Ontology-driven subsumption is now reachable for Tessera-namespace values — the graph spike's blocked finding is resolved, and C4/L2 can flag subsumption-based overlaps (a policy matching `PII` conflicting with one matching `PHI`) that were previously invisible. Demonstrated in `docs/exercises/cross-policy-overlap-demo.md`.
+- The change-impact tool: no code change (the kernel already strips prefixes). Ontology-driven subsumption is now reachable for Tessera-namespace values. The graph spike's blocked finding is resolved, and C4/L2 can flag subsumption-based overlaps (a policy matching `PII` conflicting with one matching `PHI`) that were previously invisible. Demonstrated in `docs/exercises/cross-policy-overlap-demo.md`.
 
 ### What this ADR does not do
 
@@ -1352,25 +1350,25 @@ No external consumer exists (ADR-017's immutability bar is suspended), so this i
 
 ### Context
 
-The 2026-05-19 governance-gap survey identified AI-specific governance ([#25](https://github.com/bgiesbrecht/tessera/issues/25)) as an in-scope gap: organizations increasingly need to mark data with AI-use restrictions — "may not be used to train models," "may not drive automated decisions" (cf. GDPR Article 22). The scoping document (`docs/v1-candidates/governance-gaps-scoping.md` §4) analyzed the fit and found it clean: these are *properties of the data* (the three-category test from `abac-and-attribute-axes.md` — data attribute vs. request condition vs. principal property places them as data attributes), so they extend the ADR-018 attribute-axis framework rather than introducing a new mechanism.
+The 2026-05-19 governance-gap survey identified AI-specific governance ([#25](https://github.com/bgiesbrecht/tessera/issues/25)) as an in-scope gap: organizations increasingly need to mark data with AI-use restrictions: "may not be used to train models," "may not drive automated decisions" (cf. GDPR Article 22). The scoping document (`docs/v1-candidates/governance-gaps-scoping.md` §4) analyzed the fit and found it clean: these are *properties of the data* (the three-category test from `abac-and-attribute-axes.md`: data attribute vs. request condition vs. principal property places them as data attributes), so they extend the ADR-018 attribute-axis framework rather than introducing a new mechanism.
 
 ### Decision
 
 Add two flat attribute axes to v0:
 
-- **`trainingEligibility`** — well-known values `NoTraining`, `TrainingWithConsent`, `TrainingAllowed`. Whether the data may be used to train models.
-- **`automatedDecision`** — well-known values `NoAutomatedDecision`, `ADMWithHumanReview`, `AutomatedDecisionAllowed`. Whether the data may drive automated decision-making.
+- **`trainingEligibility`**: well-known values `NoTraining`, `TrainingWithConsent`, `TrainingAllowed`. Whether the data may be used to train models.
+- **`automatedDecision`**: well-known values `NoAutomatedDecision`, `ADMWithHumanReview`, `AutomatedDecisionAllowed`. Whether the data may drive automated decision-making.
 
 Both are flat axes in the ADR-018 sense (independent enumeration members, no subsumption hierarchy), declared exactly like `dataSubject` / `regulatoryRegime` / `businessDomain`: an `AttributeAxis` individual with `axisType flat`, an object property on `Resource`, and a starter set of well-known `NamedIndividual` values. Values follow ADR-028: a bare value is Tessera's vocabulary; adopters extend with their own namespaced values.
 
 ### What this means
 
 - **No new policy kind, no new emission path.** The axes compose with the existing selector/matching machinery. The worked example (`spec/v0/examples/ai-governance-training-mask-policy.*`) is an ordinary `byScope` `ColumnVisibilityConstraint` keyed off `trainingEligibility: NoTraining`; it lowers unchanged through both adapters' byScope column-mask emitters (`has_tag_value(...)` on UC, `SYSTEM$GET_TAG_ON_CURRENT_COLUMN(...)` on Snowflake).
-- **Spec changes:** `spec/v0/ontology.ttl` (two axes, two properties, six value individuals), `spec/v0/context.jsonld` (two `@type: @vocab` terms), `spec/v0/shapes.ttl` (two per-axis value shapes). `schema.json` needed no change — the attributes map is open on axis keys by design (SHACL handles axis-value discipline).
+- **Spec changes:** `spec/v0/ontology.ttl` (two axes, two properties, six value individuals), `spec/v0/context.jsonld` (two `@type: @vocab` terms), `spec/v0/shapes.ttl` (two per-axis value shapes). `schema.json` needed no change: the attributes map is open on axis keys by design (SHACL handles axis-value discipline).
 
 ### The honest limitation
 
-**No data platform natively enforces an AI-use restriction.** A governed tag records the classification; a data platform cannot stop a downstream ML job from reading and training on the column. The enforcement leverage is *indirect and by composition*: `trainingEligibility: NoTraining` becomes enforceable when it drives an access policy — e.g. masking NoTraining columns to the general ML/analytics population, as the worked example does. So on its own the axis is a portable, adapter-mappable *classification* (advisory); its teeth come from the access machinery it composes with. Capability profiles must not claim the platform enforces the AI restriction itself. This matches the scoping document's §1 framing (these gaps press the edge of "compiles to platform-native enforcement"; Tessera's value is portable expression + honest capability reporting).
+**No data platform natively enforces an AI-use restriction.** A governed tag records the classification; a data platform cannot stop a downstream ML job from reading and training on the column. The enforcement leverage is *indirect and by composition*: `trainingEligibility: NoTraining` becomes enforceable when it drives an access policy, e.g. masking NoTraining columns to the general ML/analytics population, as the worked example does. So on its own the axis is a portable, adapter-mappable *classification* (advisory); its teeth come from the access machinery it composes with. Capability profiles must not claim the platform enforces the AI restriction itself. This matches the scoping document's §1 framing (these gaps press the edge of "compiles to platform-native enforcement"; Tessera's value is portable expression + honest capability reporting).
 
 ### What this ADR does not do
 
@@ -1387,25 +1385,25 @@ Both are flat axes in the ADR-018 sense (independent enumeration members, no sub
 
 ### Context
 
-The 2026-05-19 survey flagged audit logging ([#19](https://github.com/bgiesbrecht/tessera/issues/19)) as an in-scope gap. The v0 `AuditLog` obligation was a bare `Obligation` subclass with only a free-string `obligationTarget` — it could name a destination but could not say *what* to capture or *what character of sink* is required. The scoping document (`governance-gaps-scoping.md` §2) rated this the architecturally simplest of the three gaps: an obligation-vocabulary refinement, no new policy kind.
+The 2026-05-19 survey flagged audit logging ([#19](https://github.com/bgiesbrecht/tessera/issues/19)) as an in-scope gap. The v0 `AuditLog` obligation was a bare `Obligation` subclass with only a free-string `obligationTarget`: it could name a destination but could not say *what* to capture or *what character of sink* is required. The scoping document (`governance-gaps-scoping.md` §2) rated this the architecturally simplest of the three gaps: an obligation-vocabulary refinement, no new policy kind.
 
 ### Decision
 
-Give the `AuditLog` obligation three semantic parameters — the *content and character* of the required record, not a log format:
+Give the `AuditLog` obligation three semantic parameters (the *content and character* of the required record, not a log format):
 
-- **`auditFields`** — the semantic fields that must be captured, as `AuditField` individuals: `AccessPrincipal`, `AccessResource`, `AccessAction`, `AccessTimestamp`, `AccessPurpose`, `AccessOutcome`. Meaning, not column names.
-- **`auditSink`** — the *category* of destination, an `AuditSink` individual: `PlatformNative`, `ExternalSIEM`, `ImmutableStore`. The concrete target still binds via `obligationTarget` / adapter configuration (ADR-021), never a platform table name in the policy.
-- **`auditRetention`** — how long the audit record itself must persist, as an ISO-8601 duration (e.g. `P7Y`). Retention of the log is itself a retention concern; this cross-references, and does not pre-empt, #21.
+- **`auditFields`**: the semantic fields that must be captured, as `AuditField` individuals: `AccessPrincipal`, `AccessResource`, `AccessAction`, `AccessTimestamp`, `AccessPurpose`, `AccessOutcome`. Meaning, not column names.
+- **`auditSink`**: the *category* of destination, an `AuditSink` individual: `PlatformNative`, `ExternalSIEM`, `ImmutableStore`. The concrete target still binds via `obligationTarget` / adapter configuration (ADR-021), never a platform table name in the policy.
+- **`auditRetention`**: how long the audit record itself must persist, as an ISO-8601 duration (e.g. `P7Y`). Retention of the log is itself a retention concern; this cross-references, and does not pre-empt, #21.
 
 Values follow ADR-028 (bare = Tessera vocabulary, adopter values namespaced) via `@type: @vocab` context terms. Spec changes: `ontology.ttl` (the two value classes + six/three individuals + three properties), `context.jsonld` (three terms), `shapes.ttl` (`auditFields`/`auditSink` value shapes via `sh:targetSubjectsOf`). `schema.json` gains the three optional properties on the obligation object. Worked example: `spec/v0/examples/audit-obligation-sensitive-read.*`.
 
 ### The honest limitation
 
-**Most platforms audit access account-wide and by default** — Databricks `system.access.audit`, Snowflake `ACCESS_HISTORY` record access without a per-object policy. So a per-policy audit obligation is frequently *satisfied-by-assertion*: the value is a portable, checkable statement of the requirement, and the adapter's job (when emission lands) is to map it to — or confirm coverage against — the platform's audit facility, not to enable a new mechanism. The obligation must not be reported as newly *enforced* where the platform already audits by default. This is the §1 framing of the scoping document (these gaps press the edge of "compiles to platform-native enforcement"; Tessera's value is portable expression + honest capability reporting).
+**Most platforms audit access account-wide and by default**: Databricks `system.access.audit`, Snowflake `ACCESS_HISTORY` record access without a per-object policy. So a per-policy audit obligation is frequently *satisfied-by-assertion*: the value is a portable, checkable statement of the requirement, and the adapter's job (when emission lands) is to map it to (or confirm coverage against) the platform's audit facility, not to enable a new mechanism. The obligation must not be reported as newly *enforced* where the platform already audits by default. This is the §1 framing of the scoping document (these gaps press the edge of "compiles to platform-native enforcement"; Tessera's value is portable expression + honest capability reporting).
 
 ### What this ADR does not do
 
-- **Does not emit or enforce audit configuration.** This is an expression-first refinement. Adapter emission — an emit-time coverage/assertion diagnostic per platform — is a tracked follow-up; a new capability level (e.g. `asserted-satisfied`) belongs with it (scoping doc §6.4).
+- **Does not emit or enforce audit configuration.** This is an expression-first refinement. Adapter emission (an emit-time coverage/assertion diagnostic per platform) is a tracked follow-up; a new capability level (e.g. `asserted-satisfied`) belongs with it (scoping doc §6.4).
 - **Does not attach obligations to Policy-container rules.** Obligations attach to the freestanding `PolicyConstraint` shape (as they did before). Extending obligation attachment to Policy-container rules is a separate structural change, out of scope here.
 - **Does not settle audit-log retention semantics.** `auditRetention` names the duration; the mechanics of enforcing log retention ride on #21.
 
@@ -1427,13 +1425,13 @@ Retention/deletion ([#21](https://github.com/bgiesbrecht/tessera/issues/21)) was
 
 Add **`RetentionConstraint`** as a first-class `PolicyConstraint` subclass, **expression-first**: v0 expresses and validates the retention requirement portably but does **not** emit destructive enforcement.
 
-- **Shape.** Unlike the access-shaped kinds, a `RetentionConstraint` has no `principal`, `action`, `effect`, or `rules` — it carries `appliesTo` (the resource) and a `retention` spec: `direction` (`DeleteAfter` = minimization vs `RetainFor` = preservation — the two opposite drivers, which a single "period" cannot capture), `period` (ISO-8601 duration), `basis` (the timestamp column / lifecycle event the clock runs from), and `disposition` (`Purge` / `Anonymize` / `Archive`). `Purge` is deliberately distinct from the `Delete` *action* — this is the lifecycle terminal, not an access verb.
+- **Shape.** Unlike the access-shaped kinds, a `RetentionConstraint` has no `principal`, `action`, `effect`, or `rules`. It carries `appliesTo` (the resource) and a `retention` spec: `direction` (`DeleteAfter` = minimization vs `RetainFor` = preservation, two opposite drivers a single "period" cannot capture), `period` (ISO-8601 duration), `basis` (the timestamp column or lifecycle event the clock runs from), and `disposition` (`Purge` / `Anonymize` / `Archive`). `Purge` is deliberately distinct from the `Delete` *action*: the lifecycle terminal, not an access verb.
 - **Expression-first, not enforced.** Both adapters report `RETENTION_EXPRESSION_ONLY` (INFO) and emit no DDL. The capability profiles mark `RETENTION` `UNSUPPORTED` with the reason. This keeps ADR-001 clean and matches how #25 and #19 landed: on gaps where the platform has no native enforcement, Tessera's value is portable, checkable expression + honest capability reporting.
 - **Spec.** New `oneOf` branch `retentionDocument` in `schema.json` (retention has its own document shape); `RetentionConstraint` + retention vocabulary in `ontology.ttl`; `retention`/`direction`/`period`/`basis`/`disposition` context terms; `RetentionConstraintShape` + direction/disposition value shapes in `shapes.ttl`. `PolicyConstraintShape`'s target narrowed from the abstract `PolicyConstraint` to the five access-shaped subclasses, so its `principal`/`action`/`effect` requirements do not wrongly apply to retention. Worked example: `spec/v0/examples/retention-delete-after-policy.*`.
 
 ### Why not emit the scheduled job (the deferred option)
 
-Retention is the one gap with a *genuinely emittable* enforcement path (a scheduled `DELETE`). It was deliberately **not** taken in v0: emitting `CREATE TASK … DELETE` is a category shift — Tessera would generate destructive, procedural, operational jobs rather than compile governance to declarative native primitives — and given the fragile skunkworks posture (ADR-002), that overreach is exactly what to avoid without a concrete customer driver. Emitted enforcement (narrow delete-after) remains a deferred, **opt-in**, driver-led increment.
+Retention is the one gap with a *genuinely emittable* enforcement path (a scheduled `DELETE`). It was deliberately **not** taken in v0: emitting `CREATE TASK … DELETE` is a category shift, since Tessera would generate destructive, procedural, operational jobs rather than compile governance to declarative native primitives. Given the fragile skunkworks posture (ADR-002), that overreach is what to avoid without a concrete customer driver. Emitted enforcement (narrow delete-after) remains a deferred, **opt-in**, driver-led increment.
 
 ### What this ADR does not do
 
@@ -1450,15 +1448,15 @@ Retention is the one gap with a *genuinely emittable* enforcement path (a schedu
 
 ### Context
 
-ADR-003 made adapters the unifying abstraction and declared native-platform adapters and **custom-pattern** adapters peers against one contract (ADR-024). The reference engagement that drove ADR-003 — a customer enforcing row visibility through hand-built **ACL tables joined into wrapping views**, predating native RLS, with thousands of ACL rows they want to migrate *selectively* — was the whole reason for the peer-adapter design. Yet both adapters built to date (Unity Catalog, Snowflake) are native. The peer-adapter claim was only half-proven: nothing demonstrated an adapter whose enforcement target is *not* a platform primitive.
+ADR-003 made adapters the unifying abstraction and declared native-platform adapters and **custom-pattern** adapters peers against one contract (ADR-024). The peer-adapter design existed for one reference engagement: a customer enforcing row visibility through hand-built **ACL tables joined into wrapping views**, predating native RLS, with thousands of ACL rows they want to migrate *selectively*. Yet both adapters built to date (Unity Catalog, Snowflake) are native. The peer-adapter claim was only half-proven: nothing demonstrated an adapter whose enforcement target is *not* a platform primitive.
 
 ### Decision
 
 Add **`adapters/custom_acl/`** (`CustomACLAdapter`, `name="custom-acl"`, `platform="Custom ACL (view-layer)"`) as a first-class peer against the ADR-024 contract. It is a **pattern adapter**, not a platform adapter:
 
-- **Emit target is a wrapping secure view, not a platform primitive.** A `byDataset` `RowVisibilityConstraint` (the ACL-join shape: `PrincipalSetFromTable` ⋈ `ResourceSetFromTable` on a shared codename, `exists-in-dataset` condition) lowers to `CREATE OR REPLACE VIEW <base>_secured AS SELECT * FROM <base> b WHERE EXISTS (…)`. The **view is the enforcement mechanism** — the customer grants consumers the view instead of the base table. This is the same EXISTS join the native adapters place inside a row-filter function / row-access policy; the difference is the wrapper. `defaultStrategy: none` is inherent (principals absent from the ACL join match no rows — fail-closed).
-- **Extract is the highest-value responsibility — the selective-migration on-ramp.** `extract()` parses an ACL-view definition (regex over the documented ACL-join shape, mirroring the Snowflake `_extract_bydataset_row_access` heuristic) back into a `byDataset` `RowVisibilityConstraint` at `confidence 0.9`. This is what lets thousands of hand-built ACL views become IR that can be re-emitted to native Unity Catalog / Snowflake — migrating selectively while the ACL pattern stays operational for the rest. This is precisely the workflow ADR-003 exists to enable.
-- **Engine-neutral SQL.** Emitted DDL uses `current_user()`, `lower(trim(...))`, and a correlated `EXISTS` — the customer runs it on whichever engine hosts the ACL pattern; the adapter never executes.
+- **Emit target is a wrapping secure view, not a platform primitive.** A `byDataset` `RowVisibilityConstraint` (the ACL-join shape: `PrincipalSetFromTable` ⋈ `ResourceSetFromTable` on a shared codename, `exists-in-dataset` condition) lowers to `CREATE OR REPLACE VIEW <base>_secured AS SELECT * FROM <base> b WHERE EXISTS (…)`. The view is the enforcement mechanism: the customer grants consumers the view instead of the base table. This is the same EXISTS join the native adapters place inside a row-filter function or row-access policy; only the wrapper differs. `defaultStrategy: none` is inherent, since principals absent from the ACL join match no rows (fail-closed).
+- **Extract, the selective-migration on-ramp.** `extract()` parses an ACL-view definition (regex over the documented ACL-join shape, mirroring the Snowflake `_extract_bydataset_row_access` heuristic) back into a `byDataset` `RowVisibilityConstraint` at `confidence 0.9`. Thousands of hand-built ACL views then become IR that re-emits to native Unity Catalog or Snowflake, migrating selectively while the ACL pattern stays operational for the rest. ADR-003 exists to enable this workflow.
+- **Engine-neutral SQL.** Emitted DDL uses `current_user()`, `lower(trim(...))`, and a correlated `EXISTS`. The customer runs it on whichever engine hosts the ACL pattern; the adapter never executes.
 - **Honest capability profile.** `ROW_VISIBILITY` / `DATASET_DRIVEN_PRINCIPALS` / `DATASET_DRIVEN_RESOURCES` SUPPORTED (the data-driven selectors are the pattern's raison d'être); `COLUMN_VISIBILITY` PARTIAL (a CASE in the view SELECT list is queued); tag/ABAC/obligation/purpose/retention UNSUPPORTED.
 
 No IR change. This ADR extends ADR-003/ADR-024 by establishing the pattern-adapter category concretely.
@@ -1479,16 +1477,16 @@ No IR change. This ADR extends ADR-003/ADR-024 by establishing the pattern-adapt
 
 ### Context
 
-With Unity Catalog and Snowflake (native) and custom-ACL (pattern) adapters in place, the IR had been exercised against two native platforms whose primitives are broadly similar (row-filter functions / row-access policies; column masks). A stronger portability test is a native platform whose governance primitives are shaped differently. Oracle qualifies: its enforcement is Virtual Private Database (VPD), Data Redaction, and object grants — none of which resemble the UC/Snowflake mechanisms.
+With Unity Catalog and Snowflake (native) and custom-ACL (pattern) adapters in place, the IR had been exercised against two native platforms whose primitives are broadly similar (row-filter functions / row-access policies; column masks). A stronger portability test is a native platform whose governance primitives are shaped differently. Oracle qualifies: its enforcement is Virtual Private Database (VPD), Data Redaction, and object grants, none of which resemble the UC/Snowflake mechanisms.
 
 ### Decision
 
-Add **`adapters/oracle/`** (`OracleAdapter`, `name="oracle"`, `platform="Oracle"`) as a fourth peer against the ADR-024 contract, with the following mechanism mapping (cited per ADR-027 — describe the documented primitive, do not invent):
+Add **`adapters/oracle/`** (`OracleAdapter`, `name="oracle"`, `platform="Oracle"`) as a fourth peer against the ADR-024 contract, with the following mechanism mapping (cited per ADR-027: describe the documented primitive, do not invent):
 
 - **Row visibility → Virtual Private Database.** `DBMS_RLS.ADD_POLICY` attaches a PL/SQL *policy function* that returns a predicate string Oracle appends to every query's WHERE clause.
   - *byIdentity*: the function is an `IF/ELSIF` ladder over `SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>') = 'TRUE'`, each branch returning the rule's row predicate (an `in` condition → `<col> IN (...)`); a fail-closed `ELSE '1=0'` covers principals in no rule. `explicit-baseline-group` is modeled as an explicit baseline rule (the baseline group is a normal branch), consistent with how UC emits it.
-  - *byDataset*: the function returns a non-correlated `IN`-subquery — `<col> IN (SELECT p.<col> FROM <mapping> m JOIN <acl> p ...)` — over the ACL tables, keyed off `SYS_CONTEXT('USERENV','SESSION_USER')`. (A correlated `EXISTS` was tried first and failed live — see the finding below.)
-- **Column visibility → Oracle Data Redaction.** `DBMS_REDACT.ADD_POLICY`. A `Redact` with a replacement literal lowers to `function_type => DBMS_REDACT.REGEXP` (pattern `(.*)`, `regexp_replace_string` = the replacement) — **not** `FULL`, which cannot carry an arbitrary replacement string (it uses type-default masking values). The `expression` gates who sees redaction: allowed roles (`effect: allow`) see real data, so redaction applies when the session holds none of them. (The `expression` is itself a PL/SQL string literal, so inner quotes are doubled — a real bug caught and guarded in test.)
+  - *byDataset*: the function returns a non-correlated `IN`-subquery, `<col> IN (SELECT p.<col> FROM <mapping> m JOIN <acl> p ...)`, over the ACL tables, keyed off `SYS_CONTEXT('USERENV','SESSION_USER')`. (A correlated `EXISTS` was tried first and failed live; see the finding below.)
+- **Column visibility → Oracle Data Redaction.** `DBMS_REDACT.ADD_POLICY`. A `Redact` with a replacement literal lowers to `function_type => DBMS_REDACT.REGEXP` (pattern `(.*)`, `regexp_replace_string` = the replacement), not `FULL`, which cannot carry an arbitrary replacement string (it uses type-default masking values). The `expression` gates who sees redaction: allowed roles (`effect: allow`) see real data, so redaction applies when the session holds none of them. The `expression` is itself a PL/SQL string literal, so inner quotes are doubled (a real bug caught and guarded in test).
 - **Access grants → GRANT.** `GRANT <priv> ON <schema>.<obj> TO <role>` (Read→SELECT, Write→UPDATE, Delete→DELETE, Execute→EXECUTE).
 - **Full ADR-024 cycle.** `discover` reads `ALL_POLICIES` (+ the function body from `ALL_SOURCE`), `REDACTION_POLICIES`/`REDACTION_COLUMNS`, and `ALL_TAB_PRIVS`; `extract` lifts each back to IR (VPD byDataset/byIdentity, redaction, grant) by parsing the normalized artifact; `reconcile` uses the default contract path.
 
@@ -1498,8 +1496,8 @@ Add **`adapters/oracle/`** (`OracleAdapter`, `name="oracle"`, `platform="Oracle"
 - **Object naming.** Oracle has no catalog tier; the adapter maps a 3-part `catalog.schema.table` to `SCHEMA.OBJECT` (dropping the catalog), overridable via `resource_bindings`.
 - **Identifier legality.** Group names that are not legal unquoted Oracle identifiers (e.g. `account users`) must be bound via `identity_bindings`; the default sanitizer uppercases and underscores.
 - **Live-verified 2026-08-17 on Oracle 23ai Free.** byDataset VPD row visibility returned 2 / 5 / 0 rows as ACL mappings were added/removed (fail-closed when absent); Data Redaction showed a non-exempt reader `CLERK-REDACTED` without the allowed role and the real value with it. Live testing caught three real emission bugs, all now fixed and guarded:
-  1. **byDataset predicate was a correlated `EXISTS (... AND p.<col> = <col>)`** — the bare outer column resolved to the same-named ACL column *inside* the subquery (`p.<col> = p.<col>`, always true), so any mapped user saw all rows. Replaced with a non-correlated `<col> IN (SELECT p.<col> FROM ...)`, where the outer column is unambiguous.
-  2. **Redaction role test used `SYS_CONTEXT(...) IS NULL`** — `SYS_SESSION_ROLES` returns `'TRUE'`/`'FALSE'` (not NULL) for an ungranted role, so redaction never applied. Corrected to `= 'FALSE' OR IS NULL` (redact-by-default; reveal only on `'TRUE'`). `NVL` is forbidden in redaction expressions (ORA-28087), so the verbose form is required.
+  1. **byDataset predicate was a correlated `EXISTS (... AND p.<col> = <col>)`.** The bare outer column resolved to the same-named ACL column *inside* the subquery (`p.<col> = p.<col>`, always true), so any mapped user saw all rows. Replaced with a non-correlated `<col> IN (SELECT p.<col> FROM ...)`, where the outer column is unambiguous.
+  2. **Redaction role test used `SYS_CONTEXT(...) IS NULL`.** `SYS_SESSION_ROLES` returns `'TRUE'`/`'FALSE'` (not NULL) for an ungranted role, so redaction never applied. Corrected to `= 'FALSE' OR IS NULL` (redact-by-default; reveal only on `'TRUE'`). `NVL` is forbidden in redaction expressions (ORA-28087), so the verbose form is required.
   3. **`regexp_occurrence => 0`** (all matches) doubled the replacement because the greedy `(.*)` also matches the trailing empty position. Changed to `=> 1`.
 - Exemption facts recorded for operators: SYS and `EXEMPT ACCESS POLICY` bypass VPD; SYS and `EXEMPT REDACTION POLICY` (held by DBA, hence SYSTEM) bypass redaction. Verification therefore uses a non-DBA reader for the redaction check.
 
@@ -1508,7 +1506,7 @@ No IR change.
 ### Consequences
 
 - The IR is now demonstrated portable across three native platforms with materially different primitives, plus one non-native pattern. Worked artifacts: `acl-row-visibility.oracle.sql` (a fourth mechanism for the ACL policy, beside UC / Snowflake / custom-ACL) and `oracle-mechanisms.oracle.sql` (VPD byIdentity, Data Redaction, GRANT).
-- Confirms the mask-value fidelity concern is real (FULL vs REGEXP) — a portability finding worth carrying into any future Mask/Hash work.
+- Confirms the mask-value fidelity concern is real (FULL vs REGEXP), a portability finding for any future Mask/Hash work.
 
 ---
 

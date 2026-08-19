@@ -108,7 +108,7 @@ def main() -> None:
             print(f"    {k}: {v}")
 
     print()
-    print("=== Scenario 1: seed data as-is — BGIESBRECHT sees 1-URGENT + 2-HIGH only ===")
+    print("=== Scenario 1: seed data as-is, BGIESBRECHT sees 1-URGENT + 2-HIGH only ===")
     cur.execute("USE SECONDARY ROLES NONE")
     scenario("scenario 1")
 

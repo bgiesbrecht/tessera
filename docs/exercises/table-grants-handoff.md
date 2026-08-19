@@ -1,4 +1,4 @@
-# Handoff — Table-Level Grants Exercise
+# Handoff: Table-Level Grants Exercise
 
 **For:** Claude Code
 **Status:** Phase 1 inputs. Drafted by claude.ai (design partner), reviewed against the current spec by Claude Code, decisions on open questions recorded in §"Resolutions before Phase 2" below.
@@ -8,11 +8,11 @@
 
 ## Why this exercise
 
-Six completed exercises so far have exercised row-visibility (group, ACL, ABAC, Snowflake-byDataset) and column masking. ABAC support landed in ADRs 018–021. What hasn't been exercised: **basic table-level grants** — the bread-and-butter "users in group X can read tables in schema Y" pattern that predates ABAC and is what most customers reach for first.
+Six completed exercises so far have exercised row-visibility (group, ACL, ABAC, Snowflake-byDataset) and column masking. ABAC support landed in ADRs 018–021. What hasn't been exercised: **basic table-level grants**, the bread-and-butter "users in group X can read tables in schema Y" pattern that predates ABAC and is what most customers reach for first.
 
 The exercise validates that Tessera expresses three progressively richer grant patterns cleanly. It also addresses open issue #10 (policy-execute-grants).
 
-The framework must be **load-bearing on simple cases as much as complex ones**. For migration, if a customer moving hundreds of grants has to use native DDL for the simple ones, they maintain two sources of truth. The IR must express the full corpus, simple and complex.
+The framework has to be **load-bearing on simple cases as much as complex ones**. For migration, if a customer moving hundreds of grants has to use native DDL for the simple ones, they maintain two sources of truth. The IR must express the full corpus, simple and complex.
 
 
 ---
@@ -34,7 +34,7 @@ The framework must be **load-bearing on simple cases as much as complex ones**. 
 - `byIdentity` resource selector pointing at a specific table.
 - `byIdentity` principal selector pointing at a specific group.
 - `action: Read` (the standard read action).
-- `effect: allow` — the simplest effect, and the one that distinguishes affirmative grants from restriction policies.
+- `effect: allow`, the base effect, and the one that distinguishes affirmative grants from restriction policies.
 - A single-rule Policy container with no `defaultStrategy` (because there's no default behavior to specify; the policy is purely affirmative).
 - **The policyKind question:** is `RowVisibilityConstraint` the right shape for an affirmative grant, or does the IR need an `AccessGrantConstraint` distinct from restriction-shaped policies? Phase 2 should derive Scenario A both ways and let the diagnostic compare.
 
@@ -52,7 +52,7 @@ The framework must be **load-bearing on simple cases as much as complex ones**. 
 **What this tests in the IR.**
 - `byScope` selector at schema level (ADR-019).
 - The implicit-downward-inheritance semantics from ADR-019.
-- `byScope` without an attached `matching` block — the "match every resource in scope" case. Verified at the JSON Schema layer (the `oneOf` branch for `byScope` requires `scope` but not `matching`); Phase 2 should confirm SHACL accepts it and document the semantics explicitly.
+- `byScope` without an attached `matching` block, the "match every resource in scope" case. Verified at the JSON Schema layer (the `oneOf` branch for `byScope` requires `scope` but not `matching`); Phase 2 should confirm SHACL accepts it and document the semantics explicitly.
 
 ### Scenario C: Function execute grant
 
@@ -67,7 +67,7 @@ The framework must be **load-bearing on simple cases as much as complex ones**. 
 **What this tests in the IR.**
 - Whether `Execute` is a valid action in the v0 vocabulary. **Verified prior to Phase 2: it was not in v0; it has been added** with semantic-only scope (see resolutions below). The exercise grounds the addition; the ADR documenting it lands alongside the diagnostic.
 - Whether the resource selector cleanly handles functions as resources. The `function:` prefix is a new informal IRI convention; Phase 2 should adopt it and surface in the diagnostic.
-- Open issue #10's "policy-execute-grants" finding — this scenario is the worked exercise that grounds it.
+- Open issue #10's "policy-execute-grants" finding: this scenario is the worked exercise that grounds it.
 
 ---
 
@@ -81,7 +81,7 @@ The annotation legend in claude.ai's draft is resolved as follows:
 
 Two design questions, resolved:
 
-- **Execute action — add to v0 first, let exercise discover, or what?** Added prior to Phase 2 across `ontology.ttl`, `context.jsonld`, `schema.json`, `shapes.ttl`. Semantic-only scope (gating who can invoke business-logic resources); platform-mechanism uses of EXECUTE (UDFs as policy-enforcement vehicles, EXECUTE grants required to attach a UDF to a Tessera-emitted column-mask policy) remain **adapter scaffolding, not IR-modeled**. This boundary is the load-bearing finding the exercise records — Glean's enumeration of EXECUTE uses on Unity Catalog made the boundary visible.
+- **Execute action: add to v0 first, let exercise discover, or what?** Added prior to Phase 2 across `ontology.ttl`, `context.jsonld`, `schema.json`, `shapes.ttl`. Semantic-only scope (gating who can invoke business-logic resources); platform-mechanism uses of EXECUTE (UDFs as policy-enforcement vehicles, EXECUTE grants required to attach a UDF to a Tessera-emitted column-mask policy) remain **adapter scaffolding, not IR-modeled**. The exercise records this boundary as a finding; Glean's enumeration of EXECUTE uses on Unity Catalog made it visible.
 
 - **`policyKind` for affirmative grants.** Open. Phase 2 should derive both forms (squeeze under `RowVisibilityConstraint` with `effect: allow`, and sketch what an `AccessGrantConstraint` would look like). Diagnostic compares; design decision deferred to a follow-up ADR.
 
@@ -99,18 +99,18 @@ Per `docs/worked-example-exercise.md`, the standard artifact set, plus the new e
 
 Plus, adjacent:
 
-- `adapters/tests/setup_table_grants.py` — idempotent setup of groups, schema, function (run before Phase 3).
+- `adapters/tests/setup_table_grants.py`: idempotent setup of groups, schema, function (run before Phase 3).
 - An ADR documenting the `Execute` action addition with the semantic-vs-mechanism boundary.
 
 ## What Phase 3 should produce
 
 After the Phase 2 artifacts are committed:
 
-- `spec/v0/examples/table-grants.findings.md` — there is no existing implementation to compare against, so this is `findings.md` rather than `comparison.md`. Validates:
+- `spec/v0/examples/table-grants.findings.md`: there is no existing implementation to compare against, so this is `findings.md` rather than `comparison.md`. Validates:
   - **Behavioral correctness.** Brice runs the emitted SQL in the workspace, exercises each grant scenario, confirms expected behavior.
   - **Framework fit.** Does the IR express each scenario cleanly? Does the `RowVisibilityConstraint` shoehorn feel awkward?
   - **Coverage of the underlying issue.** Specifically, does Scenario C resolve or sharpen open issue #10?
-  - **Migration-shape validation.** A `SHOW GRANTS ON TABLE` row from the workspace, manually lowered to the IR shapes Phase 2 produced. This is the smallest possible extraction sketch; it validates that the IR shapes can carry what a migration would extract.
+  - **Migration-shape validation.** A `SHOW GRANTS ON TABLE` row from the workspace, manually lowered to the IR shapes Phase 2 produced. One row is enough to check that the IR shapes can carry what a migration would extract.
 
 ---
 
@@ -118,21 +118,21 @@ After the Phase 2 artifacts are committed:
 
 For Scenario A (single table grant):
 
-1. Brice in `acme_marketing_analytics`, queries `SELECT * FROM acme.tpch.orders` — should succeed.
-2. Brice not in that group, queries the same — should fail (assuming no other policy grants access).
-3. Brice in the group attempts `UPDATE acme.tpch.orders SET ... WHERE ...` — should fail (only Read is granted).
+1. Brice in `acme_marketing_analytics`, queries `SELECT * FROM acme.tpch.orders`, should succeed.
+2. Brice not in that group, queries the same, should fail (assuming no other policy grants access).
+3. Brice in the group attempts `UPDATE acme.tpch.orders SET ... WHERE ...`, should fail (only Read is granted).
 
 For Scenario B (schema-level grant with propagation):
 
-1. Brice in `acme_data_engineering`, queries any existing table in `acme.tpch_staging` — should succeed.
-2. Brice not in that group, queries the same — should fail.
-3. **The propagation test.** Create a new table in the schema after the policy is applied. Brice in the group queries it — should succeed without any additional grant.
+1. Brice in `acme_data_engineering`, queries any existing table in `acme.tpch_staging`, should succeed.
+2. Brice not in that group, queries the same, should fail.
+3. **The propagation test.** Create a new table in the schema after the policy is applied. Brice in the group queries it, should succeed without any additional grant.
 
 For Scenario C (function execute):
 
-1. Brice in `acme_marketing_analytics`, calls `SELECT acme.tpch.compute_customer_ltv(123)` — should succeed.
-2. Brice not in that group, calls the same — should fail.
-3. Brice in the group attempts to redefine or drop the function — should fail (only Execute is granted).
+1. Brice in `acme_marketing_analytics`, calls `SELECT acme.tpch.compute_customer_ltv(123)`, should succeed.
+2. Brice not in that group, calls the same, should fail.
+3. Brice in the group attempts to redefine or drop the function, should fail (only Execute is granted).
 
 ---
 
@@ -163,11 +163,11 @@ For deliberate scope-limiting:
 
 ## Note on what this exercise might surface
 
-Predictions worth recording before Phase 2 runs:
+Predictions before Phase 2 runs:
 
 - **Scenario A** likely works cleanly under `RowVisibilityConstraint + effect: allow`. The IR has shaped equivalents.
 - **Scenario B** likely works at the schema layer; the SHACL behavior for `byScope` without `matching` is the genuine open question.
-- **Scenario C** definitely needs the `Execute` action (now added). The `function:` IRI prefix is a new informal convention worth surfacing.
+- **Scenario C** definitely needs the `Execute` action (now added). The `function:` IRI prefix is a new informal convention to surface.
 - **The `policyKind` question** is likely to surface real awkwardness with `RowVisibilityConstraint`. The shape doesn't naturally communicate "this is an affirmative grant," and a future `AccessGrantConstraint` is a likely v0 addition.
 - **The extraction sketch** is likely to surface that Tessera-IR is well-suited to lift `SHOW GRANTS` rows mechanically, validating the migration use case.
 

@@ -1,6 +1,6 @@
 """Tests for C4 (cross-policy overlap, diff) and L2 (standing overlap lint).
 
-These pin the ADR-023 MULTIPLE_MASKS detection and — critically — the ADR-001
+These pin the ADR-023 MULTIPLE_MASKS detection and, critically, the ADR-001
 confidence boundary: two attribute predicates that provably co-apply are PROVEN,
 but a predicate vs. a concrete resource is only CANDIDATE, because proving it
 would require knowing whether that resource carries the attribute tag.
@@ -110,7 +110,7 @@ def _rowvis(pid: str, table: str, group: str, values=None) -> dict:
 
 def test_two_row_filters_same_table_conflict():
     # The bug this fix targets: two RowVisibilityConstraint policies on the same
-    # table — an innocent-looking "add a filter for another group" change —
+    # table, an innocent-looking "add a filter for another group" change,
     # conflict under single-row-filter-per-table, even though both are
     # keep-matching-rows (same effect). Previously suppressed by an
     # effects-must-diverge gate; must now be flagged.
@@ -148,7 +148,7 @@ def test_disjoint_flat_axis_no_overlap():
                        "effect": "allow"}],
             "defaultBranch": {"effect": "transform", "transformation": {"type": tf}},
         }
-    # GDPR and HIPAA are siblings on a flat axis — no subsumption, no overlap.
+    # GDPR and HIPAA are siblings on a flat axis: no subsumption, no overlap.
     a = regime_mask("a", "GDPR", "Redact")
     b = regime_mask("b", "HIPAA", "Hash")
     assert _l2(lint(_corpus(a, b))) == []

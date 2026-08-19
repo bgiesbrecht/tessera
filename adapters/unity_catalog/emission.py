@@ -1,14 +1,14 @@
-"""Unity Catalog emission — IR → Databricks DDL/SQL.
+"""Unity Catalog emission: IR → Databricks DDL/SQL.
 
 Coverage (scaffold):
-    * Row visibility — group-driven, single rule, allow-list semantics (the
+    * Row visibility: group-driven, single rule, allow-list semantics (the
       group-row-visibility-policy-a worked-example shape).
     * Other policyKinds and selector kinds emit a placeholder statement plus a
       diagnostic flagging the gap. The contract is exercised end-to-end; the
       adapter is honest about what it has not yet implemented.
 
-The handler dispatch is deliberately verbose — flattened rather than abstracted
-behind a registry — to keep the emission paths auditable while the contract
+The handler dispatch is deliberately verbose (flattened rather than abstracted
+behind a registry) to keep the emission paths auditable while the contract
 shape settles.
 """
 
@@ -93,7 +93,7 @@ def _emit_row_visibility(policy: dict[str, Any], config: AdapterConfig) -> Emiss
     target_table = config.bind_resource(raw_resource) or _strip_iri(raw_resource)
     rules = policy.get("rules") or []
 
-    # byDataset principals — the ACL-mapping-table pattern. Dispatch to a
+    # byDataset principals: the ACL-mapping-table pattern. Dispatch to a
     # separate helper that emits a row-filter UDF with an EXISTS body joining
     # the IR's mapping tables on current_user().
     if rules and all(
@@ -298,7 +298,7 @@ def _emit_row_visibility_by_dataset(
 def _emit_row_visibility_by_scope(policy: dict[str, Any], config: AdapterConfig) -> EmissionResult:
     """Lower a byScope+matching RowVisibilityConstraint to Databricks ABAC DDL.
 
-    Emission target (Mechanism B — CASE inside the UDF, the only natural choice
+    Emission target (Mechanism B, CASE inside the UDF, the only natural choice
     when there are more than two branches):
 
         CREATE OR REPLACE FUNCTION <fn>(<param> STRING) RETURNS BOOLEAN
@@ -321,7 +321,7 @@ def _emit_row_visibility_by_scope(policy: dict[str, Any], config: AdapterConfig)
 
     The Tessera->platform tag translation comes from config.tag_taxonomy (ADR-021).
     `column:$matched` in IR rule conditions substitutes the function parameter
-    name at emit time — the IR's per-policy abstraction over the matched column.
+    name at emit time: the IR's per-policy abstraction over the matched column.
     """
     diagnostics: list[Diagnostic] = []
     policy_id = policy.get("@id")
@@ -575,7 +575,7 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
 
     Supports:
         * `appliesTo: byIdentity` with `resource: column:<catalog>.<schema>.<table>.<col>`.
-        * `appliesTo: byScope` with `scope: catalog:|schema:|table:<id>` and `matching:` —
+        * `appliesTo: byScope` with `scope: catalog:|schema:|table:<id>` and `matching:`,
           dispatched to `_emit_column_visibility_by_scope` (ABAC column mask).
         * Multiple rules; each rule with `effect: allow` contributes a `WHEN ... THEN <col>` branch.
         * `defaultBranch` with `effect: transform` + `transformation` produces the ELSE clause.
@@ -846,7 +846,7 @@ def _emit_column_visibility_by_scope(
     policy_name = f"tessera__{slug}"
     grantee = config.extras.get("column_mask_grantee", "account users")
 
-    # Build the policy statement. The EXCEPT clause is optional — if no rules
+    # Build the policy statement. The EXCEPT clause is optional: if no rules
     # produce allowed groups, the mask applies to everyone in the grantee set.
     except_clause = ""
     if except_groups:
@@ -1027,7 +1027,7 @@ def _emit_access_grant(policy: dict[str, Any], config: AdapterConfig) -> Emissio
     action_ir = (policy.get("action") or "Read")
     rules = policy.get("rules") or []
 
-    # Resolve the target object — kind + qualified name — and apply resource_bindings.
+    # Resolve the target object (kind + qualified name) and apply resource_bindings.
     object_kind: str | None = None
     target_name: str | None = None
     needs_usage_scaffold: str | None = None    # what level of USE-* to emit

@@ -1,4 +1,4 @@
-# Diagnostic Report — ABAC Row-Filter (priority)
+# Diagnostic Report: ABAC Row-Filter (priority)
 
 **Companion artifacts:**
 - `abac-row-filter-priority.tessera.yaml` / `.jsonld`
@@ -85,11 +85,11 @@ v0's condition algebra has `operands` as a generic list with no formal type syst
 
 ### 4.3 Mechanism A vs B distinction collapses for ABAC row filter
 
-The prior column-mask exercise surfaced two ways to encode the principal split (Mechanism A: TO/EXCEPT in policy header; Mechanism B: branching inside the UDF). For binary cases, A is cleaner. For three-or-more-branch cases — like this one — A cannot express it; B is the only choice.
+The prior column-mask exercise surfaced two ways to encode the principal split (Mechanism A: TO/EXCEPT in policy header; Mechanism B: branching inside the UDF). For binary cases, A is cleaner. For three-or-more-branch cases like this one, A cannot express it; B is the only choice.
 
 The implication for Tessera: the IR's clean multi-rule shape compiles to a single Mechanism-B UDF. The IR's `defaultStrategy` distinction (`negated-complement` vs `explicit-baseline-group`) is preserved at the IR layer (for audit, intent, and other-platform emission) but collapses at the Databricks-ABAC-row-filter emission. Both strategies compile to the same `CASE … WHEN … ELSE` UDF.
 
-This is **not a problem** — it's an honest acknowledgment that the IR carries intent that the platform's emission can't always express. The audit value of `defaultStrategy` is at the IR layer; the platform doesn't need to know.
+This is **not a problem**. It is an honest acknowledgment that the IR carries intent that the platform's emission can't always express. The audit value of `defaultStrategy` is at the IR layer; the platform doesn't need to know.
 
 The companion observation: a hypothetical platform that *did* support multi-policy attachment at the row-filter level (each policy with its own TO/EXCEPT) could distinguish `negated-complement` from `explicit-baseline-group` more directly. Databricks doesn't; other platforms might. The IR's expressivity is greater than any single platform's emission shape, which is the right relationship.
 
@@ -105,7 +105,7 @@ This exercise uses `negated-complement` (chosen in §4.2 of the inputs) without 
 
 ## 5. Per-mechanism timing disclosure
 
-The row-filter mechanism on Databricks ABAC inherits the same account-group cache propagation as the prior exercises: 2–4 minutes for `is_account_group_member` changes. Tag-binding propagation (changes to `abac_column = orderpriority`) is a separate timing characteristic — likely fast since tag lookup goes through the metastore, but a precise measurement is a Phase 3 observation.
+The row-filter mechanism on Databricks ABAC inherits the same account-group cache propagation as the prior exercises: 2–4 minutes for `is_account_group_member` changes. Tag-binding propagation (changes to `abac_column = orderpriority`) is a separate timing characteristic, likely fast since tag lookup goes through the metastore, but a precise measurement is a Phase 3 observation.
 
 ---
 
@@ -113,13 +113,13 @@ The row-filter mechanism on Databricks ABAC inherits the same account-group cach
 
 | Requirement | Status |
 |---|---|
-| Use verified ABAC ROW FILTER DDL form | ✓ — `CREATE POLICY ... ON CATALOG ... ROW FILTER fn TO ... FOR TABLES MATCH COLUMNS ... AS alias USING COLUMNS (alias)`. |
-| Reference all three groups verbatim | ✓ — `acme_all_priority_ops`, `acme_high_priority_ops`, and `account users` (broad TO). |
-| Catalog or narrower scope | ✓ — `ON CATALOG acme` (broader than schema; both valid). |
+| Use verified ABAC ROW FILTER DDL form | ✓. `CREATE POLICY ... ON CATALOG ... ROW FILTER fn TO ... FOR TABLES MATCH COLUMNS ... AS alias USING COLUMNS (alias)`. |
+| Reference all three groups verbatim | ✓. `acme_all_priority_ops`, `acme_high_priority_ops`, and `account users` (broad TO). |
+| Catalog or narrower scope | ✓. `ON CATALOG acme` (broader than schema; both valid). |
 | `MATCH COLUMNS has_tag_value('abac_column', 'orderpriority')` | ✓ |
-| `USING COLUMNS (...)` to pass matched value | ✓ — `USING COLUMNS (priority_col)`. |
+| `USING COLUMNS (...)` to pass matched value | ✓. `USING COLUMNS (priority_col)`. |
 | Applies to `acme.tpch.orders_abac` | ✓ (catalog scope; only tagged column in scope). |
-| Fail-closed for unmatched principals | ✓ — the UDF's ELSE branch catches "everyone else"; no principal sees nothing. The "fail-closed if UDF errors" case is platform-handled (Databricks returns no rows). |
+| Fail-closed for unmatched principals | ✓. the UDF's ELSE branch catches "everyone else"; no principal sees nothing. The "fail-closed if UDF errors" case is platform-handled (Databricks returns no rows). |
 
 ---
 
@@ -128,7 +128,7 @@ The row-filter mechanism on Databricks ABAC inherits the same account-group cach
 | Finding | Category | Recommended action |
 |---|---|---|
 | Axis-naming gap for row-discriminator columns (§4.1) | **v1 candidate** | Open issue. Decision: new well-known axis vs. document adopter-extensibility convention. |
-| Condition-operand reference convention (§4.2) | **v1 candidate** | Open issue. Small design — formalize `$matched` reserved identifier or equivalent. |
+| Condition-operand reference convention (§4.2) | **v1 candidate** | Open issue. Small design: formalize `$matched` reserved identifier or equivalent. |
 | Mechanism A vs B collapses for multi-branch row filter (§4.3) | **Observation, not a gap** | Document in the technical design's adapter contract section. No spec change needed; the IR's richer expressivity than platform emission is the right relationship. |
 | Cross-policy combination for row filters (§3 / inputs §6.3) | **Phase 3 observation pending** | Deploy this row filter alongside another (or test by attaching a second row filter targeting the same column) to observe Databricks' behavior. |
 
@@ -144,7 +144,7 @@ These are intentional scope choices.
 
 ---
 
-## 9. Postscript — adapter coverage 2026-05-19
+## 9. Postscript: adapter coverage 2026-05-19
 
 The Unity Catalog adapter now emits this policy. `_emit_row_visibility_by_scope` in `adapters/unity_catalog/emission.py` produces the three-piece DDL: `CREATE OR REPLACE FUNCTION` with the Mechanism B CASE body, `GRANT EXECUTE` (scaffolding per ADR-025), and `CREATE OR REPLACE POLICY ... ON CATALOG acme ROW FILTER ... FOR TABLES MATCH COLUMNS has_tag_value('abac_column', 'orderpriority') AS orderpriority USING COLUMNS (orderpriority)`.
 
@@ -156,17 +156,17 @@ tag_taxonomy = {
 }
 ```
 
-The IR's `column:$matched` reference in rule conditions substitutes the function parameter name at emit time — the IR's per-policy abstraction over the matched column.
+The IR's `column:$matched` reference in rule conditions substitutes the function parameter name at emit time, the IR's per-policy abstraction over the matched column.
 
 **Differences from the hand-derived target** (`abac-row-filter-priority.databricks.sql`):
 
 | Aspect | Hand-derived | Adapter | Why divergent |
 |---|---|---|---|
 | Function parameter name | `priority` | `orderpriority` | Adapter derives from the tag value; arbitrary either way |
-| Policy `MATCH COLUMNS` alias | `priority_col` | `orderpriority` | Same — adapter derives from the tag value |
+| Policy `MATCH COLUMNS` alias | `priority_col` | `orderpriority` | Same; adapter derives from the tag value |
 | `COMMENT 'Tessera ABAC row filter — ...'` clause | present | absent | Adapter doesn't emit COMMENT clauses yet (cosmetic; queued as a small refinement) |
 | Whitespace alignment | manually aligned for readability | standard formatting | Cosmetic |
 
-Substantively equivalent. Live-applied via `CREATE OR REPLACE POLICY` (the prior hand-derived policy with the same name was overwritten cleanly). Caller (not in either custom group; `account users` only) saw `4,499,708` rows in priorities `3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW` — exactly the ELSE branch, consistent with the prior exercise's verification.
+Substantively equivalent. Live-applied via `CREATE OR REPLACE POLICY` (the prior hand-derived policy with the same name was overwritten cleanly). Caller (not in either custom group; `account users` only) saw `4,499,708` rows in priorities `3-MEDIUM`, `4-NOT SPECIFIED`, `5-LOW`, exactly the ELSE branch, consistent with the prior exercise's verification.
 
 Capability profile entry `Capability.ATTRIBUTE_BASED_SCOPING` updated to reflect that ABAC row visibility is now implemented (PARTIAL overall; ABAC column masking via byScope is the remaining stub).

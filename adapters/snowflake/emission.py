@@ -1,7 +1,7 @@
-"""Snowflake emission — IR → Snowflake DDL/SQL.
+"""Snowflake emission: IR → Snowflake DDL/SQL.
 
 Coverage (scaffold):
-    * Row visibility — role-driven, single rule, allow-list semantics. Same source
+    * Row visibility: role-driven, single rule, allow-list semantics. Same source
       IR as the Unity Catalog row-visibility path; different platform output.
     * Other policyKinds and selector kinds emit a placeholder statement plus a
       diagnostic flagging the gap.
@@ -305,7 +305,7 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
         ALTER TABLE <table> MODIFY COLUMN <col> SET MASKING POLICY <name>;
 
     Snowflake role-discrimination semantics per issue #14: the adapter emits
-    `IS_ROLE_IN_SESSION` (Intent B — permission-scope semantics, matches
+    `IS_ROLE_IN_SESSION` (Intent B, permission-scope semantics, matches
     Snowflake's documented recommendation). If a policy needs primary-role-only
     discrimination (Intent A), that's a deferred design question, not implemented here.
 
@@ -358,7 +358,7 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
     schema_qualified = target_table.rsplit(".", 1)[0] if target_table.count(".") >= 1 else target_table
 
     # Each rule contributes a WHEN clause. The policy body's parameter name must
-    # not collide with any column name referenced in the body — see the row-access
+    # not collide with any column name referenced in the body. See the row-access
     # policy comment in _emit_row_visibility_by_dataset. For masking policies the
     # parameter IS the column being masked, so the name should match (Snowflake
     # binds positionally and uses the parameter name as the column reference
@@ -431,7 +431,7 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
 
 
 # ============================================================================
-# ABAC byScope emission (#31) — Snowflake tag-based policy attachment
+# ABAC byScope emission (#31): Snowflake tag-based policy attachment
 # ============================================================================
 #
 # Snowflake's tag-based-attachment mechanism (verified against
@@ -444,7 +444,7 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
 #     discriminator the IR references via the `column:$matched` sentinel.
 #
 # Both attach by *tag*, so the byScope scope (which columns/tables carry the
-# tag) is a per-environment tagging concern, not part of emission — the adapter
+# tag) is a per-environment tagging concern, not part of emission. The adapter
 # emits the policy + the tag attachment; the adopter's tagging places it.
 
 _MATCHED_SENTINEL = "column:$matched"
@@ -641,7 +641,7 @@ def _emit_row_visibility_by_scope(
     The matching attribute value names the row-discriminator column; the IR
     references its value with the `column:$matched` sentinel, and Snowflake
     binds the actual column to the policy predicate positionally via the ON
-    clause (live-verified 2026-08-13 — the ON clause needs the real column name
+    clause (live-verified 2026-08-13, the ON clause needs the real column name
     and type, and the driving tag is set on the TABLE, not the column). Ordered
     first-match (ADR-015) is a CASE ladder; the defaultBranch is the ELSE.
     """
@@ -664,7 +664,7 @@ def _emit_row_visibility_by_scope(
         )
 
     # The row-access policy's argument binds to the discriminator column via the
-    # ALTER TAG ... ON (<col> <type>) clause — Snowflake requires the *actual*
+    # ALTER TAG ... ON (<col> <type>) clause. Snowflake requires the *actual*
     # column name there, not an abstract parameter (live-verified 2026-08-13).
     # The matching attribute value names that discriminator column.
     attrs = (applies_to.get("matching") or {}).get("attributes") or {}
@@ -674,7 +674,7 @@ def _emit_row_visibility_by_scope(
         code="ABAC_ROW_ACCESS_TABLE_TAG",
         message=(
             f"tag-based row access attaches at the TABLE level: set tag {tag_key!r} on the "
-            f"target table(s) (not the column), and ensure column {discriminator!r} exists — "
+            f"target table(s) (not the column), and ensure column {discriminator!r} exists; "
             "it binds positionally to the policy predicate. (Masking, by contrast, tags the "
             "column.)"
         ),
@@ -1040,7 +1040,7 @@ def _emit_access_grant(policy: dict[str, Any], config: AdapterConfig) -> Emissio
             if object_kind == "SCHEMA" and priv != "USAGE":
                 # Snowflake doesn't allow privileges like SELECT directly on a SCHEMA.
                 # Schema-level read intent expands to "SELECT on all current + future
-                # tables in the schema" — matching Tessera's byScope downward-
+                # tables in the schema", matching Tessera's byScope downward-
                 # propagation semantics from ADR-019.
                 statements.append(
                     f"{keyword} {priv} ON ALL TABLES IN SCHEMA {target_name} TO ROLE {bound_principal};"

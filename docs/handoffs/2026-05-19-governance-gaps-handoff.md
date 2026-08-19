@@ -1,4 +1,4 @@
-# Handoff — Governance Gap Issues (Top 10 Survey)
+# Handoff: Governance Gap Issues (Top 10 Survey)
 
 **For:** Claude Code (in-repo implementor).
 **From:** claude.ai (design partner). Survey conducted 2026-05-19 across external sources on common data governance requirements.
@@ -12,11 +12,11 @@ The claude.ai conversation surveyed external sources on common data governance r
 
 The handoff creates a tracking surface for all concerns:
 
-- **Covered items** (issues #16/#17/#18/#22) — filed so future contributors find explanations of coverage, not silence.
-- **Out-of-scope items** (issue #20) — filed deliberately to redirect future proposals to the issue.
-- **Underexercised items** (issue #23) — covered in design but not yet validated by worked exercise.
-- **Integration questions** (issue #24) — partially covered; the remaining question is per-environment configuration.
-- **Real gaps** (issues #19, #21, #25) — these get Phase 2 scoping documents.
+- **Covered items** (issues #16/#17/#18/#22): filed so future contributors find an explanation of the coverage rather than silence.
+- **Out-of-scope items** (issue #20): filed deliberately to redirect future proposals to the issue.
+- **Underexercised items** (issue #23): covered in design but not yet validated by a worked exercise.
+- **Integration questions** (issue #24): partially covered; the remaining question is per-environment configuration.
+- **Real gaps** (issues #19, #21, #25): these get Phase 2 scoping documents.
 
 ---
 
@@ -79,9 +79,9 @@ Eight labels were created on the repo to support this taxonomy. They are now par
 
 ## Phase 2 scope
 
-The claude.ai assistant will draft scoping documents for **#19 (audit logging)**, **#21 (retention)**, and **#25 (AI governance)** in subsequent handoffs. The scoping documents follow the structure of `docs/v1-candidates/abac-and-attribute-axes.md` — i.e., they articulate the design surface without committing to spec changes; ADRs and spec implementations come after scoping conversations settle.
+The claude.ai assistant will draft scoping documents for **#19 (audit logging)**, **#21 (retention)**, and **#25 (AI governance)** in subsequent handoffs. The scoping documents follow the structure of `docs/v1-candidates/abac-and-attribute-axes.md`: they articulate the design surface without committing to spec changes; ADRs and spec implementations come after scoping conversations settle.
 
-claude.ai's priority hint: retention (#21) is the most urgent of the three real gaps given universal regulatory citations (GDPR Article 5(1)(e), CCPA, HIPAA). AI governance (#25) is slightly lower priority because the regulatory landscape is still evolving. Audit logging (#19) sits in between — universally required but architecturally straightforward as an obligation-vocabulary refinement.
+claude.ai's priority hint: retention (#21) is the most urgent of the three real gaps given universal regulatory citations (GDPR Article 5(1)(e), CCPA, HIPAA). AI governance (#25) is slightly lower priority because the regulatory landscape is still evolving. Audit logging (#19) sits in between: universally required, but architecturally straightforward as an obligation-vocabulary refinement.
 
 Brice (project lead) will signal before any scoping documents land. The signal may include a preferred order, a request to combine some, or a request to start with one.
 

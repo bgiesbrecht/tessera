@@ -3,15 +3,15 @@
 v1 scope:
     * YAML → JSON-LD conversion (the practitioner-friendly authoring direction).
     * Two input shapes supported:
-        - "envelope" form  — `policy: {id, kind, …}` wrapper (the
+        - "envelope" form: `policy: {id, kind, …}` wrapper (the
           form the tutorial teaches authors to write).
-        - "flat" form      — JSON-LD-shaped YAML with `@context`, `@type`,
+        - "flat" form: JSON-LD-shaped YAML with `@context`, `@type`,
           `@id`, `policyKind` at top level (the form used by the early worked
           examples; passes through structurally).
-    * Comment preservation is deferred (ADR-004) — `ruamel.yaml` is used
+    * Comment preservation is deferred (ADR-004); `ruamel.yaml` is used
       from the start so the structural read preserves enough metadata to
       add comment preservation later without re-architecting.
-    * The reverse direction (JSON-LD → YAML) is deferred — single direction
+    * The reverse direction (JSON-LD → YAML) is deferred. Single direction
       covers the practitioner path; reverse-direction work belongs with the
       adapter extraction story (migration use case).
 

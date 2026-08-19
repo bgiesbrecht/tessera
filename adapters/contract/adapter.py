@@ -2,7 +2,7 @@
 
 Every platform adapter inherits from this class and implements the four
 responsibilities defined in technical-design-v0.2.md §5: discovery, extraction,
-emission, reconciliation. The base class is intentionally thin — it declares
+emission, reconciliation. The base class is intentionally thin: it declares
 the interface and provides no platform-specific behavior of its own.
 """
 
@@ -38,7 +38,7 @@ class Adapter(ABC):
     def emit(self, policy: dict[str, Any]) -> EmissionResult:
         """Lower a parsed JSON-LD policy to platform-native DDL/SQL statements.
 
-        Emission never executes the statements — that is the caller's
+        Emission never executes the statements. That is the caller's
         responsibility. The returned EmissionResult carries the statements and
         any diagnostics produced during lowering (capability gaps, configuration
         misses, etc.).

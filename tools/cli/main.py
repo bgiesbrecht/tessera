@@ -1,27 +1,27 @@
-"""Tessera CLI — unified command surface over the converter + adapters.
+"""Tessera CLI: unified command surface over the converter and adapters.
 
 Subcommands:
 
-    validate  <file>                          — JSON Schema + SHACL on a YAML or JSON-LD policy
-    convert   <file> [--out PATH]             — YAML → JSON-LD
+    validate  <file>                          : JSON Schema + SHACL on a YAML or JSON-LD policy
+    convert   <file> [--out PATH]             : YAML → JSON-LD
     emit      <file> --adapter NAME [--config bindings.yaml]
-                                              — produce platform DDL
-    discover  --adapter NAME [scope args]     — inventory deployed policies
+                                                produce platform DDL
+    discover  --adapter NAME [scope args]     : inventory deployed policies
     extract   --adapter NAME [scope args] [--name N]
-                                              — discover + lift each (or one) artifact to IR
+                                                discover + lift each (or one) artifact to IR
     reconcile --adapter NAME [scope args] --intended PATH
-                                              — diff intended IR against deployed state
+                                                diff intended IR against deployed state
     impact    [--git BASE PROP | --baseline … --proposed … | --corpus DIR]
-                                              — how a proposed change alters what the corpus decides
-    lint      [--at REF | --corpus DIR]       — standing corpus health check (dead rules, overlap)
+                                                how a proposed change alters what the corpus decides
+    lint      [--at REF | --corpus DIR]       : standing corpus health check (dead rules, overlap)
 
 Platform connection details:
 
-    Databricks   — pass `--profile <profile>` and `--warehouse-id <id>`, or set
+    Databricks: pass `--profile <profile>` and `--warehouse-id <id>`, or set
                    TESSERA_DB_PROFILE and TESSERA_DB_WAREHOUSE in the environment.
                    The Databricks SDK handles the auth.
 
-    Snowflake    — pass `--account`, `--user`, `--warehouse`, `--database`, and
+    Snowflake: pass `--account`, `--user`, `--warehouse`, `--database`, and
                    `--auth-file`, or set TESSERA_SF_* env vars. The auth file
                    contents are read as the password.
 
@@ -188,7 +188,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
         jsonschema.validate(doc, schema)
         print(f"schema: OK")
     except jsonschema.ValidationError as e:
-        print(f"schema: FAIL — {e.message}")
+        print(f"schema: FAIL. {e.message}")
         return 2
 
     shapes = Graph(); shapes.parse(str(SHAPES_PATH), format="turtle")
@@ -465,7 +465,7 @@ def _add_scope_args(parser: argparse.ArgumentParser) -> None:
 def make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="tessera",
-        description="Tessera CLI — convert, validate, emit, discover, extract, reconcile.",
+        description="Tessera CLI: convert, validate, emit, discover, extract, reconcile.",
     )
     sub = p.add_subparsers(dest="command", required=True)
 
@@ -519,7 +519,7 @@ def make_parser() -> argparse.ArgumentParser:
     _add_scope_args(r)
     r.set_defaults(func=cmd_reconcile)
 
-    # impact — change-impact analysis over a policy corpus
+    # impact: change-impact analysis over a policy corpus
     im = sub.add_parser("impact", help="Report how a proposed change alters what the corpus decides.")
     im.add_argument("--git", nargs=2, metavar=("BASE_REF", "PROP_REF"),
                     help="Compare across two git refs (default: HEAD WORKING). WORKING = working tree.")
@@ -531,7 +531,7 @@ def make_parser() -> argparse.ArgumentParser:
                     help="Exit nonzero if any finding has this polarity (CI gating; opt-in).")
     im.set_defaults(func=cmd_impact)
 
-    # lint — standing whole-corpus health check
+    # lint: standing whole-corpus health check
     ln = sub.add_parser("lint", help="Standing corpus health check: dead rules, cross-policy overlap.")
     ln.add_argument("--at", metavar="REF", help="Ref to lint (default WORKING = working tree).")
     ln.add_argument("--corpus", help="Filesystem override: lint every policy file under this directory.")

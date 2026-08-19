@@ -5,7 +5,7 @@
     3. Validate extracted IRs against schema + SHACL.
     4. Emit equivalent Databricks DDL via UnityCatalogAdapter.emit, using bindings
        that map Snowflake-side identifiers to their Databricks counterparts.
-    5. Deploy the migrated DDL on Databricks (Phase 4) — provision prerequisite
+    5. Deploy the migrated DDL on Databricks (Phase 4): provision prerequisite
        tables/ACL data, drop existing row filters and column masks on the
        targets, apply the new DDL.
     6. Verify behavior (Phase 5): confirm SHOW GRANTS / row counts / column
@@ -83,7 +83,7 @@ def main() -> None:
 
     # Bindings translate Snowflake-side identifiers to Databricks-side identifiers.
     # Includes the ACL mapping-table references (data tables) which the byDataset
-    # policy's body reaches into — migration requires either remapping these
+    # policy's body reaches into. Migration requires either remapping these
     # references or migrating the data; here we remap and migrate the data
     # alongside.
     uc_config = AdapterConfig(

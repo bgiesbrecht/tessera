@@ -1,7 +1,7 @@
 """Spike (1): the corpus as an RDF graph, queried for the interaction surface.
 
 The Layer-1 question: does loading the policy corpus into a graph and querying
-it with SPARQL buy us more than the Python-side checks — in particular, can we
+it with SPARQL buy us more than the Python-side checks. In particular, can we
 get attribute subsumption (PII ⊇ PHI) "for free" from the ontology via property
 paths, and express the cross-policy interaction surface declaratively?
 
@@ -9,10 +9,10 @@ This spike answers empirically. It builds one rdflib graph from the ontology
 plus a set of policy JSON-LD documents, and runs SPARQL to (a) extract each
 policy's attachment target and attribute matches, and (b) attempt an
 ontology-subsumption query. It also probes whether attribute values in the
-corpus actually resolve to vocabulary IRIs — which turns out to be the crux.
+corpus actually resolve to vocabulary IRIs, which turns out to be the crux.
 
-Finding (see the companion spike report): the graph's one genuine advantage —
-ontology subsumption via property paths — was originally *blocked* because the
+Finding (see the companion spike report): the graph's one genuine advantage,
+ontology subsumption via property paths, was originally *blocked* because the
 `sensitivity` term was `"@type": "@id"` and the context had no `@vocab`, so bare
 attribute values expanded to document-base junk instead of `vocab#` IRIs.
 **ADR-028 (2026-08-05) resolved this**: `sensitivity` is now `"@type": "@vocab"`
@@ -141,7 +141,7 @@ def attribute_iri_probe(g: Graph) -> dict:
 def subsumption_pairs(g: Graph) -> list[tuple[str, str]]:
     """Policy pairs whose sensitivity values are related by the ontology
     hierarchy (one subsumes the other), via a SPARQL property path. Returns
-    empty on the current corpus because values are not vocab IRIs — the finding."""
+    empty on the current corpus because values are not vocab IRIs, the finding."""
     q = """
     PREFIX t: <https://bgiesbrecht.github.io/tessera/spec/v0/vocab#>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>

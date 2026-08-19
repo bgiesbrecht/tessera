@@ -21,7 +21,7 @@ ORACLE_PROFILE = CapabilityProfile(
             CapabilitySupport.SUPPORTED,
             "Emitted via Virtual Private Database (VPD): DBMS_RLS.ADD_POLICY attaches a PL/SQL "
             "policy function that returns a predicate appended to every query's WHERE clause "
-            "(docs.oracle.com — Using Oracle Virtual Private Database to Control Data Access). "
+            "(docs.oracle.com, Using Oracle Virtual Private Database to Control Data Access). "
             "byIdentity rules become IF/ELSIF branches over SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>') "
             "= 'TRUE', each returning the rule's row predicate; a fail-closed ELSE ('1=0') covers "
             "principals in no rule (explicit-baseline-group is modeled as an explicit baseline rule). "
@@ -35,14 +35,14 @@ ORACLE_PROFILE = CapabilityProfile(
         ),
         Capability.COLUMN_VISIBILITY: (
             CapabilitySupport.SUPPORTED,
-            "Emitted via Oracle Data Redaction: DBMS_REDACT.ADD_POLICY (docs.oracle.com — Oracle "
+            "Emitted via Oracle Data Redaction: DBMS_REDACT.ADD_POLICY (docs.oracle.com, Oracle "
             "Database Advanced Security Guide, Using Oracle Data Redaction). A Redact with a "
             "replacement literal lowers to function_type => DBMS_REDACT.REGEXP (regexp_pattern '(.*)', "
             "regexp_replace_string => the replacement) because FULL redaction cannot carry an arbitrary "
-            "replacement string — it uses type-default masking values. regexp_occurrence => 1 (first "
+            "replacement string; it uses type-default masking values. regexp_occurrence => 1 (first "
             "match only; => 0 doubled the replacement because the greedy (.*) also matches the trailing "
             "empty position). The `expression` gates who sees redaction: redact unless the session holds "
-            "an allowed role — `SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>') = 'FALSE' OR ... IS NULL` "
+            "an allowed role: `SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>') = 'FALSE' OR ... IS NULL` "
             "(NVL is forbidden in redaction expressions, ORA-28087; a bare `IS NULL` test never redacts "
             "an ungranted role). Coverage: byIdentity column targets, Redact transformation. Mask/Hash "
             "queued. Live-verified 2026-08-17 on Oracle 23ai Free: a non-exempt reader without the role "

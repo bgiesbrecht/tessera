@@ -1,4 +1,4 @@
-"""custom-ACL adapter — the ADR-003 reference pattern adapter.
+"""custom-ACL adapter: the ADR-003 reference pattern adapter.
 
 A *pattern* adapter, not a platform adapter (ADR-032): its enforcement target is
 the customer's own ACL-table + wrapping-view convention, which predates and sits
@@ -6,7 +6,7 @@ alongside native RLS. It is a peer of the Unity Catalog and Snowflake adapters
 against the same contract (ADR-024).
 
 `emit` lowers a byDataset RowVisibilityConstraint to a wrapping secure view.
-`extract` — the high-value path — lifts such a view back to IR (the selective
+`extract` lifts such a view back to IR (the selective
 migration on-ramp). `discover` inventories candidate ACL views; `reconcile` uses
 the default contract implementation (discover → extract → diff).
 """
@@ -76,5 +76,5 @@ class CustomACLAdapter(Adapter):
         return discover_schema(cursor, db, sc)
 
     def extract(self, artifact: dict[str, Any]) -> ExtractionResult:
-        """Lift an ACL view into Tessera IR — the selective-migration on-ramp."""
+        """Lift an ACL view into Tessera IR: the selective-migration on-ramp."""
         return extract_artifact(artifact)

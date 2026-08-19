@@ -2,7 +2,7 @@
 
 The shape of this declaration is intentionally informational. The adapter
 references it when emitting diagnostics about features that would be downgraded
-or refused. It is not a runtime gate — emission may still produce output for a
+or refused. It is not a runtime gate: emission may still produce output for a
 PARTIAL capability, accompanied by a warning diagnostic explaining the boundary.
 """
 
@@ -32,7 +32,7 @@ UNITY_CATALOG_PROFILE = CapabilityProfile(
             "granted group (caller sees CLERK-REDACTED). byScope verified against "
             "spec/v0/examples/abac-column-mask-policy-{a,b}.jsonld: emission is functionally "
             "equivalent to the hand-derived abac-column-mask.databricks.sql (only "
-            "stylistic differences — auto-generated alias `clerk` vs hand-stylized "
+            "stylistic differences: auto-generated alias `clerk` vs hand-stylized "
             "`pii_clerk_col`; defensive `cast(val AS STRING)` in the Hash UDF). Coverage: "
             "byIdentity column targets and byScope ABAC targets; rules with effect=allow or "
             "effect=transform; defaultBranch with effect=transform; Redact and Hash (sha256) "
@@ -47,7 +47,7 @@ UNITY_CATALOG_PROFILE = CapabilityProfile(
             "scaffolding; CREATE POLICY ... ON CATALOG/SCHEMA/TABLE ... ROW FILTER ... "
             "MATCH COLUMNS has_tag_value(...) AS alias USING COLUMNS (alias)). Column "
             "visibility added 0.6.3 (closes #30): parallel three-piece DDL with COLUMN MASK "
-            "in place of ROW FILTER and ON COLUMN <alias> in place of USING COLUMNS — the "
+            "in place of ROW FILTER and ON COLUMN <alias> in place of USING COLUMNS. The "
             "rule's principal becomes the EXCEPT clause; the defaultBranch transformation "
             "becomes the UDF body. The IR's `column:$matched` reference substitutes the "
             "function parameter at emit time (row-filter path). tag_taxonomy (ADR-021) "

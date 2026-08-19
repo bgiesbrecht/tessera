@@ -4,7 +4,7 @@
   "@id": "policy:analysts-tiering",
   "version": "1.0.0",
   "policyKind": "RowVisibilityConstraint",
-  "description": "Two distinct analyst tiers on a separate table \u2014 no overlap, no dead rules.",
+  "description": "Two distinct analyst tiers on a separate table, no overlap, no dead rules.",
   "appliesTo": {
     "selector": "byIdentity",
     "resource": "table:acme.tpch.customers"

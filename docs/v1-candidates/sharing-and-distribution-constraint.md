@@ -2,9 +2,9 @@
 
 **Status:** scoping. No spec changes yet. Sister document to `abac-and-attribute-axes.md` (which scoped what eventually became ADRs 018–021).
 
-**Purpose:** Frame what it would take for Tessera to represent governance policies around data sharing — Delta Sharing, Snowflake Secure Shares and Listings, marketplace publications, cloud-storage hand-offs, BigQuery Analytics Hub, ad-hoc exports — in a portable way that respects ADR-027's descriptive-not-prescriptive posture.
+**Purpose:** Frame what it would take for Tessera to represent governance policies around data sharing (Delta Sharing, Snowflake Secure Shares and Listings, marketplace publications, cloud-storage hand-offs, BigQuery Analytics Hub, ad-hoc exports) in a portable way that respects ADR-027's descriptive-not-prescriptive posture.
 
-The end state this scoping aims at: a v0 IR extension that admits a `DistributionConstraint` policy expressing **who can share what to whom, under what conditions, via what class of channel, for how long, with what obligations** — and adapters that lower the intent to whichever platform mechanism enforces the closest fit.
+The end state this scoping aims at: a v0 IR extension that admits a `DistributionConstraint` policy expressing **who can share what to whom, under what conditions, via what class of channel, for how long, with what obligations**. Adapters lower that intent to whichever platform mechanism enforces the closest fit.
 
 ---
 
@@ -22,7 +22,7 @@ That disclaimer is narrower than it reads. It says Tessera does not *follow data
 
 ## §2. The dimensions a sharing policy must express
 
-Across the platforms in scope — Delta Sharing (Databricks UC-governed and open protocol), Snowflake Secure Shares, Snowflake Listings, BigQuery Analytics Hub / Authorized Views, cloud-storage hand-offs (signed URLs, IAM cross-account), marketplace publications, ad-hoc query-result exports — a credible sharing policy needs to express the following:
+The platforms in scope are Delta Sharing (Databricks UC-governed and open protocol), Snowflake Secure Shares, Snowflake Listings, BigQuery Analytics Hub / Authorized Views, cloud-storage hand-offs (signed URLs, IAM cross-account), marketplace publications, and ad-hoc query-result exports. Across them, a credible sharing policy needs to express the following:
 
 | Dimension | What the policy says | Examples of authoring intent |
 |---|---|---|
@@ -119,7 +119,7 @@ tessera:notAfter    a owl:DatatypeProperty ;
     rdfs:range xsd:dateTime .
 ```
 
-The `recipient` property reuses `PrincipalSelector`. Recipients are principals — Delta Sharing recipients are organizations or metastores; Snowflake consumers are accounts; BigQuery subscribers are GCP projects. Treating them as principals keeps the IR vocabulary minimal.
+The `recipient` property reuses `PrincipalSelector`. Recipients are principals: Delta Sharing recipients are organizations or metastores; Snowflake consumers are accounts; BigQuery subscribers are GCP projects. Treating them as principals keeps the IR vocabulary minimal.
 
 ### §3.3 Recipient classification via existing attribute axes
 
@@ -142,8 +142,8 @@ Existing `jurisdiction` (under `regulatoryRegime` axis) and `dataSubject` axes a
 
 Two forms, both serializable as xsd types:
 
-- **`maxDuration: P90D`** — relative TTL from grant; xsd:duration in ISO 8601 form.
-- **`notAfter: 2026-12-31T00:00:00Z`** — hard expiration timestamp; xsd:dateTime in ISO 8601 form.
+- **`maxDuration: P90D`.** Relative TTL from grant; xsd:duration in ISO 8601 form.
+- **`notAfter: 2026-12-31T00:00:00Z`.** Hard expiration timestamp; xsd:dateTime in ISO 8601 form.
 
 Either or both may be specified; if both, the earlier resulting expiration wins. The IR carries the intent; the adapter chooses whichever it can enforce (Delta Sharing supports both via token TTL + share expiration; cloud-storage signed URLs support only `maxDuration` via URL expiry).
 
@@ -151,7 +151,7 @@ Either or both may be specified; if both, the earlier resulting expiration wins.
 
 Reuse existing primitives. A `DistributionConstraint` rule may carry:
 
-- **`transformation`** referencing an existing `TransformationInstance` (Redact, Mask, Hash, Aggregate). The transformation applies to the shared form — the share is filtered through it.
+- **`transformation`** referencing an existing `TransformationInstance` (Redact, Mask, Hash, Aggregate). The transformation applies to the shared form: the share is filtered through it.
 - **`obligation`** referencing an Obligation instance (audit-log, watermark, agreement-required, breach-notification). Obligations are largely out-of-band on most platforms; the adapter emits diagnostics surfacing which obligations the platform can enforce natively and which must be carried by the operator.
 
 ### §3.6 Combined rule shape (proposed)
@@ -326,7 +326,7 @@ policy:
       effect: allow
 ```
 
-The three policies use the same vocabulary; the adapter chooses different channel mechanisms for each. (§5.1 → Delta Sharing recipient with token TTL + filtered share with masking views. §5.2 → marketplace listing of an aggregation view. §5.3 → cloud-storage cross-account IAM with hard expiration, audit logging configured separately, or — if the adapter is sufficiently expressive — a Delta Sharing extract with a copy step orchestrated out-of-band.)
+The three policies use the same vocabulary; the adapter chooses different channel mechanisms for each. (§5.1 → Delta Sharing recipient with token TTL + filtered share with masking views. §5.2 → marketplace listing of an aggregation view. §5.3 → cloud-storage cross-account IAM with hard expiration, audit logging configured separately, or, if the adapter is sufficiently expressive, a Delta Sharing extract with a copy step orchestrated out-of-band.)
 
 ---
 
@@ -338,14 +338,14 @@ The existing technical-design disclaimer reads:
 
 This conflates two distinct concerns:
 
-- **(A) Policy behavior on data after it moves to a different platform.** *"If a column is shared via Delta Sharing to a Snowflake consumer, does the column-masking policy follow it across the boundary?"* Answer: no, that's not in v0 (or arguably ever) — Tessera does not control the recipient's enforcement layer.
-- **(B) Policy expression about the decision to share.** *"Can a Tessera policy say 'this column may be shared to internal recipients with no transformation, to partners only with redaction, and never to public'?"* Yes — this is exactly what `DistributionConstraint` would express. The policy constrains the *creation* of the share, even if it cannot follow the data.
+- **(A) Policy behavior on data after it moves to a different platform.** *"If a column is shared via Delta Sharing to a Snowflake consumer, does the column-masking policy follow it across the boundary?"* Answer: no, that is not in v0 (or arguably ever), since Tessera does not control the recipient's enforcement layer.
+- **(B) Policy expression about the decision to share.** *"Can a Tessera policy say 'this column may be shared to internal recipients with no transformation, to partners only with redaction, and never to public'?"* Yes. `DistributionConstraint` expresses exactly this. The policy constrains the *creation* of the share, even if it cannot follow the data.
 
 The current disclaimer reads as denying (B). When this scoping document advances toward implementation, the disclaimer needs to be rewritten to deny only (A):
 
 > *Policy enforcement once data has crossed platform boundaries is not in scope. Tessera expresses sharing-intent policies that constrain share creation, the conditions on the channel, transformations applied to the shared form, and obligations attached; the recipient platform's own governance is responsible for enforcement after data hand-off.*
 
-This sharpening is small but important — it preserves ADR-001's framing while admitting `DistributionConstraint` as a legitimate IR concern.
+This sharpening preserves ADR-001's framing while admitting `DistributionConstraint` as a legitimate IR concern.
 
 ---
 
@@ -353,17 +353,17 @@ This sharpening is small but important — it preserves ADR-001's framing while 
 
 Parallel to how the ABAC scoping produced ADRs 018–021, this scoping would produce roughly three ADRs:
 
-- **ADR-028 — `DistributionConstraint` semantic shape: recipient, channel, time, transformations, obligations.** Records the policy kind's intended semantics and the new ObjectProperties (`recipient`, `channel`, `maxDuration`, `notAfter`).
-- **ADR-029 — `ChannelCharacteristic` as a named-individuals vocabulary.** Records the closed-vocabulary of channel guarantees, following the ADR-018 pattern for axes (named individuals, closed-vocabulary validation via `sh:in`, adopter-extensibility via subclassing if needed).
-- **ADR-030 — Sharpening the operational-interoperability disclaimer.** Records the (A) vs (B) distinction above; updates the technical design and ADR-001 commentary.
+- **ADR-028: `DistributionConstraint` semantic shape (recipient, channel, time, transformations, obligations).** Records the policy kind's intended semantics and the new ObjectProperties (`recipient`, `channel`, `maxDuration`, `notAfter`).
+- **ADR-029: `ChannelCharacteristic` as a named-individuals vocabulary.** Records the closed vocabulary of channel guarantees, following the ADR-018 pattern for axes (named individuals, closed-vocabulary validation via `sh:in`, adopter-extensibility via subclassing if needed).
+- **ADR-030: sharpening the operational-interoperability disclaimer.** Records the (A) vs (B) distinction above; updates the technical design and ADR-001 commentary.
 
 Spec changes (parallel to Stage 4 of the ABAC work):
 
-- `spec/v0/ontology.ttl` — `DistributionConstraint`, `ChannelCharacteristic`, named individuals, `recipient`/`channel`/`maxDuration`/`notAfter` properties, `recipientTypeAxis` and its values.
-- `spec/v0/context.jsonld` — short-name bindings.
-- `spec/v0/schema.json` — JSON Schema structural validation for the new shape.
-- `spec/v0/shapes.ttl` — SHACL shapes for the new selector and channel-requirement node shape; closed-vocabulary on `ChannelCharacteristic`.
-- `docs/technical-design-v0.2.md` — new subsection on `DistributionConstraint` semantics.
+- `spec/v0/ontology.ttl`: `DistributionConstraint`, `ChannelCharacteristic`, named individuals, `recipient`/`channel`/`maxDuration`/`notAfter` properties, `recipientTypeAxis` and its values.
+- `spec/v0/context.jsonld`: short-name bindings.
+- `spec/v0/schema.json`: JSON Schema structural validation for the new shape.
+- `spec/v0/shapes.ttl`: SHACL shapes for the new selector and channel-requirement node shape; closed-vocabulary on `ChannelCharacteristic`.
+- `docs/technical-design-v0.2.md`: new subsection on `DistributionConstraint` semantics.
 
 The total surface is comparable to the ABAC additions (a few classes, a few properties, a closed vocabulary, three to five worked-example artifacts).
 
@@ -375,11 +375,11 @@ These are real design choices the worked exercise will need to resolve:
 
 1. **Are recipients principals or a parallel concept?** Proposed as principals (§3.2). Alternative: introduce `tessera:Recipient` as a sibling class with its own selector. The principal-reuse path is simpler but conflates "who initiated" with "who receives" at the IR level. The parallel-class path is more explicit but doubles the surface. Worked exercise will pressure-test which.
 
-2. **How does `DistributionConstraint` compose with existing `RowVisibilityConstraint` / `ColumnVisibilityConstraint` policies on the same resource?** If a share is created on a table that already has a column mask, does the mask apply to the share? On Databricks the answer is yes (UC policies follow the data into the share); on Snowflake the answer is more nuanced (secure views may need to be reconstructed). This is the ADR-023 γ-with-refinement question, applied across policy kinds.
+2. **How does `DistributionConstraint` compose with existing `RowVisibilityConstraint` / `ColumnVisibilityConstraint` policies on the same resource?** If a share is created on a table that already has a column mask, does the mask apply to the share? On Databricks the answer is yes (UC policies follow the data into the share); on Snowflake the answer is more nuanced (secure views may need to be reconstructed). The ADR-023 γ-with-refinement question recurs here, across policy kinds.
 
-3. **Should `aggregationOnly` be a channel characteristic or a transformation?** It's currently shown as a transformation in §5.2 (`AggregationOnly` with `minimumGroupSize`). But it also constrains the channel — recipients of an aggregation-only share cannot run row-level queries. Which is the cleaner home? Possibly both, with the transformation being authoritative and the channel characteristic being derived for capability-matching.
+3. **Should `aggregationOnly` be a channel characteristic or a transformation?** It's currently shown as a transformation in §5.2 (`AggregationOnly` with `minimumGroupSize`). But it also constrains the channel: recipients of an aggregation-only share cannot run row-level queries. Which is the cleaner home? Possibly both, with the transformation being authoritative and the channel characteristic being derived for capability-matching.
 
-4. **`agreementRequired` — how is the agreement identified?** §5.1 uses `agreement: dpa:2026-partner`. Should this be an IRI to an external agreement document? An obligation? A standalone concept? Some marketplaces (Snowflake Listings) carry T&Cs natively; others require out-of-band tracking. The IR shape needs to admit both.
+4. **`agreementRequired`: how is the agreement identified?** §5.1 uses `agreement: dpa:2026-partner`. Should this be an IRI to an external agreement document? An obligation? A standalone concept? Some marketplaces (Snowflake Listings) carry T&Cs natively; others require out-of-band tracking. The IR shape needs to admit both.
 
 5. **Audit-log destinations.** Tessera shouldn't model storage paths in the IR, but the `obligations` block needs *some* way to identify where audit logs go. Probably an opaque IRI (`tessera:audit-bucket`) resolved per-environment in `AdapterConfig.extras`, parallel to the tag-taxonomy pattern.
 
@@ -387,7 +387,7 @@ These are real design choices the worked exercise will need to resolve:
 
 7. **What about "no share" policies?** A `DistributionConstraint` with no `effect: allow` rule and a default-deny posture would express "this resource may never be shared." The IR shape needs to admit deny as well as allow (the rules support both per ADR-026 framing); but worth confirming the semantics align with what platforms can enforce.
 
-8. **Cross-cutting: how does `byScope` interact with `DistributionConstraint`?** A schema-scoped sharing policy (`appliesTo: scope: schema:foo`) means "anything in this schema can only be shared per these rules." This is operationally interesting — it's the share-time analog of the ABAC scoping pattern. Should pressure-test in the worked exercise.
+8. **Cross-cutting: how does `byScope` interact with `DistributionConstraint`?** A schema-scoped sharing policy (`appliesTo: scope: schema:foo`) means "anything in this schema can only be shared per these rules." It is the share-time analog of the ABAC scoping pattern. Should pressure-test in the worked exercise.
 
 ---
 
@@ -395,9 +395,9 @@ These are real design choices the worked exercise will need to resolve:
 
 Following the discipline of the ABAC and table-grants exercises, the worked exercise that grounds this scoping should:
 
-- **Pick one concrete scenario** that exercises the maximum surface. Recommendation: **§5.1 (partner data share with PII redaction)** — it touches recipient classification, channel requirements, time bounds, transformations, obligations, and has a clean implementation path on both Databricks Delta Sharing and Snowflake Listings.
+- **Pick one concrete scenario** that exercises the maximum surface. Recommendation: **§5.1 (partner data share with PII redaction)**. It touches recipient classification, channel requirements, time bounds, transformations, and obligations, and has a clean implementation path on both Databricks Delta Sharing and Snowflake Listings.
 - **Hand-derive the Tessera policy YAML and JSON-LD** in `spec/v0/examples/distribution-partner-share-*` artifacts.
-- **Hand-derive the platform DDL on both platforms** — Databricks Delta Sharing recipient + share + filtered view; Snowflake Listing with marketplace T&Cs + secure share + masked view.
+- **Hand-derive the platform DDL on both platforms:** Databricks Delta Sharing recipient + share + filtered view; Snowflake Listing with marketplace T&Cs + secure share + masked view.
 - **Write the diagnostic and comparison documents** capturing what landed cleanly, what surfaced as gaps, what proved that recipients-as-principals is the right shape (or isn't).
 - **Implement adapter emission** in both UC and Snowflake adapters; live-verify on the `acme` infrastructure provisioned by `setup_demo_infra.py`.
 - **Update the capability profiles** with the channel-characteristic guarantee matrix from §4.
@@ -418,18 +418,18 @@ Outcomes if the exercise succeeds:
 For Brice and any reviewers before greenlighting the worked exercise:
 
 1. **Scope of v0 vs reserved-for-v1.** Should all eight channel characteristics land at once, or pick a subset for the worked exercise (say five: audited, recipientIdentified, revocable, timeBounded, agreementRequired) and queue the rest? The minimum-viable set is the one the worked example actually exercises.
-2. **Marketplace listings vs direct shares.** Are listings a separate channel class, or a layered concept (a listing is a publication of an underlying share)? Operationally the latter — listings advertise; the underlying share enforces. The IR might just model the share and treat the listing as adapter-side scaffolding.
+2. **Marketplace listings vs direct shares.** Are listings a separate channel class, or a layered concept (a listing is a publication of an underlying share)? Operationally the latter: listings advertise, and the underlying share enforces. The IR might just model the share and treat the listing as adapter-side scaffolding.
 3. **Ad-hoc query exports.** Should Tessera even try to express policies that constrain "user runs query, downloads CSV"? The platform-side enforcement surface is thin (Databricks has download-controls; Snowflake has download-prevention via secure views; others lack it). May be reasonable to declare ad-hoc exports as out-of-scope and document.
 4. **Snowflake's data clean room mechanism.** Snowflake's *Native App Framework* + data clean rooms support a "query-only, never-extract" guarantee that's stronger than typical shares. Worth a callout for v1; probably not in scope for the first DistributionConstraint pass.
 5. **BigQuery Analytics Hub and Authorized Views.** Should the first worked exercise also target BigQuery, or stick with Databricks + Snowflake parity? Lean: Databricks + Snowflake for the first pass, BigQuery as a follow-up adapter exercise.
-6. **The disclaimer rewrite (§6).** Is the (A) vs (B) distinction the right framing? Anything missing — e.g., does the project need an explicit position on "what does Tessera say about data crossing into a *non-Tessera-governed* environment"?
+6. **The disclaimer rewrite (§6).** Is the (A) vs (B) distinction the right framing? Anything missing (for example, does the project need an explicit position on "what does Tessera say about data crossing into a *non-Tessera-governed* environment")?
 
 ---
 
 ## §11. Recommended next step
 
-If this scoping is greenlit, the immediate next move is **Phase B — worked exercise**, targeting §5.1 (partner data share with PII redaction) end-to-end on Databricks Delta Sharing and Snowflake Listings, following the same Phase 1 / Phase 2 / Phase 3 discipline that produced the ABAC and table-grants exercises.
+If this scoping is greenlit, the immediate next move is **Phase B (the worked exercise)**, targeting §5.1 (partner data share with PII redaction) end-to-end on Databricks Delta Sharing and Snowflake Listings, following the same Phase 1 / Phase 2 / Phase 3 discipline that produced the ABAC and table-grants exercises.
 
-The worked exercise will pressure-test the IR shape proposed here against real platform DDL, and surface the design choices §8's open questions enumerate. The result lands as ADRs 028–030 plus v0 spec additions plus adapter emission code — and Tessera grows from five policy kinds with three exercised (RowVis, ColVis, AccessGrant) to five with four exercised.
+The worked exercise will pressure-test the IR shape proposed here against real platform DDL, and surface the design choices §8's open questions enumerate. The result lands as ADRs 028–030 plus v0 spec additions plus adapter emission code. Tessera grows from five policy kinds with three exercised (RowVis, ColVis, AccessGrant) to five with four exercised.
 
 Sharing is the largest unexercised surface in the v0 IR. Landing it cleanly moves Tessera from "two-thirds of the declared policy kinds work" to "four-fifths work," and brings the framework's coverage in line with what real customer corpora actually carry. (`DataQualityConstraint` and the reserved-space additions remain out of scope per ADR-001.)

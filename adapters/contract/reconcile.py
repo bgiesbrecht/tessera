@@ -1,4 +1,4 @@
-"""Reconciliation — diff intended IR state against observed platform state.
+"""Reconciliation: diff intended IR state against observed platform state.
 
 Platform-neutral comparison logic. Each adapter exposes `discover()` and
 `extract()` to produce an "observed IR" snapshot; the caller provides the
@@ -10,7 +10,7 @@ Matching is by **policy identity**: `appliesTo.resource` + the action. Two
 policies match if they target the same resource for the same action; we then
 compare the rules + defaultBranch shape for modifications.
 
-The diff is structural, not semantic-deep-equal — the IR's `@context`,
+The diff is structural, not semantic-deep-equal. The IR's `@context`,
 `@id`, `description`, `provenance` fields are noise for reconciliation
 purposes; the rules and the appliesTo resource are signal.
 """

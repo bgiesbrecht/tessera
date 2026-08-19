@@ -1,4 +1,4 @@
-"""custom-ACL discovery & extraction — ACL-view → Tessera IR.
+"""custom-ACL discovery & extraction: ACL-view → Tessera IR.
 
 Extraction is this adapter's highest-value responsibility and the reason ADR-003
 exists: a customer with thousands of hand-built ACL views wants to lift them into
@@ -7,7 +7,7 @@ migrated *selectively*, keeping the ACL pattern operational for the rest.
 
 `extract_artifact` parses a wrapping-view definition (the shape this adapter's
 `emit` produces, and the shape the customer hand-writes) back into a byDataset
-RowVisibilityConstraint. The regexes are deliberate-not-perfect — they match the
+RowVisibilityConstraint. The regexes are deliberate-not-perfect: they match the
 documented ACL-join shape; a production extractor would use a SQL AST parser.
 Low-confidence / partial matches surface as diagnostics rather than silent IR.
 
@@ -153,7 +153,7 @@ def extract_artifact(artifact: dict[str, Any]) -> ExtractionResult:
         "provenance": {
             "extractedFrom": f"custom-acl:view:{fq}",
             "notes": (
-                "Extracted by CustomACLAdapter discover()/extract() — the ACL-view "
+                "Extracted by CustomACLAdapter discover()/extract(). The ACL-view "
                 "migration on-ramp (ADR-032). Re-emit through a native adapter to migrate."
             ),
         },
@@ -172,7 +172,7 @@ def discover_schema(
 ) -> DiscoveryResult:
     """Inventory candidate ACL-wrapping views.
 
-    Offline: pass `offline_views` (a list of acl_view artifacts) directly — used
+    Offline: pass `offline_views` (a list of acl_view artifacts) directly, used
     when the caller already has view definitions in hand. Live: pass a DB-API
     `cursor` plus `database`/`schema` to query INFORMATION_SCHEMA.VIEWS and keep
     only definitions that contain an EXISTS ACL-join (a conservative heuristic).
@@ -208,7 +208,7 @@ def discover_schema(
             f"WHERE TABLE_SCHEMA = '{schema}'"
         )
         rows = cursor.fetchall()
-    except Exception as exc:  # noqa: BLE001 — engine-neutral; surface as diagnostic
+    except Exception as exc:  # noqa: BLE001. Engine-neutral; surface as diagnostic
         return DiscoveryResult(
             artifacts=[],
             diagnostics=[Diagnostic(

@@ -4,23 +4,23 @@ The idea from the Layer-2 design conversation: because Tessera policies are
 attribute/selector-based over finite domains, the abstract "request space" a
 single policy discriminates is finite and small. We can enumerate it, evaluate
 the policy's ordered first-match decision (ADR-015) on each abstract request,
-and diff two versions of the policy — reporting every abstract request whose
+and diff two versions of the policy, reporting every abstract request whose
 decision *flips*, with a concrete witness and whether it OPENED or CLOSED.
 
 This is not evaluation over data (ADR-001): a request here is an *abstract*
 tuple of "does the principal match selector S?" and "which value-class is column
 C in?", never a concrete user or row. Within a single policy there is no
-cross-policy combining question (ADR-023) — first-match gives one decision per
-request — so this slice needs no combining commitment and no solver.
+cross-policy combining question (ADR-023): first-match gives one decision per
+request, so this slice needs no combining commitment and no solver.
 
 Scope of this spike:
   * Conditions supported: absent, `in`, `eq` on a single column operand. Any
     other operator makes a rule opaque; the policy is reported as only partially
     enumerable rather than silently mis-evaluated.
   * Principal selectors are treated as independent booleans (a request may
-    "match" any subset). This OVER-approximates — it includes principal
+    "match" any subset). This OVER-approximates: it includes principal
     combinations that real membership might make impossible (two disjoint
-    groups) — so it can over-report a flip, never miss one. Refining it needs a
+    groups), so it can over-report a flip, never miss one. Refining it needs a
     declared-disjointness assertion (scoping-doc §9.3).
 """
 
@@ -167,7 +167,7 @@ def decide(policy: Policy, request: AbstractRequest) -> Decision:
                 return Decision(rule.effect or NO_MATCH, tf)
         except _OpaqueCondition:
             continue
-    # No rule matched — fall to the declared default terminal.
+    # No rule matched: fall to the declared default terminal.
     if policy.default_branch is not None:
         db = policy.default_branch
         tf = db.transformation.get("type") if db.transformation else None

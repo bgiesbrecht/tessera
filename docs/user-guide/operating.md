@@ -6,10 +6,10 @@ This page is for engineers wiring Tessera into a deployment pipeline. It assumes
 
 Tessera defines a four-responsibility contract (ADR-024) implemented by every platform adapter:
 
-1. **Emit** — lower an IR policy to platform-native DDL/SQL statements. Implemented in current adapters.
-2. **Discover** — inventory policy-bearing artifacts on the platform. Stubbed in current adapters.
-3. **Extract** — lift a platform artifact to IR. Stubbed in current adapters.
-4. **Reconcile** — diff intended IR state against observed platform state. Stubbed in current adapters.
+1. **Emit.** Lower an IR policy to platform-native DDL/SQL statements. Implemented in current adapters.
+2. **Discover.** Inventory policy-bearing artifacts on the platform. Stubbed in current adapters.
+3. **Extract.** Lift a platform artifact to IR. Stubbed in current adapters.
+4. **Reconcile.** Diff intended IR state against observed platform state. Stubbed in current adapters.
 
 **Adapters never execute.** They return platform-native statements; the caller composes execution with logging, retry, dry-run, audit, and whatever else the deployment policy requires. This separation keeps adapters testable without platform credentials and keeps the contract synchronous and pure.
 
@@ -89,9 +89,9 @@ print(profile.support_for(Capability.ROW_VISIBILITY))   # SUPPORTED / PARTIAL / 
 print(profile.rationale(Capability.ATTRIBUTE_BASED_SCOPING))
 ```
 
-The `Capability` enum is closed (eight entries today: row visibility, column visibility, attribute-based scoping, dataset-driven principals, dataset-driven resources, conditional obligations, purpose binding, regulatory-regime attribute). Adding values is a deliberate contract change, not a per-adapter decision — this is what makes capability gaps comparable across adapters.
+The `Capability` enum is closed (eight entries today: row visibility, column visibility, attribute-based scoping, dataset-driven principals, dataset-driven resources, conditional obligations, purpose binding, regulatory-regime attribute). Adding values is a deliberate contract change, not a per-adapter decision; that is what makes capability gaps comparable across adapters.
 
-**Reading a capability entry:** `SUPPORTED` means the adapter emits DDL exercising this concept; `PARTIAL` means coverage is incomplete with a stated boundary; `UNSUPPORTED` means the adapter refuses or warns. Emission may still produce output for `PARTIAL` (with a warning diagnostic) — the profile is informational, not a runtime gate.
+**Reading a capability entry:** `SUPPORTED` means the adapter emits DDL exercising this concept; `PARTIAL` means coverage is incomplete with a stated boundary; `UNSUPPORTED` means the adapter refuses or warns. Emission may still produce output for `PARTIAL` (with a warning diagnostic); the profile is informational, not a runtime gate.
 
 For the current state of each adapter's coverage, read the `entries` map in:
 - `adapters/unity_catalog/capability.py`
@@ -110,10 +110,10 @@ if result.has_errors:
 ```
 
 A `Diagnostic` has:
-- **severity** — `info` / `warning` / `error`
-- **code** — short stable identifier (e.g., `UNIMPLEMENTED_POLICY_KIND`, `UNBOUND_PRINCIPAL`)
-- **message** — human-readable explanation
-- **location** — optional pointer into the source policy (e.g., `rules[1].condition`)
+- **severity:** `info` / `warning` / `error`
+- **code:** short stable identifier (e.g., `UNIMPLEMENTED_POLICY_KIND`, `UNBOUND_PRINCIPAL`)
+- **message:** human-readable explanation
+- **location:** optional pointer into the source policy (e.g., `rules[1].condition`)
 
 **Convergent diagnostic vocabulary.** Adapters use parallel codes for parallel concerns (`UNIMPLEMENTED_POLICY_KIND` is the same code in both UC and Snowflake adapters). The contract module does not enforce convergence — see the `claude.ai` handoff doc for an open design question about whether to formalize a shared diagnostic enum.
 
@@ -225,11 +225,11 @@ Snowflake offers two distinct primitives for role-based gating, and they carry *
 
 Both are documented and supported. Snowflake's own guidance: "*If role activation and role hierarchy are important, Snowflake recommends that the policy conditions use the `IS_ROLE_IN_SESSION` function for account roles and the `IS_DATABASE_ROLE_IN_SESSION` function for database roles.*"
 
-**What the Tessera adapter does:** emits `IS_ROLE_IN_SESSION(X)` for `byIdentity` principal selectors — the RBAC-standard semantic, matching Snowflake's recommendation. This means a Tessera policy that selects `group:high_priority_ops` translates to "any user with the `HIGH_PRIORITY_OPS` role granted, regardless of whether it's currently primary."
+**What the Tessera adapter does:** emits `IS_ROLE_IN_SESSION(X)` for `byIdentity` principal selectors, the RBAC-standard semantic, matching Snowflake's recommendation. A Tessera policy that selects `group:high_priority_ops` translates to "any user with the `HIGH_PRIORITY_OPS` role granted, regardless of whether it's currently primary."
 
-**Why this matters operationally.** Since BCR-1692 (Snowflake behavior change, rolled out Aug 2024 → Mar 2025), the platform defaults new users to `DEFAULT_SECONDARY_ROLES = ('ALL')` — every role granted to the user is session-active automatically. This is **consistent with the adapter's emission**: secondary roles activate; `IS_ROLE_IN_SESSION` sees them; permission-scope semantics hold. No defeat condition; the platform default and the adapter's choice align.
+**Why this matters operationally.** Since BCR-1692 (Snowflake behavior change, rolled out Aug 2024 → Mar 2025), the platform defaults new users to `DEFAULT_SECONDARY_ROLES = ('ALL')`: every role granted to the user is session-active automatically. That aligns with the adapter's emission: secondary roles activate; `IS_ROLE_IN_SESSION` sees them; permission-scope semantics hold. The platform default and the adapter's choice agree.
 
-**The thing to watch for** is an *authoring/emission mismatch* — an author who *expects* primary-role-only semantics (because they're thinking in audit-trail terms: "this data should only be accessible when explicitly acting as role X") will be surprised when their policy doesn't discriminate. The Tessera adapter does not currently express the primary-role-only intent; if you need it, the discussion lives in issue [#14](https://github.com/bgiesbrecht/tessera/issues/14) and is deferred until a worked exercise drives the design.
+**The thing to watch for** is an *authoring/emission mismatch*: an author who *expects* primary-role-only semantics (because they're thinking in audit-trail terms, "this data should only be accessible when explicitly acting as role X") will be surprised when their policy doesn't discriminate. The Tessera adapter does not currently express the primary-role-only intent; if you need it, the discussion lives in issue [#14](https://github.com/bgiesbrecht/tessera/issues/14) and is deferred until a worked exercise drives the design.
 
 **Verifying behavior:**
 
@@ -253,13 +253,13 @@ ALTER USER analyst_x SET DEFAULT_SECONDARY_ROLES = ('PUBLIC');
 USE SECONDARY ROLES NONE;
 ```
 
-**When `byDataset` fits better:** if the policy is actually deciding data-driven entitlement (ACL-table-driven, not role-driven), author with `byDataset` rather than `byIdentity`. `byDataset` lowers to a mapping-table-based policy gating on `CURRENT_USER()`, which is orthogonal to role activation entirely — the role-discrimination question doesn't arise. This is the pattern Snowflake [documents for data-driven entitlement](https://docs.snowflake.com/en/user-guide/security-row-using), not a blanket Snowflake-recommended alternative to `byIdentity` for "complex" policies. See [`authoring.md`](./authoring.md) § Snowflake authoring guidance for selector-fit guidance.
+**When `byDataset` fits better:** if the policy is actually deciding data-driven entitlement (ACL-table-driven, not role-driven), author with `byDataset` rather than `byIdentity`. `byDataset` lowers to a mapping-table-based policy gating on `CURRENT_USER()`, orthogonal to role activation entirely, so the role-discrimination question doesn't arise. This is the pattern Snowflake [documents for data-driven entitlement](https://docs.snowflake.com/en/user-guide/security-row-using), not a blanket Snowflake-recommended alternative to `byIdentity` for "complex" policies. See [`authoring.md`](./authoring.md) § Snowflake authoring guidance for selector-fit guidance.
 
 ADR-024's postscript records the live-verification finding under refined framing (initially misframed as a "gotcha"; corrected after design discussion). Issue [#14](https://github.com/bgiesbrecht/tessera/issues/14) tracks the open question of whether the IR should grow to express Intent A vs Intent B explicitly.
 
 ### Existing policies on the same table
 
-Snowflake permits multiple row-access policies attached to the same column? No — Snowflake permits **one** row-access policy per column (similar to Databricks). For re-application:
+Snowflake permits **one** row-access policy per column (similar to Databricks). For re-application:
 
 ```sql
 ALTER TABLE db.schema.table DROP ROW ACCESS POLICY db.schema.policy_name;
@@ -267,8 +267,8 @@ ALTER TABLE db.schema.table DROP ROW ACCESS POLICY db.schema.policy_name;
 
 ### Runnable examples
 
-- `adapters/tests/live_snowflake.py` — the role-based parity test (`byIdentity` against the seed `SNOW_ORDERS` table; observes secondary-roles behavior).
-- `adapters/tests/live_snowflake_bydataset.py` — the `byDataset` exercise (ACL-table-driven; all four scenarios including secondary-roles immunity).
+- `adapters/tests/live_snowflake.py`: the role-based parity test (`byIdentity` against the seed `SNOW_ORDERS` table; observes secondary-roles behavior).
+- `adapters/tests/live_snowflake_bydataset.py`: the `byDataset` exercise (ACL-table-driven; all four scenarios including secondary-roles immunity).
 
 ## Validation pipeline
 
@@ -303,7 +303,7 @@ Layer 1 enforces structure; Layer 2 enforces semantic well-formedness; Layer 3 e
 
 ## Dry-run mode
 
-Not yet a first-class adapter mode. The current pattern: emit DDL, print/log, do not execute. The runner scripts under `adapters/tests/` exemplify this — emission is unconditional; execution is gated separately by the script. A formal `verify` adapter responsibility (parallel to discover/extract/emit/reconcile) is an open design question — see the claude.ai handoff doc.
+Not yet a first-class adapter mode. The current pattern: emit DDL, print/log, do not execute. The runner scripts under `adapters/tests/` exemplify this: emission is unconditional; execution is gated separately by the script. A formal `verify` adapter responsibility (parallel to discover/extract/emit/reconcile) is an open design question; see the claude.ai handoff doc.
 
 ## Per-adapter checklists for production deployment
 
@@ -331,5 +331,5 @@ Not yet a first-class adapter mode. The current pattern: emit DDL, print/log, do
 
 - **Discovery, extraction, reconciliation in production.** Stubbed in current adapters; building them out is queued work.
 - **Multi-policy orchestration.** ADR-023's γ-with-refinement framing describes the model; production patterns for staged rollout, A/B comparison, and rollback are not yet codified.
-- **Tessera CLI.** No CLI exists yet — deployment is library-shaped, called from your own Python. A CLI may emerge once the converter and a few more adapters land.
+- **Tessera CLI.** No CLI exists yet; deployment is library-shaped, called from your own Python. A CLI may emerge once the converter and a few more adapters land.
 - **Custom adapters.** See [`contributing.md`](./contributing.md) for writing one against the contract.

@@ -1,6 +1,6 @@
 # Evaluating Tessera
 
-This page is for decision-makers — security, data architecture, governance leadership — assessing whether Tessera fits a real estate. It is deliberately direct about scope, non-goals, and limitations.
+This page is for decision-makers (security, data architecture, governance leadership) assessing whether Tessera fits a real estate. It is deliberately direct about scope, non-goals, and limitations.
 
 ## What Tessera is
 
@@ -21,17 +21,17 @@ These are not edge-case clarifications. They are load-bearing scope decisions, d
 - **Not operational interoperability.** Policy behavior when data physically moves between platforms (Delta Sharing, Iceberg, replication) is reserved space. Out of scope for v0.
 - **Not a universal authorization language.** Scope is data-platform governance specifically. Not for application authz, not for API gateways, not for OS-level access control.
 - **Not a substitute for Unity Catalog inside Databricks-only shops.** If you run only Databricks, Unity Catalog already does what you need. Tessera adds value precisely when policy must mean the same thing on Unity Catalog AND somewhere else.
-- **Not a standards-body submission.** Tessera draws semantic alignment from ODRL, DPV, and adjacent vocabularies (ADR-005) but does not seek formal standardization. It is engineering posture: skunkworks, customer-driven, ADR-disciplined (ADR-002).
+- **Not a standards-body submission.** Tessera draws semantic alignment from ODRL, DPV, and adjacent vocabularies (ADR-005) but does not seek formal standardization. Its posture is engineering: skunkworks, customer-driven, ADR-disciplined (ADR-002).
 - **Not a Databricks product.** It is an Anthropic / Databricks Field Engineering project led by Brice Giesbrecht. It does not have a Databricks product roadmap, formal SLAs, or commercial commitments.
 - **Not prescriptive about authoring style.** Tessera represents policy intent; it does not invent cross-platform authoring recommendations the platforms themselves do not document. Where Snowflake or Databricks recommends a pattern, Tessera surfaces and cites that recommendation. Where they don't, Tessera describes what each shape represents and lets you choose. (ADR-027.)
 
 ## When Tessera fits
 
-The strongest fit is an organization with:
+Tessera fits an organization with:
 
-- **Multiple data platforms** — at least one of which is Databricks (the adapter Tessera leans into first) and at least one other (Snowflake, custom Spark+ACL, BigQuery on the roadmap).
-- **Real policy ambiguity** — different teams or platforms have arrived at semantically equivalent policies via different mechanisms (governed tags vs object tags vs classification tables) and the inconsistency is costing audit time, migration time, or policy-drift incidents.
-- **An engineering culture that values explicit decision records** — Tessera is opinionated about ADR discipline, capability profiles as documents, and diagnostic surfaces as first-class artifacts. Organizations that prefer black-box tooling will find the surface area heavy.
+- **Multiple data platforms.** At least one is Databricks (the adapter Tessera leans into first) and at least one other (Snowflake, custom Spark+ACL, BigQuery on the roadmap).
+- **Real policy ambiguity.** Different teams or platforms have arrived at semantically equivalent policies via different mechanisms (governed tags vs object tags vs classification tables), and the inconsistency is costing audit time, migration time, or policy-drift incidents.
+- **An engineering culture that values explicit decision records.** Tessera is opinionated about ADR discipline, capability profiles as documents, and diagnostic surfaces as first-class artifacts. Organizations that prefer black-box tooling will find the surface area heavy.
 
 Weaker fit:
 
@@ -43,7 +43,7 @@ Weaker fit:
 
 Tessera does not contest Unity Catalog's role inside Databricks. Unity Catalog is the source of truth for governance inside the Databricks platform; Tessera operates between governance estates. This concession is irreducible and load-bearing. Documents or framings that contradict it produce internal Databricks friction the project cannot survive.
 
-If your evaluation hinges on Tessera replacing Unity Catalog — or being preferred to it for Databricks-internal policy — the answer is no. Tessera is for the gap between estates, not within an estate.
+If your evaluation hinges on Tessera replacing Unity Catalog (or being preferred to it for Databricks-internal policy), the answer is no. Tessera is for the gap between estates, not within an estate.
 
 ## Honest limitations as of 2026-05-19
 
@@ -55,7 +55,7 @@ These are not roadmap items; they are the current state. Read them before commit
 - `PrincipalSetFromTable` does not formally split ACL-column-name from protected-column-name (one of the v1 candidates surfaced by the Snowflake byDataset exercise).
 - Match-modifier declarations on `byDataset` selectors (case-insensitive match, whitespace normalization) are not modeled.
 
-The v0 immutability bar is suspended (ADR-017) until external dependency exists, so these gaps remain addressable. But they are gaps today.
+The v0 immutability bar is suspended (ADR-017) until external dependency exists, so these gaps remain addressable. They are gaps today.
 
 **The adapter scaffolds are first cuts:**
 - Databricks: emits row-visibility for `byIdentity`. Column visibility, ABAC, `byDataset`, and other selector kinds are stubbed with diagnostics.
@@ -67,7 +67,7 @@ The v0 immutability bar is suspended (ADR-017) until external dependency exists,
 - No CLI. Library-shaped Python only.
 - No formal `verify` mode for deployment-time configuration checks (e.g., "this principal binding maps to a role that doesn't exist on the target," "the target column type doesn't match the policy's expected type").
 
-**The customer engagement backing v0 is one real ACL-pattern shop.** ADR-003's reference customer — a Snowflake shop with hundreds of ACL-table-based policies — drove the design discipline (adapter-first, `byDataset` first-class, capability profiles as artifacts). Other customer corpora may strain the design in ways v0 hasn't yet absorbed.
+**The customer engagement backing v0 is one real ACL-pattern shop.** ADR-003's reference customer, a Snowflake shop with hundreds of ACL-table-based policies, drove the design discipline (adapter-first, `byDataset` first-class, capability profiles as artifacts). Other customer corpora may strain the design in ways v0 hasn't yet absorbed.
 
 ## Decision framework
 
@@ -75,7 +75,7 @@ Three questions in order:
 
 1. **Does your estate have at least two data platforms where the same policy must mean the same thing?** If no, stop here; use the platforms' native primitives.
 
-2. **Is policy ambiguity / drift between platforms a real cost — audit failures, migration friction, governance incidents?** If no, the engineering overhead of adopting Tessera is not justified by the value it adds. Revisit when the cost materializes.
+2. **Is policy ambiguity / drift between platforms a real cost (audit failures, migration friction, governance incidents)?** If no, the engineering overhead of adopting Tessera is not justified by the value it adds. Revisit when the cost materializes.
 
 3. **Can your engineering culture absorb explicit ADR discipline, capability-profile reading, and diagnostic-surface engagement?** Tessera does not present a unified abstraction over platforms; it presents an honest cross-platform vocabulary with explicit per-platform translation. Teams expecting black-box governance will find the surface area heavy.
 
@@ -96,9 +96,9 @@ Tessera's positioning: compile-time portability between platforms, leaning into 
 
 ## What to read next
 
-- [`tutorial.md`](./tutorial.md) — concrete end-to-end if you want to see what Tessera actually does.
-- `docs/executive-summary.md` — one-page leadership brief.
-- `docs/problem-and-recommendation.md` — stakeholder framing.
-- `DECISIONS.md` — every significant decision recorded. ADRs 001–027.
-- `docs/technical-design-v0.2.md` — spec-level reference.
-- `spec/v0/examples/` — seven completed worked exercises with full artifacts and diagnostic findings.
+- [`tutorial.md`](./tutorial.md): concrete end-to-end if you want to see what Tessera actually does.
+- `docs/executive-summary.md`: one-page leadership brief.
+- `docs/problem-and-recommendation.md`: stakeholder framing.
+- `DECISIONS.md`: every significant decision recorded. ADRs 001–027.
+- `docs/technical-design-v0.2.md`: spec-level reference.
+- `spec/v0/examples/`: seven completed worked exercises with full artifacts and diagnostic findings.

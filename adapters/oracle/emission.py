@@ -1,4 +1,4 @@
-"""Oracle emission — IR → Oracle DDL/PL-SQL.
+"""Oracle emission: IR → Oracle DDL/PL-SQL.
 
 Oracle's governance primitives are different in shape from Unity Catalog's and
 Snowflake's, which is exactly why a third platform is a good portability test
@@ -89,7 +89,7 @@ def _emit_retention_expression_only(policy_id: Any) -> EmissionResult:
 
 
 # ---------------------------------------------------------------------------
-# Row visibility — Virtual Private Database (VPD)
+# Row visibility: Virtual Private Database (VPD)
 # ---------------------------------------------------------------------------
 
 
@@ -128,8 +128,8 @@ def _emit_row_visibility_by_identity(
 ) -> EmissionResult:
     """Role-gated VPD policy function. Each byIdentity rule becomes an IF branch
     testing SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>'); the returned predicate is
-    the rule's row filter. Fail-closed ELSE ('1=0') for principals in no rule —
-    which is what explicit-baseline-group intends (the baseline group is an
+    the rule's row filter. Fail-closed ELSE ('1=0') for principals in no rule.
+    That is what explicit-baseline-group intends (the baseline group is an
     explicit rule)."""
     diagnostics: list[Diagnostic] = []
     policy_id = policy.get("@id")
@@ -189,9 +189,10 @@ def _emit_row_visibility_by_identity(
 def _emit_row_visibility_by_dataset(
     policy: dict[str, Any], config: AdapterConfig, schema: str, obj: str,
 ) -> EmissionResult:
-    """VPD policy function whose predicate is a correlated EXISTS over the ACL
-    tables — the same join the other adapters build, returned as a WHERE predicate
-    string. Fail-closed for principals absent from the join (EXISTS yields no rows)."""
+    """VPD policy function whose predicate is a non-correlated IN-subquery over the
+    ACL tables (the same join the other adapters build), returned as a WHERE
+    predicate string. Fail-closed for principals absent from the join: the
+    subquery returns no values."""
     diagnostics: list[Diagnostic] = []
     policy_id = policy.get("@id")
     rules = policy.get("rules") or []
@@ -249,7 +250,7 @@ def _emit_row_visibility_by_dataset(
     # A non-correlated IN-subquery, NOT a correlated EXISTS. Live verification
     # caught the trap: in `EXISTS (... AND p.<col> = <col>)` the bare <col>
     # resolves to the inner ACL table p (which also has that column), making the
-    # predicate `p.<col> = p.<col>` — always true, so any mapped user saw all rows.
+    # predicate `p.<col> = p.<col>`, always true, so any mapped user saw all rows.
     # The IN form keeps the outer column bare (VPD resolves it to the protected
     # table, correctly, and robustly under table aliasing) while the subquery is
     # self-contained: the set of values the current user is entitled to.
@@ -315,7 +316,7 @@ def _add_vpd_policy(schema: str, obj: str, policy_id: Any, fn: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Column visibility — Oracle Data Redaction
+# Column visibility: Oracle Data Redaction
 # ---------------------------------------------------------------------------
 
 
@@ -373,13 +374,13 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
     # Data Redaction applies when `expression` is TRUE. Allowed roles must see real
     # data, so redact when the session has NONE of the allowed roles.
     if allow_roles:
-        # Redact when the session holds NONE of the allowed roles — redact-by-default:
+        # Redact when the session holds none of the allowed roles (redact-by-default):
         # reveal only when the role is explicitly 'TRUE'. SYS_SESSION_ROLES returns
         # 'TRUE'/'FALSE' for a role and NULL for one that does not exist. Data Redaction
         # expressions forbid NVL (ORA-28087) but allow `= / IS NULL / OR / AND`, so the
         # robust form is `(SYS_CONTEXT(..) = 'FALSE' OR SYS_CONTEXT(..) IS NULL)`. (Both
-        # facts — the NVL ban and that a bare `IS NULL` test never redacts an ungranted
-        # role — were caught in live verification.) Inner quotes are doubled for the
+        # facts, the NVL ban and that a bare `IS NULL` test never redacts an ungranted
+        # role, were caught in live verification.) Inner quotes are doubled for the
         # PL/SQL string literal.
         conds = " AND ".join(
             f"(SYS_CONTEXT(''SYS_SESSION_ROLES'', ''{r}'') = ''FALSE'' "
@@ -435,7 +436,7 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
 
 
 # ---------------------------------------------------------------------------
-# Access grants — GRANT
+# Access grants: GRANT
 # ---------------------------------------------------------------------------
 
 
@@ -486,7 +487,7 @@ def _emit_access_grant(policy: dict[str, Any], config: AdapterConfig) -> Emissio
 
 
 # ---------------------------------------------------------------------------
-# Helpers — identifiers & naming
+# Helpers: identifiers & naming
 # ---------------------------------------------------------------------------
 
 
@@ -541,7 +542,7 @@ def _oracle_qualified(resource_iri: str, config: AdapterConfig) -> str:
 def _oracle_role(principal_ref: str, config: AdapterConfig) -> str:
     """Map a PrincipalRef to an Oracle role name. Honors config.identity_bindings;
     else uppercases and replaces spaces/hyphens with underscores (Oracle role names
-    are unquoted identifiers — 'account users' must be bound or sanitized)."""
+    are unquoted identifiers, so 'account users' must be bound or sanitized)."""
     bound = config.bind_principal(principal_ref)
     if bound:
         return bound

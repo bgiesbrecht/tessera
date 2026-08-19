@@ -1,6 +1,6 @@
 """Generate the cross-policy overlap demo: fixtures + narrative markdown.
 
-Shows C4 / L2 catching the ADR-023 MULTIPLE_MASKS situation — two column-mask
+Shows C4 / L2 catching the ADR-023 MULTIPLE_MASKS situation: two column-mask
 policies that resolve to the same columns with divergent transformations, which
 a platform declaring `single-column-mask-per-column` will refuse to emit.
 
@@ -8,7 +8,7 @@ The story: a corpus starts with one PII redaction mask. A second team adds a
 hashing mask for the same PII columns (a different downstream consumer's need).
 Both are individually valid; together they conflict. C4 catches the moment the
 second policy lands; L2 keeps surfacing the standing conflict. A third policy
-targets a concrete column that *may* carry the attribute — flagged CANDIDATE,
+targets a concrete column that *may* carry the attribute, flagged CANDIDATE,
 not PROVEN, because whether that column is tagged is a platform fact the tool
 does not read (the ADR-001 line).
 
@@ -128,7 +128,7 @@ def _rel(path: Path) -> str:
 
 
 def _render_markdown(diff: str, lint_after: str, lint_before: str) -> str:
-    return f"""# Demo — cross-policy overlap detection (ADR-023)
+    return f"""# Demo: cross-policy overlap detection (ADR-023)
 
 > **Generated file.** Produced by `tools/impact/demo/build_overlap_demo.py`.
 > Every tool-output block below is real output from `tools/impact`. Regenerate
@@ -142,9 +142,9 @@ the same shape applies to row filters (**one row filter per table**). These are
 *multiplicity* constraints: the platform permits at most one such policy per
 target, so two policies resolving to the same target conflict whether their
 effects disagree (Redact vs Hash) or are identical (a redundant duplicate). This
-demo uses column masks; the row-filter case — "someone added a second filter for
-another team on the same table" — is the same rule and is flagged the same way.
-Under γ-with-refinement, Tessera does not pick a winner — it surfaces the
+demo uses column masks; the row-filter case ("someone added a second filter for
+another team on the same table") is the same rule and is flagged the same way.
+Under γ-with-refinement, Tessera does not pick a winner; it surfaces the
 conflict at analysis time so the author resolves it before deployment.
 
 The change-impact tool detects this statically:
@@ -155,14 +155,14 @@ The change-impact tool detects this statically:
 
 Both stay on the static side of the ADR-001 line. Two attribute *predicates*
 that provably co-apply (by scope containment + ontology subsumption) are
-**PROVEN**. But a predicate versus a *concrete column* is only **CANDIDATE** —
+**PROVEN**. But a predicate versus a *concrete column* is only **CANDIDATE**:
 proving that overlap would require knowing whether the column carries the
 attribute tag, which is a platform-tagging fact the tool does not read.
 
 ## The corpus
 
 `policy:pii-redact` redacts PII columns across `catalog:acme`. A second team
-adds `policy:pii-hash` — hashing PII columns in `schema:acme.tpch` for a
+adds `policy:pii-hash`, hashing PII columns in `schema:acme.tpch` for a
 different consumer. Both are individually valid; together they resolve two
 different masks onto the same PII columns in the tpch schema. A third policy,
 `policy:clerk-redact`, targets the concrete column `o_clerk`.
@@ -174,10 +174,10 @@ different masks onto the same PII columns in the tpch schema. A third policy,
 | `clerk-redact` | `column:acme.tpch.orders.o_clerk` (concrete) | Redact |
 
 `catalog:acme` ⊇ `schema:acme.tpch`, and `PII ⊇ PII`, so `pii-redact` and
-`pii-hash` provably co-apply to the PII columns in tpch — with divergent
+`pii-hash` provably co-apply to the PII columns in tpch, with divergent
 transformations. That is the conflict.
 
-## C4 — the overlap the change introduced (before → after)
+## C4: the overlap the change introduced (before → after)
 
 Adding `pii-hash` and `clerk-redact` to the single-policy baseline:
 
@@ -185,23 +185,23 @@ Adding `pii-hash` and `clerk-redact` to the single-policy baseline:
 
 Three overlaps, and the confidence split is the point:
 
-- **`pii-redact ∩ pii-hash` — PROVEN.** Two attribute predicates on overlapping
+- **`pii-redact ∩ pii-hash`: PROVEN.** Two attribute predicates on overlapping
   scope (`catalog:acme` ⊇ `schema:acme.tpch`) with the same axis value; the
   overlap follows from the policy text alone. Divergent transforms (Redact vs
   Hash).
-- **`clerk-redact ∩ pii-hash` — CANDIDATE.** A concrete column vs. an attribute
+- **`clerk-redact ∩ pii-hash`: CANDIDATE.** A concrete column vs. an attribute
   predicate: the tool would have to know `o_clerk` is tagged PII to be sure, and
-  that is a platform-tagging fact it does not read — so it flags a possibility
+  that is a platform-tagging fact it does not read, so it flags a possibility
   and names the unknown rather than guessing.
-- **`clerk-redact ∩ pii-redact` — CANDIDATE, duplicate coverage.** Same shape,
+- **`clerk-redact ∩ pii-redact`: CANDIDATE, duplicate coverage.** Same shape,
   but here both policies *redact*. The effects are identical, yet it is still a
   conflict: the platform's `single-column-mask-per-column` rule is about
-  multiplicity, not disagreement — at most one mask may resolve to a column,
+  multiplicity, not disagreement: at most one mask may resolve to a column,
   even two identical ones. A tool that only flagged *divergent* effects would
   miss this, and miss the analogous "second row filter on the same table" case
   entirely.
 
-## L2 — the standing overlap lint (after)
+## L2: the standing overlap lint (after)
 
 {_fence(lint_after)}
 
@@ -221,7 +221,7 @@ python -m tools.impact --lint --corpus tools/impact/demo/overlap/before
 
 ## Takeaway
 
-Cross-policy conflicts are invisible in any single policy file — they emerge
+Cross-policy conflicts are invisible in any single policy file; they emerge
 only from the corpus as a whole, and on Databricks they surface at query time,
 after deployment, as a runtime rejection. C4/L2 pull that discovery forward to
 analysis time and name both policies, the platform constraint, and the ADR-023

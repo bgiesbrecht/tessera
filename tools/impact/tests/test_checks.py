@@ -76,7 +76,7 @@ def _rule(resource, effect, values=None):
 
 
 # ============================================================================
-# Exercise 1 — remove Rule A2 from group-row-visibility-policy-a
+# Exercise 1: remove Rule A2 from group-row-visibility-policy-a
 # ============================================================================
 
 
@@ -179,7 +179,7 @@ def test_add_expose_only_policy_is_widen():
 
 
 # ============================================================================
-# C5 — dangling reference (seeded by the change)
+# C5: dangling reference (seeded by the change)
 # ============================================================================
 
 
@@ -230,7 +230,7 @@ def test_identical_corpus_no_findings():
 
 
 # ============================================================================
-# C1 — fall-through coverage
+# C1: fall-through coverage
 # ============================================================================
 
 
@@ -259,7 +259,7 @@ def test_c1_not_fired_when_rule_still_present():
 
 
 # ============================================================================
-# C2 — default-net removal / weakening (Exercise 3)
+# C2: default-net removal / weakening (Exercise 3)
 # ============================================================================
 
 
@@ -300,7 +300,7 @@ def test_c2_default_branch_removal_flagged_narrow():
 
 
 # ============================================================================
-# C3 — reachability / shadowing
+# C3: reachability / shadowing
 # ============================================================================
 
 
