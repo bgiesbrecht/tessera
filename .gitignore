@@ -218,8 +218,9 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Tessera-specific
-# Local Snowflake credential file — never committed
+# Local platform credential files — never committed
 snowflake_auth.txt
+oracle_auth.txt
 # Misc local downloads / archives that occasionally land in the repo root
 files*.zip
 # macOS Finder metadata

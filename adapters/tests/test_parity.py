@@ -18,6 +18,7 @@ from pathlib import Path
 
 from adapters.contract.types import AdapterConfig
 from adapters.custom_acl import CustomACLAdapter
+from adapters.oracle import OracleAdapter
 from adapters.snowflake import SnowflakeAdapter
 from adapters.unity_catalog import UnityCatalogAdapter
 
@@ -269,6 +270,71 @@ def test_custom_acl_profile_is_pattern_adapter():
     assert acl.capability_profile.support_for(Capability.ROW_VISIBILITY) == CapabilitySupport.SUPPORTED
     assert acl.capability_profile.support_for(Capability.DATASET_DRIVEN_PRINCIPALS) == CapabilitySupport.SUPPORTED
     assert acl.capability_profile.support_for(Capability.ATTRIBUTE_BASED_SCOPING) == CapabilitySupport.UNSUPPORTED
+
+
+def test_oracle_row_visibility_lowers_to_vpd():
+    """ADR-033: byIdentity row visibility → an Oracle VPD policy function (role-gated
+    predicate over SYS_CONTEXT) attached with DBMS_RLS.ADD_POLICY. Distinct from the
+    UC row-filter function and Snowflake row-access policy for the same IR."""
+    policy = _load("group-row-visibility-policy-a.jsonld")
+    r = OracleAdapter().emit(policy)
+    assert not r.has_errors, r.diagnostics
+    sql = "\n".join(r.statements)
+    assert "DBMS_RLS.ADD_POLICY" in sql
+    assert "SYS_CONTEXT('SYS_SESSION_ROLES', 'ACME_HIGH_PRIORITY_OPS')" in sql
+    # The `in` condition is lowered to an IN predicate with doubled quotes (PL/SQL literal).
+    assert "o_orderpriority IN (''1-URGENT'', ''2-HIGH'')" in sql
+    # Fail-closed ELSE for principals in no rule.
+    assert "RETURN '1=0'" in sql
+
+
+def test_oracle_column_mask_lowers_to_data_redaction_with_quoted_expression():
+    """ADR-033: Redact-with-replacement → DBMS_REDACT.REGEXP so the replacement
+    literal is honored (FULL cannot). The `expression` is a PL/SQL string literal, so
+    its inner quotes must be doubled — a regression guard for that."""
+    policy = _load("column-mask-orders-clerk-policy.jsonld")
+    r = OracleAdapter().emit(policy)
+    assert not r.has_errors, r.diagnostics
+    sql = "\n".join(r.statements)
+    assert "DBMS_REDACT.ADD_POLICY" in sql
+    assert "function_type        => DBMS_REDACT.REGEXP" in sql
+    assert "regexp_replace_string => 'CLERK-REDACTED'" in sql
+    # Inner quotes doubled — the literal would be malformed otherwise.
+    assert "''SYS_SESSION_ROLES''" in sql and "''ORDERS_FULL_ACCESS''" in sql
+
+
+def test_oracle_bydataset_vpd_round_trips_to_equivalent_ir():
+    """Oracle's full cycle: emit a byDataset VPD policy, then extract its function
+    body back to IR. The reconstructed dataset + operand match the source."""
+    policy = _load("acl-row-visibility-policy.jsonld")
+    adapter = OracleAdapter()
+    emitted = adapter.emit(policy)
+    assert not emitted.has_errors
+    artifact = {
+        "kind": "vpd_policy", "object_owner": "TPCH", "object_name": "ORDERS_RLS_ACL",
+        "function_body": emitted.statements[0],
+    }
+    ext = adapter.extract(artifact)
+    assert ext.policy is not None and ext.confidence >= 0.85
+    src_rule = policy["rules"][0]
+    out_rule = ext.policy["rules"][0]
+    assert out_rule["principal"]["dataset"]["principalColumn"] == src_rule["principal"]["dataset"]["principalColumn"]
+    assert out_rule["condition"]["operands"][0]["resourceColumn"] == src_rule["condition"]["operands"][0]["resourceColumn"]
+
+
+def test_oracle_access_grant_lowers_to_grant_statement():
+    policy = _load("table-grants-scenario-a.jsonld")
+    r = OracleAdapter().emit(policy)
+    assert not r.has_errors, r.diagnostics
+    assert "GRANT SELECT ON TPCH.ORDERS TO ACME_MARKETING_ANALYTICS;" in "\n".join(r.statements)
+
+
+def test_oracle_byscope_is_refused_honestly():
+    """Oracle has no tag-driven attachment; byScope must produce a diagnostic, not DDL."""
+    policy = _load("abac-column-mask-policy-a.jsonld")
+    r = OracleAdapter().emit(policy)
+    assert r.statements == []
+    assert any(d.code == "UNSUPPORTED_ABAC_SCOPING" for d in r.diagnostics)
 
 
 def test_capability_profiles_differ_meaningfully():

@@ -113,8 +113,11 @@ def _build_adapter(name: str, config) -> Any:
     if name in ("custom-acl", "acl"):
         from adapters.custom_acl import CustomACLAdapter
         return CustomACLAdapter(config=config)
+    if name in ("oracle", "ora"):
+        from adapters.oracle import OracleAdapter
+        return OracleAdapter(config=config)
     raise SystemExit(
-        f"error: unknown adapter {name!r}; expected unity-catalog, snowflake, or custom-acl"
+        f"error: unknown adapter {name!r}; expected unity-catalog, snowflake, custom-acl, or oracle"
     )
 
 
@@ -480,14 +483,14 @@ def make_parser() -> argparse.ArgumentParser:
     # emit
     e = sub.add_parser("emit", help="Produce platform DDL for a policy.")
     e.add_argument("file", help="Path to a .tessera.yaml or .jsonld file.")
-    e.add_argument("--adapter", required=True, choices=["unity-catalog", "uc", "databricks", "snowflake", "sf", "custom-acl", "acl"])
+    e.add_argument("--adapter", required=True, choices=["unity-catalog", "uc", "databricks", "snowflake", "sf", "custom-acl", "acl", "oracle", "ora"])
     e.add_argument("--config", help="Bindings YAML (identity_bindings, resource_bindings, tag_taxonomy, extras).")
     e.add_argument("--json", action="store_true", help="Emit machine-readable JSON to stdout.")
     e.set_defaults(func=cmd_emit)
 
     # discover
     d = sub.add_parser("discover", help="Inventory deployed policies on a platform.")
-    d.add_argument("--adapter", required=True, choices=["unity-catalog", "uc", "databricks", "snowflake", "sf", "custom-acl", "acl"])
+    d.add_argument("--adapter", required=True, choices=["unity-catalog", "uc", "databricks", "snowflake", "sf", "custom-acl", "acl", "oracle", "ora"])
     d.add_argument("--config", help="Bindings YAML.")
     d.add_argument("--json", action="store_true", help="Emit machine-readable JSON to stdout.")
     _add_databricks_conn_args(d)
@@ -497,7 +500,7 @@ def make_parser() -> argparse.ArgumentParser:
 
     # extract
     x = sub.add_parser("extract", help="Discover then lift each artifact to Tessera IR.")
-    x.add_argument("--adapter", required=True, choices=["unity-catalog", "uc", "databricks", "snowflake", "sf", "custom-acl", "acl"])
+    x.add_argument("--adapter", required=True, choices=["unity-catalog", "uc", "databricks", "snowflake", "sf", "custom-acl", "acl", "oracle", "ora"])
     x.add_argument("--name", help="Extract only an artifact whose name matches (substring).")
     x.add_argument("--out", help="Write each extracted IR as <name>.jsonld in this directory; default stdout JSON.")
     x.add_argument("--config", help="Bindings YAML.")
@@ -508,7 +511,7 @@ def make_parser() -> argparse.ArgumentParser:
 
     # reconcile
     r = sub.add_parser("reconcile", help="Diff intended IR (file or directory) against deployed state.")
-    r.add_argument("--adapter", required=True, choices=["unity-catalog", "uc", "databricks", "snowflake", "sf", "custom-acl", "acl"])
+    r.add_argument("--adapter", required=True, choices=["unity-catalog", "uc", "databricks", "snowflake", "sf", "custom-acl", "acl", "oracle", "ora"])
     r.add_argument("--intended", required=True, help="Path to an intended-IR file or directory of .tessera.yaml / .jsonld files.")
     r.add_argument("--config", help="Bindings YAML.")
     _add_databricks_conn_args(r)

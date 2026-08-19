@@ -11,6 +11,7 @@ adapters and custom-pattern adapters implement the same four responsibilities
 contract/                Adapter ABC, CapabilityProfile, AdapterConfig, Result types
 unity_catalog/           Databricks adapter (Unity Catalog) — native platform
 snowflake/               Snowflake adapter — native platform
+oracle/                  Oracle adapter (VPD / Data Redaction / GRANT) — native platform (ADR-033)
 custom_acl/              Custom ACL-table + wrapping-view adapter — pattern adapter (ADR-032)
 tests/                   Cross-adapter parity tests + live_*.py integration scripts
 ```
@@ -82,6 +83,12 @@ output for a PARTIAL capability with a warning diagnostic.
   reconcile). Emit covers `RowVisibilityConstraint` (`byIdentity`, `byScope`,
   `byDataset`), `ColumnVisibilityConstraint` (`Redact`), and `AccessGrantConstraint`.
   `RetentionConstraint` is expression-only (`RETENTION_EXPRESSION_ONLY`, ADR-031).
+- **Oracle** — full cycle against Oracle primitives (ADR-033): row visibility via VPD
+  (`DBMS_RLS.ADD_POLICY` + a role-gated / EXISTS policy function), column masking via
+  Data Redaction (`DBMS_REDACT.ADD_POLICY`, REGEXP so the replacement is honored),
+  access grants via `GRANT`. No tag-driven ABAC (`byScope` refused with a diagnostic;
+  OLS deferred). Emission + offline extract are tested; live verification is pending an
+  instance (`tests/live_oracle.py`, reads `oracle_auth.txt`).
 - **custom-ACL** — emit lowers a `byDataset` `RowVisibilityConstraint` to a wrapping
   secure view; extract lifts such a view back to IR (the selective-migration on-ramp,
   ADR-032). Column masking in the view is a queued follow-up.

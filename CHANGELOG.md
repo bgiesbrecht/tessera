@@ -4,6 +4,27 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.14.0] — 2026-08-17
+
+Fourth adapter: **Oracle** (ADR-033) — a third native platform, proving IR portability against a materially different mechanism set (Virtual Private Database, Data Redaction, GRANT — none resembling the UC/Snowflake primitives).
+
+### Added
+
+- **`adapters/oracle/`** (`OracleAdapter`), full ADR-024 cycle:
+  - **emit** — row visibility → VPD (`DBMS_RLS.ADD_POLICY` + a PL/SQL policy function): `byIdentity` becomes an `IF/ELSIF` ladder over `SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>')` returning each rule's predicate with a fail-closed `ELSE`, `byDataset` returns a correlated `EXISTS` over the ACL tables. Column masking → Data Redaction (`DBMS_REDACT.ADD_POLICY`, `function_type => REGEXP` so the `Redact` replacement literal is honored — FULL can't). Access grants → `GRANT`. `byScope` ABAC refused with a diagnostic (no tag-driven attachment; OLS deferred). `RetentionConstraint` → `RETENTION_EXPRESSION_ONLY`.
+  - **discover** — `ALL_POLICIES` (+ function body from `ALL_SOURCE`), `REDACTION_POLICIES`/`REDACTION_COLUMNS`, `ALL_TAB_PRIVS`.
+  - **extract** — VPD (byDataset/byIdentity), redaction, and grant artifacts lifted back to IR; **reconcile** via the default contract path.
+  - Honest capability profile (docs cited per ADR-027); marked emitted-not-live-verified until the live run stamps a date.
+- **Worked artifacts** `spec/v0/examples/acl-row-visibility.oracle.sql` (a fourth mechanism for the ACL policy, beside UC / Snowflake / custom-ACL) and `oracle-mechanisms.oracle.sql` (VPD byIdentity, Data Redaction, GRANT).
+- **CLI**: `--adapter oracle` (alias `ora`) on all four adapter subcommands.
+- **Parity tests**: VPD row-visibility lowering, Data Redaction with a doubled-quote `expression` regression guard, byDataset VPD emit→extract round-trip, GRANT lowering, and honest `byScope` refusal.
+- **Live-verify** `adapters/tests/live_oracle.py` (reads `oracle_auth.txt`, gitignored; `pip install oracledb`), gated on a provided instance.
+
+### Notes
+
+- **Portability finding (ADR-033):** Oracle FULL redaction cannot carry an arbitrary replacement, so `Redact` lowers to REGEXP — a mask-value-fidelity fact worth carrying into future Mask/Hash work. The `DBMS_REDACT` `expression` is a PL/SQL string literal, so inner quotes are doubled (a real bug caught and guarded in test).
+- Oracle has no catalog tier; a 3-part `catalog.schema.table` maps to `SCHEMA.OBJECT` (catalog dropped), overridable via `resource_bindings`. Non-identifier group names (e.g. `account users`) must be bound via `identity_bindings`.
+
 ## [0.13.0] — 2026-08-17
 
 Third adapter: **custom-ACL** (ADR-032) — the ADR-003 reference *pattern* adapter. A peer of the native Unity Catalog and Snowflake adapters against the same contract (ADR-024), whose enforcement target is the customer's own ACL-table + wrapping-view convention rather than a platform primitive.

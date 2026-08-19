@@ -1472,6 +1472,42 @@ No IR change. This ADR extends ADR-003/ADR-024 by establishing the pattern-adapt
 
 ---
 
+## ADR-033 — Oracle adapter: mechanism mapping (VPD / Data Redaction / GRANT)
+
+**Date:** 2026-08-17
+**Status:** Accepted
+
+### Context
+
+With Unity Catalog and Snowflake (native) and custom-ACL (pattern) adapters in place, the IR had been exercised against two native platforms whose primitives are broadly similar (row-filter functions / row-access policies; column masks). A stronger portability test is a native platform whose governance primitives are shaped differently. Oracle qualifies: its enforcement is Virtual Private Database (VPD), Data Redaction, and object grants — none of which resemble the UC/Snowflake mechanisms.
+
+### Decision
+
+Add **`adapters/oracle/`** (`OracleAdapter`, `name="oracle"`, `platform="Oracle"`) as a fourth peer against the ADR-024 contract, with the following mechanism mapping (cited per ADR-027 — describe the documented primitive, do not invent):
+
+- **Row visibility → Virtual Private Database.** `DBMS_RLS.ADD_POLICY` attaches a PL/SQL *policy function* that returns a predicate string Oracle appends to every query's WHERE clause.
+  - *byIdentity*: the function is an `IF/ELSIF` ladder over `SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>') = 'TRUE'`, each branch returning the rule's row predicate (an `in` condition → `<col> IN (...)`); a fail-closed `ELSE '1=0'` covers principals in no rule. `explicit-baseline-group` is modeled as an explicit baseline rule (the baseline group is a normal branch), consistent with how UC emits it.
+  - *byDataset*: the function returns a correlated `EXISTS` over the ACL tables, keyed off `SYS_CONTEXT('USERENV','SESSION_USER')` — the same join the other adapters build.
+- **Column visibility → Oracle Data Redaction.** `DBMS_REDACT.ADD_POLICY`. A `Redact` with a replacement literal lowers to `function_type => DBMS_REDACT.REGEXP` (pattern `(.*)`, `regexp_replace_string` = the replacement) — **not** `FULL`, which cannot carry an arbitrary replacement string (it uses type-default masking values). The `expression` gates who sees redaction: allowed roles (`effect: allow`) see real data, so redaction applies when the session holds none of them. (The `expression` is itself a PL/SQL string literal, so inner quotes are doubled — a real bug caught and guarded in test.)
+- **Access grants → GRANT.** `GRANT <priv> ON <schema>.<obj> TO <role>` (Read→SELECT, Write→UPDATE, Delete→DELETE, Execute→EXECUTE).
+- **Full ADR-024 cycle.** `discover` reads `ALL_POLICIES` (+ the function body from `ALL_SOURCE`), `REDACTION_POLICIES`/`REDACTION_COLUMNS`, and `ALL_TAB_PRIVS`; `extract` lifts each back to IR (VPD byDataset/byIdentity, redaction, grant) by parsing the normalized artifact; `reconcile` uses the default contract path.
+
+### Honest gaps
+
+- **No tag-driven ABAC.** Oracle has no governed-tag policy attachment (the UC/Snowflake `byScope` mechanism). Oracle Label Security (OLS) is the nearest primitive and is deferred; `byScope` row/column policies emit a diagnostic, not DDL. `ATTRIBUTE_BASED_SCOPING` is UNSUPPORTED.
+- **Object naming.** Oracle has no catalog tier; the adapter maps a 3-part `catalog.schema.table` to `SCHEMA.OBJECT` (dropping the catalog), overridable via `resource_bindings`.
+- **Identifier legality.** Group names that are not legal unquoted Oracle identifiers (e.g. `account users`) must be bound via `identity_bindings`; the default sanitizer uppercases and underscores.
+- **Live verification is pending.** Emission and offline extract round-trips are tested; the capability profile is marked emitted-not-live-verified until a run against the provided instance (`adapters/tests/live_oracle.py`, reading `oracle_auth.txt`) stamps a date. This is the same honesty bar Snowflake's profile carries.
+
+No IR change.
+
+### Consequences
+
+- The IR is now demonstrated portable across three native platforms with materially different primitives, plus one non-native pattern. Worked artifacts: `acl-row-visibility.oracle.sql` (a fourth mechanism for the ACL policy, beside UC / Snowflake / custom-ACL) and `oracle-mechanisms.oracle.sql` (VPD byIdentity, Data Redaction, GRANT).
+- Confirms the mask-value fidelity concern is real (FULL vs REGEXP) — a portability finding worth carrying into any future Mask/Hash work.
+
+---
+
 ## How to use this document
 
 - Every new technical or stakeholder document begins by reading this file.
