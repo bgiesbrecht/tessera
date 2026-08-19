@@ -245,11 +245,18 @@ def _emit_row_visibility_by_dataset(
 
     # The predicate is a string returned by the function; single-quotes inside it
     # must be doubled for the PL/SQL literal.
+    #
+    # A non-correlated IN-subquery, NOT a correlated EXISTS. Live verification
+    # caught the trap: in `EXISTS (... AND p.<col> = <col>)` the bare <col>
+    # resolves to the inner ACL table p (which also has that column), making the
+    # predicate `p.<col> = p.<col>` — always true, so any mapped user saw all rows.
+    # The IN form keeps the outer column bare (VPD resolves it to the protected
+    # table, correctly, and robustly under table aliasing) while the subquery is
+    # self-contained: the set of values the current user is entitled to.
     predicate = (
-        f"EXISTS (SELECT 1 FROM {mapping_table} m "
+        f"{p_res} IN (SELECT p.{p_res} FROM {mapping_table} m "
         f"JOIN {resource_table} p ON m.{m_res} = p.{p_prin} "
-        f"WHERE lower(trim(m.{m_prin})) = lower(trim(SYS_CONTEXT(''USERENV'',''SESSION_USER''))) "
-        f"AND p.{p_res} = {p_res})"
+        f"WHERE lower(trim(m.{m_prin})) = lower(trim(SYS_CONTEXT(''USERENV'',''SESSION_USER''))))"
     )
     fn = _vpd_function_name(policy_id)
     func = (
@@ -366,10 +373,18 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
     # Data Redaction applies when `expression` is TRUE. Allowed roles must see real
     # data, so redact when the session has NONE of the allowed roles.
     if allow_roles:
-        # The expression is itself a PL/SQL string literal in ADD_POLICY, so inner
-        # single quotes must be doubled.
+        # Redact when the session holds NONE of the allowed roles — redact-by-default:
+        # reveal only when the role is explicitly 'TRUE'. SYS_SESSION_ROLES returns
+        # 'TRUE'/'FALSE' for a role and NULL for one that does not exist. Data Redaction
+        # expressions forbid NVL (ORA-28087) but allow `= / IS NULL / OR / AND`, so the
+        # robust form is `(SYS_CONTEXT(..) = 'FALSE' OR SYS_CONTEXT(..) IS NULL)`. (Both
+        # facts — the NVL ban and that a bare `IS NULL` test never redacts an ungranted
+        # role — were caught in live verification.) Inner quotes are doubled for the
+        # PL/SQL string literal.
         conds = " AND ".join(
-            f"SYS_CONTEXT(''SYS_SESSION_ROLES'', ''{r}'') IS NULL" for r in allow_roles
+            f"(SYS_CONTEXT(''SYS_SESSION_ROLES'', ''{r}'') = ''FALSE'' "
+            f"OR SYS_CONTEXT(''SYS_SESSION_ROLES'', ''{r}'') IS NULL)"
+            for r in allow_roles
         )
         expression = conds
     else:
@@ -404,7 +419,10 @@ def _emit_column_visibility(policy: dict[str, Any], config: AdapterConfig) -> Em
         f"    regexp_pattern       => '(.*)',\n"
         f"    regexp_replace_string => '{replacement}',\n"
         f"    regexp_position      => 1,\n"
-        f"    regexp_occurrence    => 0,\n"
+        # occurrence => 1 (first match only): the greedy `(.*)` matches the whole
+        # string once; `=> 0` (all) also matches the trailing empty position, which
+        # doubled the replacement (live-verified).
+        f"    regexp_occurrence    => 1,\n"
         f"    expression           => '{expression}'\n"
         f"  );\nEND;\n/"
     )

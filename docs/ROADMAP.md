@@ -4,7 +4,7 @@
 
 **How to read it.** This is a *living* document, revised by appending dated updates rather than rewriting history (same discipline as the CLAUDE.md handoff). It is not a commitment schedule — ordering reflects current priority, not promised dates. The authoritative decision log remains `DECISIONS.md`; tracked work items remain the GitHub issues. Where an item has an issue or ADR, it is cited.
 
-Current version: **0.14.0** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-17**.
+Current version: **0.14.1** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-17**.
 
 ---
 
@@ -14,7 +14,7 @@ The spine of the project is real and exercised end-to-end.
 
 - **The v0 IR** — JSON-LD context, OWL ontology, JSON Schema, SHACL shapes — in `spec/v0/`. The immutability bar is suspended per ADR-017 until external dependency exists; additions land in v0, each as an ADR.
 - **A third adapter — the custom ACL-table pattern** (`adapters/custom_acl/`, ADR-032) — the reference engagement that drove the adapter-first architecture (ADR-003). A *pattern* adapter, not a platform: emit lowers a `byDataset` `RowVisibilityConstraint` to a wrapping secure view (the view *is* the enforcement), and extract lifts a hand-built ACL view back to IR — the selective-migration on-ramp (emit → extract round-trips to equivalent IR). Proves the peer-adapter claim with a working non-native adapter.
-- **A fourth adapter — Oracle** (`adapters/oracle/`, ADR-033) — a third native platform with a materially different mechanism set: VPD/`DBMS_RLS` (row), Data Redaction/`DBMS_REDACT` (column), `GRANT` (access). Full ADR-024 cycle; `byScope` ABAC refused honestly (no tag-driven attachment; OLS deferred). Emission + offline extract round-trips tested; **live verification against a provided instance is pending** (`adapters/tests/live_oracle.py`).
+- **A fourth adapter — Oracle** (`adapters/oracle/`, ADR-033) — a third native platform with a materially different mechanism set: VPD/`DBMS_RLS` (row), Data Redaction/`DBMS_REDACT` (column), `GRANT` (access). Full ADR-024 cycle; `byScope` ABAC refused honestly (no tag-driven attachment; OLS deferred). **Live-verified 2026-08-17 on Oracle 23ai Free** — VPD row visibility (2/5/0 rows) and Data Redaction (role-gated) both enforce (`adapters/tests/live_oracle.py`).
 - **Both reference adapters** (Unity Catalog, Snowflake) run the full ADR-024 cycle — `emit` / `discover` / `extract` / `reconcile`. Three policy shapes across both platforms: `RowVisibilityConstraint` (`byIdentity`, `byScope`, `byDataset`), `ColumnVisibilityConstraint` (`Redact`), `AccessGrantConstraint` (table, function, schema fan-out). ABAC `byScope` (tag-driven) emits on both — UC via `MATCH COLUMNS has_tag_value(...)`, Snowflake via tag-based masking / row-access attachment (#31). Bidirectional Snowflake↔UC migration is demonstrated with behavioral-equivalence verification.
 - **The converter** (`tools/converter/`) — YAML → JSON-LD, both authoring shapes.
 - **The unified CLI** (`tools/cli/`, `python -m tools.cli`) — `validate`, `convert`, `emit`, `discover`, `extract`, `reconcile`, and `impact` / `lint` (change-impact analysis).

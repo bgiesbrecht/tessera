@@ -4,6 +4,21 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.14.1] — 2026-08-17
+
+Oracle adapter live-verified on Oracle 23ai Free — and three emission bugs the live run caught, now fixed and guarded.
+
+### Fixed
+
+- **byDataset VPD used a correlated `EXISTS (... AND p.<col> = <col>)`** whose bare outer column resolved to the same-named ACL column *inside* the subquery (`p.<col> = p.<col>`, always true) — so any mapped user saw all rows. Replaced with a non-correlated `<col> IN (SELECT p.<col> FROM ...)`. (Live: 5 rows where 2 were expected → now 2 / 5 / 0 as ACL mappings change.)
+- **Data Redaction role test used `SYS_CONTEXT(...) IS NULL`** — `SYS_SESSION_ROLES` returns `'TRUE'`/`'FALSE'`, never NULL, for an ungranted role, so redaction never applied. Corrected to `= 'FALSE' OR IS NULL` (redact-by-default; reveal only on `'TRUE'`). `NVL` is rejected by the redaction-expression grammar (ORA-28087), so the explicit form is required.
+- **`regexp_occurrence => 0`** doubled the replacement (greedy `(.*)` also matches the trailing empty position) → `CLERK-REDACTEDCLERK-REDACTED`. Changed to `=> 1`.
+
+### Notes
+
+- **Live-verified 2026-08-17 on Oracle 23ai Free:** byDataset VPD row visibility returned 2 / 5 / 0 rows as ACL rows were added/removed (fail-closed when absent); Data Redaction showed a non-exempt reader `CLERK-REDACTED` without the allowed role and the real value with it. Capability profile stamped accordingly.
+- Exemption facts recorded: SYS and `EXEMPT ACCESS POLICY` bypass VPD; SYS and `EXEMPT REDACTION POLICY` (held via DBA, so SYSTEM) bypass redaction — the redaction check therefore uses a non-DBA reader. `adapters/tests/live_oracle.py` documents the run.
+
 ## [0.14.0] — 2026-08-17
 
 Fourth adapter: **Oracle** (ADR-033) — a third native platform, proving IR portability against a materially different mechanism set (Virtual Private Database, Data Redaction, GRANT — none resembling the UC/Snowflake primitives).

@@ -25,9 +25,13 @@ ORACLE_PROFILE = CapabilityProfile(
             "byIdentity rules become IF/ELSIF branches over SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>') "
             "= 'TRUE', each returning the rule's row predicate; a fail-closed ELSE ('1=0') covers "
             "principals in no rule (explicit-baseline-group is modeled as an explicit baseline rule). "
-            "byDataset rules return a correlated EXISTS over the ACL tables keyed off "
-            "SYS_CONTEXT('USERENV','SESSION_USER'). Emitted; live verification against the provided "
-            "instance is pending (profile will be stamped with the date once run).",
+            "byDataset rules return a NON-correlated IN-subquery (`<col> IN (SELECT p.<col> FROM ...)`) "
+            "over the ACL tables keyed off SYS_CONTEXT('USERENV','SESSION_USER'). A correlated EXISTS "
+            "was tried first and failed live: the bare outer column collided with the same-named ACL "
+            "column inside the subquery, making the predicate always true. Live-verified 2026-08-17 on "
+            "Oracle 23ai Free: byDataset visibility was 2 / 5 / 0 rows as ACL mappings were "
+            "added/removed (fail-closed when absent). Note: SYS and holders of EXEMPT ACCESS POLICY "
+            "bypass VPD; SYSTEM does not by default.",
         ),
         Capability.COLUMN_VISIBILITY: (
             CapabilitySupport.SUPPORTED,
@@ -35,16 +39,21 @@ ORACLE_PROFILE = CapabilityProfile(
             "Database Advanced Security Guide, Using Oracle Data Redaction). A Redact with a "
             "replacement literal lowers to function_type => DBMS_REDACT.REGEXP (regexp_pattern '(.*)', "
             "regexp_replace_string => the replacement) because FULL redaction cannot carry an arbitrary "
-            "replacement string — it uses type-default masking values. The `expression` gates who sees "
-            "redaction: allowed roles (effect=allow) see real data, so redaction applies when the "
-            "session has none of them. Coverage: byIdentity column targets, Redact transformation. "
-            "Mask/Hash queued. Emitted; live verification pending.",
+            "replacement string — it uses type-default masking values. regexp_occurrence => 1 (first "
+            "match only; => 0 doubled the replacement because the greedy (.*) also matches the trailing "
+            "empty position). The `expression` gates who sees redaction: redact unless the session holds "
+            "an allowed role — `SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>') = 'FALSE' OR ... IS NULL` "
+            "(NVL is forbidden in redaction expressions, ORA-28087; a bare `IS NULL` test never redacts "
+            "an ungranted role). Coverage: byIdentity column targets, Redact transformation. Mask/Hash "
+            "queued. Live-verified 2026-08-17 on Oracle 23ai Free: a non-exempt reader without the role "
+            "saw 'CLERK-REDACTED', with the role saw the real value. Note: SYS and holders of EXEMPT "
+            "REDACTION POLICY bypass redaction (SYSTEM has it via DBA).",
         ),
         Capability.DATASET_DRIVEN_PRINCIPALS: (
             CapabilitySupport.SUPPORTED,
-            "PrincipalSetFromTable lowers to a correlated EXISTS inside the VPD policy function, joining "
-            "the mapping table to the resource-ACL table on the shared codename. This is Oracle's "
-            "documented pattern for data-driven VPD predicates.",
+            "PrincipalSetFromTable lowers to a non-correlated IN-subquery inside the VPD policy "
+            "function, joining the mapping table to the resource-ACL table on the shared codename. This "
+            "is Oracle's documented pattern for data-driven VPD predicates. Live-verified 2026-08-17.",
         ),
         Capability.DATASET_DRIVEN_RESOURCES: (
             CapabilitySupport.SUPPORTED,

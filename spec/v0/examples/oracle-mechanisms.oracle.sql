@@ -1,10 +1,11 @@
 -- Oracle adapter emissions showing the three distinct Oracle governance primitives
 -- (ADR-033). Each is the OracleAdapter emission of an existing worked-example IR.
+-- Row-visibility and column-redaction paths live-verified 2026-08-17 on Oracle 23ai Free.
 
 -- 1) Row visibility (byIdentity) — Virtual Private Database, role-gated predicate.
 --    Source: group-row-visibility-policy-a.jsonld. Role membership is tested via
---    SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>'); each branch returns that role's
---    row predicate; ELSE is fail-closed. Group names map to Oracle roles (bind
+--    SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>') = 'TRUE'; each branch returns that
+--    role's row predicate; ELSE is fail-closed. Group names map to Oracle roles (bind
 --    'account users' explicitly — it is not a legal unquoted identifier).
 CREATE OR REPLACE FUNCTION TPCH.TESSERA_GROUP_ROW_VISIBILITY_POLICY_A_VPD(
   p_schema IN VARCHAR2, p_object IN VARCHAR2
@@ -35,7 +36,10 @@ END;
 
 -- 2) Column visibility — Oracle Data Redaction. Source: column-mask-orders-clerk-policy.jsonld.
 --    Redact-with-replacement lowers to DBMS_REDACT.REGEXP (FULL cannot carry an
---    arbitrary replacement); the expression redacts for sessions lacking the allowed role.
+--    arbitrary replacement). occurrence => 1 (first match only, else the greedy (.*)
+--    doubles the replacement). Redact unless the session holds the allowed role
+--    ('TRUE'); NVL is not permitted in redaction expressions, so the not-allowed test
+--    is `= 'FALSE' OR IS NULL`. Live-verified: no role -> 'CLERK-REDACTED', role -> real value.
 BEGIN
   DBMS_REDACT.ADD_POLICY(
     object_schema        => 'TPCH',
@@ -46,8 +50,8 @@ BEGIN
     regexp_pattern       => '(.*)',
     regexp_replace_string => 'CLERK-REDACTED',
     regexp_position      => 1,
-    regexp_occurrence    => 0,
-    expression           => 'SYS_CONTEXT(''SYS_SESSION_ROLES'', ''ORDERS_FULL_ACCESS'') IS NULL'
+    regexp_occurrence    => 1,
+    expression           => '(SYS_CONTEXT(''SYS_SESSION_ROLES'', ''ORDERS_FULL_ACCESS'') = ''FALSE'' OR SYS_CONTEXT(''SYS_SESSION_ROLES'', ''ORDERS_FULL_ACCESS'') IS NULL)'
   );
 END;
 /

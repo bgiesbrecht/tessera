@@ -87,8 +87,8 @@ output for a PARTIAL capability with a warning diagnostic.
   (`DBMS_RLS.ADD_POLICY` + a role-gated / EXISTS policy function), column masking via
   Data Redaction (`DBMS_REDACT.ADD_POLICY`, REGEXP so the replacement is honored),
   access grants via `GRANT`. No tag-driven ABAC (`byScope` refused with a diagnostic;
-  OLS deferred). Emission + offline extract are tested; live verification is pending an
-  instance (`tests/live_oracle.py`, reads `oracle_auth.txt`).
+  OLS deferred). Live-verified 2026-08-17 on Oracle 23ai Free (`tests/live_oracle.py`): VPD row
+  visibility (2/5/0 rows) and Data Redaction (role-gated) both enforce.
 - **custom-ACL** — emit lowers a `byDataset` `RowVisibilityConstraint` to a wrapping
   secure view; extract lifts such a view back to IR (the selective-migration on-ramp,
   ADR-032). Column masking in the view is a queued follow-up.

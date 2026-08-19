@@ -7,12 +7,27 @@ live_snowflake_bydataset.py. It:
     3. Emits Oracle DDL via OracleAdapter from
        spec/v0/examples/acl-row-visibility-policy.jsonld.
     4. Applies the VPD policy function + DBMS_RLS.ADD_POLICY.
-    5. Verifies visibility changes as ACL rows are added/removed.
+    5. Verifies visibility changes as ACL rows are added/removed
+       (expected: 2 rows -> 5 rows -> 0 rows fail-closed).
+
+Live-verified 2026-08-17 on Oracle 23ai Free (54.85...:1521/FREEPDB1) run as SYSTEM:
+the three scenarios returned 2 / 5 / 0 as designed.
 
 Connection: reads the password from `oracle_auth.txt` at the repo root (gitignored,
 never committed), and the user + DSN from TESSERA_ORA_USER / TESSERA_ORA_DSN (or the
-constants below). Requires `pip install oracledb`. This script is gated on a real
-Oracle instance; it is not part of the offline pytest suite.
+constants below). Requires `pip install oracledb`. Gated on a real Oracle instance;
+not part of the offline pytest suite.
+
+The connecting user must (a) be able to run DBMS_RLS.ADD_POLICY — EXECUTE on
+SYS.DBMS_RLS is grantable only by SYS, so on a SYSTEM-only instance run this AS
+SYSTEM (`TESSERA_ORA_USER=SYSTEM`), which works because SYSTEM is NOT VPD-exempt by
+default; and (b) NOT hold EXEMPT ACCESS POLICY (SYS and that privilege bypass VPD).
+
+Column Data Redaction (the ColumnVisibilityConstraint path) was verified separately
+in the same session: SYSTEM (which holds EXEMPT REDACTION POLICY via DBA) creates the
+policy, and a distinct non-exempt reader sees 'CLERK-REDACTED' without the allowed
+role and the real value with it. That flow needs two users, so it is documented in
+ADR-033 rather than folded into this single-connection script.
 
 Note on identifiers: the committed example targets acme.tpch.orders_rls_acl, which
 the adapter maps to Oracle TPCH.ORDERS_RLS_ACL. This script overrides the object

@@ -115,11 +115,12 @@ def _extract_redaction(artifact: dict[str, Any]) -> ExtractionResult:
     expression = artifact.get("expression") or ""
     diagnostics: list[Diagnostic] = []
 
-    # Recover allowed roles from the redaction expression (roles that are NULL ⇒ redact).
-    allow_roles = re.findall(
-        r"SYS_CONTEXT\(\s*'SYS_SESSION_ROLES'\s*,\s*'([^']+)'\s*\)\s*IS\s+NULL",
+    # Recover allowed roles: any role named in the redaction expression via
+    # SYS_CONTEXT('SYS_SESSION_ROLES','<ROLE>') is an allowed (real-data) role.
+    allow_roles = list(dict.fromkeys(re.findall(
+        r"SYS_CONTEXT\(\s*'SYS_SESSION_ROLES'\s*,\s*'([^']+)'\s*\)",
         expression, re.IGNORECASE,
-    )
+    )))
     rules = [
         {"principal": {"selector": "byIdentity", "resource": f"group:{r}"}, "effect": "allow"}
         for r in allow_roles
@@ -168,15 +169,17 @@ def _extract_vpd(artifact: dict[str, Any]) -> ExtractionResult:
     resource = f"table:{schema}.{obj}".lower()
 
     join = _JOIN_RE.search(body)
-    if join and "EXISTS" in body.upper():
+    in_m = re.search(r"(\w+)\s+IN\s*\(\s*SELECT\s+\w+\.(\w+)", body, re.IGNORECASE)
+    if join and in_m:
         map_table = join.group(1)
         acl_table = join.group(3)
         m_res = join.group(6)
         p_prin = join.group(8)
         user_m = _USER_RE.search(body)
         map_prin = user_m.group(2) if user_m else "username"
-        val_m = re.search(r"AND\s+(\w+)\.(\w+)\s*=\s*(\w+)\)", body, re.IGNORECASE)
-        acl_res = val_m.group(2) if val_m else "orderpriority"
+        # The IN form: `<protected_col> IN (SELECT p.<acl_res> FROM ...)`. Both are
+        # the same column under the aligned convention (issue #13); take the ACL one.
+        acl_res = in_m.group(2)
         policy = {
             "@context": CONTEXT_URL, "@type": "Policy",
             "@id": f"policy:extracted-oracle-vpd-{obj}".lower(),
