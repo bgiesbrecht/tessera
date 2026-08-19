@@ -1,8 +1,8 @@
 # Tessera and the W3C stack
 
-**Audience:** semantic-web practitioners, ontologists, knowledge-graph engineers, and anyone who reaches reflexively for RDF when modeling cross-domain semantics. This document explains *how* Tessera uses W3C technologies (vocabulary, serialization, validation, alignment) and *why* the choices are structured as they are.
+**Audience:** semantic-web practitioners, ontologists, knowledge-graph engineers, and anyone who reaches for RDF when modeling cross-domain semantics. This document explains *how* Tessera uses W3C technologies (vocabulary, serialization, validation, alignment) and *why* the choices are structured as they are.
 
-Tessera is a portable representation of data governance policy across data platforms. The semantic-web stack is not an add-on; it is the core. Policy authoring is YAML for readability, but the canonical form is JSON-LD, formal semantics live in OWL, validation splits between JSON Schema and SHACL, and alignment to existing privacy and rights vocabularies is declared with SKOS. The architecture rests on this stack because the value proposition, "PII means the same thing on Databricks and Snowflake," is a semantic claim.
+Tessera is a portable representation of data governance policy across data platforms. Policy authoring is YAML for readability, but the canonical form is JSON-LD, formal semantics live in OWL, validation splits between JSON Schema and SHACL, and alignment to existing privacy and rights vocabularies is declared with SKOS. The architecture rests on this stack because the value proposition, "PII means the same thing on Databricks and Snowflake," is a semantic claim.
 
 ---
 
@@ -25,7 +25,7 @@ https://bgiesbrecht.github.io/tessera/spec/v0/context.jsonld
 https://bgiesbrecht.github.io/tessera/spec/v0/shapes.ttl
 ```
 
-The namespace pattern is hash-based (fragment-identified): `tessera:Policy` resolves to `https://bgiesbrecht.github.io/tessera/spec/v0/vocab#Policy`; the ontology IRI without fragment is what dereferences. This is ADR-011's persistent-URL choice; GitHub Pages serves the artifacts with whatever content types it serves them under (yes, `text/plain` on a `.ttl`: pragmatic, not pretty). The persistent-IRI discipline survives the content-type pragmatism.
+The namespace pattern is hash-based (fragment-identified): `tessera:Policy` resolves to `https://bgiesbrecht.github.io/tessera/spec/v0/vocab#Policy`, and the ontology IRI without a fragment is what dereferences. ADR-011 records this persistent-URL choice. GitHub Pages serves the artifacts as `text/plain`, including the `.ttl` files, which is acceptable for v0 because the persistent IRIs still resolve.
 
 ---
 
@@ -85,7 +85,7 @@ tessera:Restricted     a owl:Class ; rdfs:subClassOf tessera:Confidential .
 
 So under RDFS entailment, the transitive closure of `rdfs:subClassOf` puts `tessera:PII` under `tessera:Classification`, so a policy that gates on `Confidential` correctly covers `PII`-tagged data. This is the one place v0 leans on RDFS reasoning at validation time; the rest is shapes-driven and inference-light.
 
-**Properties** are typed:
+**Properties.** Each is declared with a domain and range:
 
 ```turtle
 tessera:appliesTo a owl:ObjectProperty ;
@@ -100,7 +100,7 @@ tessera:replacement a owl:DatatypeProperty ;
     rdfs:range xsd:string .
 ```
 
-Domain and range declarations are documentation, not enforcement; the SHACL shapes do the actual constraint work. Experienced semantic-web practitioners will recognize the split: OWL describes what the world looks like; SHACL enforces what a document must look like.
+Domain and range declarations are documentation, not enforcement; the SHACL shapes do the actual constraint work. The split is deliberate: OWL describes what the world looks like; SHACL enforces what a document must look like.
 
 ---
 
@@ -209,11 +209,11 @@ tessera:PolicyShape a sh:NodeShape ;
     ] .
 ```
 
-Three pragmatic decisions emerged from shipping a SHACL graph against JSON-LD documents:
+Shipping a SHACL graph against JSON-LD documents forced three decisions.
 
 ### 1. `sh:node` over `sh:targetClass` for blank-node shapes
 
-`PolicyShape` uses `sh:targetClass tessera:Policy` — fine, because the root node has `@type: Policy`. But nested selectors and conditions are JSON-LD blank nodes, and the JSON-LD-to-RDF conversion does not assert `@type` on them. So a shape that tries to use `sh:targetClass tessera:ResourceSelector` will never fire: there is no triple `_:b1 rdf:type tessera:ResourceSelector` to target.
+`PolicyShape` uses `sh:targetClass tessera:Policy`. That works because the root node has `@type: Policy`. But nested selectors and conditions are JSON-LD blank nodes, and the JSON-LD-to-RDF conversion does not assert `@type` on them. So a shape that tries to use `sh:targetClass tessera:ResourceSelector` will never fire: there is no triple `_:b1 rdf:type tessera:ResourceSelector` to target.
 
 The clean fix is to invoke the shape via `sh:node` from the containing shape's property:
 
@@ -243,7 +243,7 @@ Reads as: starting from the focus node, follow `tessera:rules` to the list head;
 
 Some constraints are expressible in JSON Schema (enum closure on string values; required fields). Others are not:
 
-- **Class typing of IRI references.** `axis: sensitivityAxis` expands to `tessera:sensitivityAxis`; SHACL's `sh:class tessera:AttributeAxis` enforces that the referenced node is a member of the AttributeAxis class. JSON Schema cannot see this — it's syntactic.
+- **Class typing of IRI references.** `axis: sensitivityAxis` expands to `tessera:sensitivityAxis`; SHACL's `sh:class tessera:AttributeAxis` enforces that the referenced node is a member of the AttributeAxis class. JSON Schema cannot see this, since it works purely on syntax.
 - **Adopter-extensible IRI value spaces.** For the hierarchical sensitivity axis, `sh:nodeKind sh:IRI` permits any IRI value (including adopter-namespaced extensions like `acme:CustomerPII`) without enumerating them. JSON Schema sees pre-expansion short names like `sensitivityAxis`; SHACL sees the post-expansion IRI and can enforce both that the node is an IRI (`sh:nodeKind sh:IRI`) and that it satisfies class membership (`sh:class tessera:AttributeAxis`, resolved against the ontology graph).
 - **Operator vocabulary closure on condition algebra.** Condition operators (`and`, `or`, `eq`, `in`, `purpose-in`, `exists-in-dataset`, ...) are well-known individuals; `sh:in (tessera:and tessera:or ...)` enforces closure at the RDF layer.
 
@@ -260,9 +260,9 @@ The validation pipeline is two-layer by design:
 | 1 | JSON Schema 2020-12 (`schema.json`) | Structural validity, conditional dependencies, enum closure on string values, type structure of nested objects |
 | 2 | SHACL (`shapes.ttl`) | Semantic well-formedness: IRI / class typing of references, closed-vocabulary on referenced IRIs, node-shape composition over blank-node structures |
 
-JSON Schema 2020-12 is not a W3C technology but it lives next to one — it's the structural-pre-pass that lets SHACL focus on what it uniquely does. Conditional dependencies (`baselineGroup` is required iff `defaultStrategy: explicit-baseline-group`; `transformation` is required iff `effect: transform`) are JSON-Schema-enforced via `if`/`then`/`else` branches. SHACL Core has logical-constraint components (`sh:and` / `sh:or` / `sh:not` / `sh:xone`) that could express these dependencies as verbose biconditionals; we deliberately did not, because the JSON Schema layer enforces them with less verbosity and no semantic loss, and the biconditional form would add no safety beyond what the schema already provides.
+JSON Schema 2020-12 is not a W3C technology, but it lives next to one: it does the structural pre-pass that lets SHACL focus on what only SHACL can do. Conditional dependencies (`baselineGroup` is required iff `defaultStrategy: explicit-baseline-group`; `transformation` is required iff `effect: transform`) are JSON-Schema-enforced via `if`/`then`/`else` branches. SHACL Core has logical-constraint components (`sh:and` / `sh:or` / `sh:not` / `sh:xone`) that could express these dependencies as verbose biconditionals; we deliberately did not, because the JSON Schema layer enforces them with less verbosity and no semantic loss, and the biconditional form would add no safety beyond what the schema already provides.
 
-The principle: **each layer does what it does best.** SHACL doesn't try to be JSON Schema; JSON Schema doesn't try to be SHACL. Together they catch everything an emitter can reasonably catch without running the policy.
+SHACL does not try to be JSON Schema, and JSON Schema does not try to be SHACL. Together they catch everything an emitter can reasonably catch without running the policy.
 
 ---
 
@@ -301,27 +301,27 @@ Tessera's vocabulary is meant to be *recognizable* to anyone who's worked with t
 
 ## What the architecture enables
 
-The W3C stack is not decoration. It enables three things that the project's value proposition depends on:
+The stack underwrites three things the value proposition depends on:
 
 ### 1. Semantic interoperability of policy across platforms
 
-A policy that gates `tessera:PII`-tagged data on Databricks (where the platform's enforcement uses governed tags) and on Snowflake (where the platform's enforcement uses object tags) refers to the *same* `tessera:PII` IRI. The platforms' tag taxonomies are mapped to Tessera via `AdapterConfig.tag_taxonomy` per ADR-021; the IR carries the meaning, the adapter carries the mechanism. This is the cross-platform fidelity that ADR-003's "adapters are peers" framing depends on, and it works because there is a shared IRI to refer to.
+A policy that gates `tessera:PII`-tagged data on Databricks (where the platform's enforcement uses governed tags) and on Snowflake (where the platform's enforcement uses object tags) refers to the *same* `tessera:PII` IRI. The platforms' tag taxonomies are mapped to Tessera via `AdapterConfig.tag_taxonomy` per ADR-021; the IR carries the meaning, the adapter carries the mechanism. ADR-003's "adapters are peers" framing depends on this cross-platform fidelity, and it holds because both platforms resolve to one shared IRI.
 
 ### 2. Honest model of constraints across the validation pipeline
 
-JSON Schema's strength is structural validation; SHACL's strength is semantic validation; OWL's strength is documentation of the underlying conceptual model. Layering them, each doing what it does best, produces a validation surface that is both rigorous and operationally tractable. Every existing policy round-trips through all three layers; the eight worked exercises validate end-to-end against schema + SHACL.
+JSON Schema handles structural validation, SHACL handles semantic validation, and OWL documents the underlying conceptual model. Layered, they produce a validation surface that is both rigorous and operationally tractable. Every worked-example policy round-trips through all three layers and validates end-to-end against schema + SHACL.
 
 ### 3. Extension discipline that respects existing adopters
 
-`@protected: true` in the JSON-LD context blocks adopters from rebinding Tessera terms; adopter-namespaced extensions (their own classification subclasses, their own attribute-axis values) extend cleanly without polluting the canonical vocabulary. The ontology's persistent IRIs are conditionally immutable per ADR-017: once external dependency exists, the v0 namespace freezes; until then, additions are admissible. This is the discipline RDF and OWL were designed for and the project leans into rather than working around.
+`@protected: true` in the JSON-LD context blocks adopters from rebinding Tessera terms; adopter-namespaced extensions (their own classification subclasses, their own attribute-axis values) extend cleanly without polluting the canonical vocabulary. The ontology's persistent IRIs are conditionally immutable per ADR-017: once external dependency exists, the v0 namespace freezes; until then, additions are admissible. RDF and OWL were designed for exactly this kind of extension.
 
 ---
 
 ## What Tessera does NOT do (and why)
 
-The omissions matter as much as the inclusions:
+The deliberate non-goals, each with its reason:
 
-- **No SPARQL queries.** Tessera does not run SPARQL against policy graphs at evaluation time. Policy combination, conflict detection, and effective-rule resolution are *adapter responsibilities* — the platform's native enforcement mechanism evaluates the policy. Tessera compiles; the platform runs. SPARQL might appear in future tooling (a linter that queries the corpus for findings; a CLI that surfaces "all policies referencing axis X"), but it is not in the evaluation hot path because Tessera has no evaluation hot path.
+- **No SPARQL queries.** Tessera does not run SPARQL against policy graphs at evaluation time. Policy combination, conflict detection, and effective-rule resolution are *adapter responsibilities*: the platform's native enforcement mechanism evaluates the policy. Tessera compiles; the platform runs. SPARQL might appear in future tooling (a linter that queries the corpus for findings; a CLI that surfaces "all policies referencing axis X"), but it is not in the evaluation hot path because Tessera has no evaluation hot path.
 
 - **No OWL DL reasoning at validation time.** The validator does not invoke a full OWL DL reasoner. pyshacl runs with `inference="none"` on the data graph; the `Classification` subsumption (`PII ⊑ Confidential`) lives in the ontology graph supplied as `ont_graph`, and pyshacl honors it for `sh:class` checks without running an additional inference pass over the data. The reasoning load is intentionally bounded.
 
@@ -340,7 +340,7 @@ The omissions matter as much as the inclusions:
 Concretely, from a `.tessera.yaml` file to a green check:
 
 ```python
-# 1. YAML → JSON-LD (mechanical mapping; converter tool queued)
+# 1. Load the canonical JSON-LD (author in YAML, then `python -m tools.cli convert`)
 doc = json.loads(open('your-policy.jsonld').read())
 
 # 2. JSON Schema (structural)
@@ -364,7 +364,7 @@ from adapters.unity_catalog import UnityCatalogAdapter
 result = UnityCatalogAdapter(config=...).emit(doc)
 ```
 
-Step 3's `inference='none'` is deliberate — the rdfs subsumption that matters (for the Classification hierarchy) lives in the ontology graph supplied as `ont_graph` and pyshacl honors it. We don't run an additional inference pass over the data graph because the JSON-LD documents don't need it; they carry their assertions explicitly.
+Step 3's `inference='none'` is deliberate. The rdfs subsumption that matters (the Classification hierarchy) lives in the ontology graph supplied as `ont_graph`, and pyshacl honors it. There is no additional inference pass over the data graph because the JSON-LD documents carry their assertions explicitly.
 
 ---
 
@@ -376,14 +376,14 @@ Step 3's `inference='none'` is deliberate — the rdfs subsumption that matters 
 | JSON-LD 1.1 context | `spec/v0/context.jsonld` |
 | SHACL shapes | `spec/v0/shapes.ttl` |
 | JSON Schema (structural) | `spec/v0/schema.json` |
-| Worked-example JSON-LDs | `spec/v0/examples/*.jsonld` (eight policies, all validating) |
+| Worked-example JSON-LDs | `spec/v0/examples/*.jsonld` (fourteen policies, all validating) |
 | Vocabulary-alignment rationale | `DECISIONS.md` ADR-005 |
 | Persistent-URL choice | `DECISIONS.md` ADR-011 |
 | Immutability discipline | `DECISIONS.md` ADR-017 |
 | Adapter contract (lowering to platform DDL) | `DECISIONS.md` ADR-024 |
 | Architecture overview (broader scope) | `docs/technical-design-v0.2.md` |
 
-The single concrete starting point for a W3C-savvy reader: open `spec/v0/ontology.ttl` and `spec/v0/shapes.ttl` side by side. The vocabulary is small (a few dozen classes and properties) and the shapes are tight. Under an hour of reading covers the substantive surface. The pragmatic-engineering decisions hidden in the comments, particularly around `sh:node` vs `sh:targetClass` for JSON-LD blank nodes, are the kind of detail that experienced practitioners will recognize as battle-scarred-but-defensible.
+A concrete starting point for a W3C-savvy reader: open `spec/v0/ontology.ttl` and `spec/v0/shapes.ttl` side by side. The vocabulary is small (a few dozen classes and properties) and the shapes are tight; an hour of reading covers the substance. The pragmatic decisions in the comments, especially `sh:node` vs `sh:targetClass` for JSON-LD blank nodes, are where the design met the reality of validating JSON-LD as RDF.
 
 ---
 
@@ -393,4 +393,4 @@ Tessera is not a W3C submission and is not seeking standardization (ADR-002). It
 
 If formalization were pursued, the artifacts are ready: persistent IRIs resolve; the ontology is internally consistent; the SHACL shapes are portable across validators; the SKOS alignment is conservative; the JSON-LD context is `@protected`.
 
-The substantial question is whether the practice survives contact with real platforms: does the cross-platform fidelity claim hold? Does meaning-over-mechanism survive deployment? Eight worked exercises and one live cross-platform migration say yes.
+The open question is whether the practice survives contact with real platforms: does the cross-platform fidelity claim hold? Does meaning-over-mechanism survive deployment? The evidence so far is the worked-example policies, which validate end to end, and one live cross-platform migration that enforced the same intent on both platforms.
