@@ -1443,6 +1443,35 @@ Retention is the one gap with a *genuinely emittable* enforcement path (a schedu
 
 ---
 
+## ADR-032 — The custom-ACL adapter: a pattern adapter whose emit target is a wrapping view and whose extract is the migration on-ramp
+
+**Date:** 2026-08-17
+**Status:** Accepted
+
+### Context
+
+ADR-003 made adapters the unifying abstraction and declared native-platform adapters and **custom-pattern** adapters peers against one contract (ADR-024). The reference engagement that drove ADR-003 — a customer enforcing row visibility through hand-built **ACL tables joined into wrapping views**, predating native RLS, with thousands of ACL rows they want to migrate *selectively* — was the whole reason for the peer-adapter design. Yet both adapters built to date (Unity Catalog, Snowflake) are native. The peer-adapter claim was only half-proven: nothing demonstrated an adapter whose enforcement target is *not* a platform primitive.
+
+### Decision
+
+Add **`adapters/custom_acl/`** (`CustomACLAdapter`, `name="custom-acl"`, `platform="Custom ACL (view-layer)"`) as a first-class peer against the ADR-024 contract. It is a **pattern adapter**, not a platform adapter:
+
+- **Emit target is a wrapping secure view, not a platform primitive.** A `byDataset` `RowVisibilityConstraint` (the ACL-join shape: `PrincipalSetFromTable` ⋈ `ResourceSetFromTable` on a shared codename, `exists-in-dataset` condition) lowers to `CREATE OR REPLACE VIEW <base>_secured AS SELECT * FROM <base> b WHERE EXISTS (…)`. The **view is the enforcement mechanism** — the customer grants consumers the view instead of the base table. This is the same EXISTS join the native adapters place inside a row-filter function / row-access policy; the difference is the wrapper. `defaultStrategy: none` is inherent (principals absent from the ACL join match no rows — fail-closed).
+- **Extract is the highest-value responsibility — the selective-migration on-ramp.** `extract()` parses an ACL-view definition (regex over the documented ACL-join shape, mirroring the Snowflake `_extract_bydataset_row_access` heuristic) back into a `byDataset` `RowVisibilityConstraint` at `confidence 0.9`. This is what lets thousands of hand-built ACL views become IR that can be re-emitted to native Unity Catalog / Snowflake — migrating selectively while the ACL pattern stays operational for the rest. This is precisely the workflow ADR-003 exists to enable.
+- **Engine-neutral SQL.** Emitted DDL uses `current_user()`, `lower(trim(...))`, and a correlated `EXISTS` — the customer runs it on whichever engine hosts the ACL pattern; the adapter never executes.
+- **Honest capability profile.** `ROW_VISIBILITY` / `DATASET_DRIVEN_PRINCIPALS` / `DATASET_DRIVEN_RESOURCES` SUPPORTED (the data-driven selectors are the pattern's raison d'être); `COLUMN_VISIBILITY` PARTIAL (a CASE in the view SELECT list is queued); tag/ABAC/obligation/purpose/retention UNSUPPORTED.
+
+No IR change. This ADR extends ADR-003/ADR-024 by establishing the pattern-adapter category concretely.
+
+### Consequences
+
+- The peer-adapter claim is now demonstrated by a working non-native adapter with a functioning migration on-ramp (emit → extract round-trips to structurally-equivalent IR; see `test_custom_acl_emit_extract_round_trips_to_equivalent_ir`).
+- Worked artifact `spec/v0/examples/acl-row-visibility.custom-acl.sql` joins the UC and Snowflake emissions of the same ACL IR.
+- Issue #13 (`ResourceSetFromTable.resourceColumn` conflation) surfaces here too; the adapter uses the aligned convention (`p.<col> = b.<col>`) and emits an INFO diagnostic rather than swallowing it.
+- The custom ACL-table pattern moves from "larger horizon" to shipped on the roadmap.
+
+---
+
 ## How to use this document
 
 - Every new technical or stakeholder document begins by reading this file.

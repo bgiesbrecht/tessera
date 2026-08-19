@@ -4,6 +4,23 @@ All notable changes to Tessera are recorded here. Versioning follows the spec's 
 
 The format draws on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project additionally references ADRs (in `DECISIONS.md`) for every change of substance.
 
+## [0.13.0] — 2026-08-17
+
+Third adapter: **custom-ACL** (ADR-032) — the ADR-003 reference *pattern* adapter. A peer of the native Unity Catalog and Snowflake adapters against the same contract (ADR-024), whose enforcement target is the customer's own ACL-table + wrapping-view convention rather than a platform primitive.
+
+### Added
+
+- **`adapters/custom_acl/`** (`CustomACLAdapter`): `emit` lowers a `byDataset` `RowVisibilityConstraint` (the two-table ACL-join shape) to `CREATE OR REPLACE VIEW <base>_secured AS SELECT * FROM <base> WHERE EXISTS (…)` — the view is the enforcement mechanism; `extract` parses such a view definition back into `byDataset` IR at confidence 0.9 (the selective-migration on-ramp — ADR-003); `discover` inventories ACL-wrapping views (offline via `config.extras['acl_views']` or live via a DB-API cursor); `reconcile` uses the default contract path. Honest capability profile: `ROW_VISIBILITY` / `DATASET_DRIVEN_PRINCIPALS` / `DATASET_DRIVEN_RESOURCES` SUPPORTED, `COLUMN_VISIBILITY` PARTIAL, tag/ABAC/obligation/purpose/retention UNSUPPORTED.
+- **Worked artifact** `spec/v0/examples/acl-row-visibility.custom-acl.sql` — the custom-ACL emission of the committed ACL IR, alongside the UC and Snowflake emissions of the same policy.
+- **CLI**: `--adapter custom-acl` (alias `acl`) on `emit` / `discover` / `extract` / `reconcile`.
+- **Parity tests**: `test_bydataset_acl_lowers_to_three_distinct_mechanisms` (UC row-filter vs Snowflake RAP vs custom-ACL view, all carrying the shared EXISTS join), `test_custom_acl_emit_extract_round_trips_to_equivalent_ir` (emit → extract reconstructs the source IR), `test_custom_acl_profile_is_pattern_adapter`.
+
+### Notes
+
+- **Pattern adapter, not a platform (ADR-032).** The emitted SQL is engine-neutral (`current_user()`, `lower(trim(...))`, correlated `EXISTS`); the customer runs it on whichever engine hosts the ACL pattern. The adapter never executes.
+- Issue #13 (`ResourceSetFromTable.resourceColumn` conflated as ACL value column vs protected discriminator) surfaces here as an INFO diagnostic; the aligned convention (`p.<col> = b.<col>`) is used, matching the native adapters.
+- The custom ACL-table pattern moves from "larger horizon" to Shipped on the roadmap. A fourth adapter (Oracle, a native platform) is in flight.
+
 ## [0.12.0] — 2026-08-14
 
 Retention / deletion (ADR-031, closing [#21](https://github.com/bgiesbrecht/tessera/issues/21)) — the last of the three scoped governance gaps. A new expression-first policy kind; no adapter emission (no platform declarative-retention primitive).

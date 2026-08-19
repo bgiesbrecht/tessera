@@ -4,7 +4,7 @@
 
 **How to read it.** This is a *living* document, revised by appending dated updates rather than rewriting history (same discipline as the CLAUDE.md handoff). It is not a commitment schedule — ordering reflects current priority, not promised dates. The authoritative decision log remains `DECISIONS.md`; tracked work items remain the GitHub issues. Where an item has an issue or ADR, it is cited.
 
-Current version: **0.12.0** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-14**.
+Current version: **0.13.0** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **2026-08-17**.
 
 ---
 
@@ -13,6 +13,7 @@ Current version: **0.12.0** (`VERSION`, `CHANGELOG.md`). Last roadmap update: **
 The spine of the project is real and exercised end-to-end.
 
 - **The v0 IR** — JSON-LD context, OWL ontology, JSON Schema, SHACL shapes — in `spec/v0/`. The immutability bar is suspended per ADR-017 until external dependency exists; additions land in v0, each as an ADR.
+- **A third adapter — the custom ACL-table pattern** (`adapters/custom_acl/`, ADR-032) — the reference engagement that drove the adapter-first architecture (ADR-003). A *pattern* adapter, not a platform: emit lowers a `byDataset` `RowVisibilityConstraint` to a wrapping secure view (the view *is* the enforcement), and extract lifts a hand-built ACL view back to IR — the selective-migration on-ramp (emit → extract round-trips to equivalent IR). Proves the peer-adapter claim with a working non-native adapter.
 - **Both reference adapters** (Unity Catalog, Snowflake) run the full ADR-024 cycle — `emit` / `discover` / `extract` / `reconcile`. Three policy shapes across both platforms: `RowVisibilityConstraint` (`byIdentity`, `byScope`, `byDataset`), `ColumnVisibilityConstraint` (`Redact`), `AccessGrantConstraint` (table, function, schema fan-out). ABAC `byScope` (tag-driven) emits on both — UC via `MATCH COLUMNS has_tag_value(...)`, Snowflake via tag-based masking / row-access attachment (#31). Bidirectional Snowflake↔UC migration is demonstrated with behavioral-equivalence verification.
 - **The converter** (`tools/converter/`) — YAML → JSON-LD, both authoring shapes.
 - **The unified CLI** (`tools/cli/`, `python -m tools.cli`) — `validate`, `convert`, `emit`, `discover`, `extract`, `reconcile`, and `impact` / `lint` (change-impact analysis).
@@ -79,7 +80,7 @@ Deliberate non-goals. These are load-bearing to the project's posture (ADR-001, 
 
 Directions that are real but not yet scoped, recorded so the shape of the project stays visible.
 
-- **A third adapter — the custom ACL-table pattern** (`adapters/custom-acl/`). The reference real-world engagement that drove the adapter-first architecture (ADR-003). Building it is the strongest test of whether the peer-adapter design is real.
+- **A fourth adapter — Oracle** (`adapters/oracle/`, in flight). A third *native platform* peer, proving IR portability against a distinct mechanism set — VPD/`DBMS_RLS` (row), Data Redaction/`DBMS_REDACT` (column), `GRANT` (access). Live-verification against a provided Oracle instance is planned.
 - **Sharing / distribution constraints.** Reserved space for the `DistributionConstraint` shape; scoping sketch in `docs/v1-candidates/sharing-and-distribution-constraint.md`.
 - **A standing corpus-health mode.** The `--lint` checks (L1, L2) are the seed of a broader "audit my whole policy corpus" capability separate from change-diffing.
 
@@ -95,4 +96,5 @@ Directions that are real but not yet scoped, recorded so the shape of the projec
 - **2026-08-13** — Live-verified the Snowflake ABAC `byScope` emission end-to-end on a real account; 0.9.1. Fixed the row-filter `ON` clause (must name the real discriminator column) and recorded the column-tag-vs-table-tag distinction. Both paths enforce as designed.
 - **2026-08-13** — Scoping doc for the three governance gaps (#19/#21/#25) drafted; then #25 (AI-governance axes) implemented (ADR-029, 0.10.0) — `trainingEligibility` / `automatedDecision`, with a worked example that composes with the column-mask machinery. #19 and #21 remain scoped-not-built (#21 pending the author's scope-framing decision).
 - **2026-08-14** — #19 (audit-logging obligation refinement) implemented (ADR-030, 0.11.0) — `auditFields` / `auditSink` / `auditRetention` on the `AuditLog` obligation, expression-first, with a worked example. Only #21 (retention) of the three remains, pending its scope-framing decision.
+- **2026-08-17** — **Third adapter shipped: custom-ACL** (ADR-032, 0.13.0) — the ADR-003 reference pattern adapter. Emit → wrapping secure view; extract → IR (migration on-ramp). Moved from "larger horizon" to Shipped; Oracle (fourth adapter, native platform) is now in flight.
 - **2026-08-14** — #21 (retention) implemented (ADR-031, 0.12.0) — `RetentionConstraint` policy kind, expression-first (first-class + full intent, but not emitted; scheduled-DELETE deferred as opt-in). **All three governance gaps (#19/#21/#25) now shipped.** The `In-scope gaps — scoping needed` section is retired.

@@ -1,21 +1,39 @@
 # Tessera platform adapters
 
 This directory contains the adapter contract (`contract/`) and concrete adapter
-implementations for the platforms Tessera targets. The current implementations
-are scaffolds: the contract is fully defined and emission is wired up for
-group-driven row-visibility policies on both platforms; discovery, extraction,
-and reconciliation are stubbed with explicit diagnostics.
+implementations. Adapters are peers against one contract (ADR-003): native-platform
+adapters and custom-pattern adapters implement the same four responsibilities
+(emit / discover / extract / reconcile) and each publishes a capability profile.
 
 ## Contents
 
 ```
-contract/                Adapter ABC, CapabilityProfile, DiagnosticReport, AdapterConfig
-unity_catalog/           Databricks adapter (Unity Catalog)
-snowflake/               Snowflake adapter
-tests/                   Cross-adapter parity tests
+contract/                Adapter ABC, CapabilityProfile, AdapterConfig, Result types
+unity_catalog/           Databricks adapter (Unity Catalog) — native platform
+snowflake/               Snowflake adapter — native platform
+custom_acl/              Custom ACL-table + wrapping-view adapter — pattern adapter (ADR-032)
+tests/                   Cross-adapter parity tests + live_*.py integration scripts
 ```
 
-See `DECISIONS.md` ADR-024 for the rationale behind the contract shape.
+See `DECISIONS.md` ADR-024 for the contract shape, ADR-003 for the peer-adapter
+model, and ADR-032 for the pattern-adapter category (custom-ACL).
+
+## Adding an adapter
+
+Mirror an existing package (`snowflake/` is the closest template):
+
+- `__init__.py` — export the `*Adapter` class only.
+- `adapter.py` — subclass `adapters.contract.adapter.Adapter`; set `name` / `platform`;
+  implement `emit()` and (optionally) `discover()` / `extract()` (`reconcile()` has a
+  default: discover → extract → diff).
+- `capability.py` — a module-level `<PLATFORM>_PROFILE` mapping each `Capability` to
+  `(CapabilitySupport, rationale)`. Keep it honest — cite platform docs per ADR-027.
+- `emission.py` — `emit_policy(policy, config) -> EmissionResult`, dispatching on
+  `policy.get("policyKind") or policy.get("@type")`.
+- `discovery.py` — `discover_schema(...)` and `extract_artifact(...)`.
+
+Then register it in `tools/cli/main.py` (`_build_adapter` + the four subcommand
+`--adapter` choices lists) and add parity coverage in `adapters/tests/test_parity.py`.
 
 ## Running the parity test
 
@@ -58,16 +76,15 @@ cite the profile when a policy concept must be downgraded or refused. The
 profile is informational, not a runtime gate — emission may still produce
 output for a PARTIAL capability with a warning diagnostic.
 
-## What the scaffolds do not yet do
+## Coverage, honestly
 
-- **Discovery** — both adapters return `DISCOVERY_NOT_IMPLEMENTED`.
-- **Extraction** — both adapters return `EXTRACTION_NOT_IMPLEMENTED`.
-- **Reconciliation** — both adapters return `RECONCILIATION_NOT_IMPLEMENTED`.
-- **Non-row-visibility policy kinds** — `ColumnVisibilityConstraint`,
-  ABAC-scoped policies, etc. emit a placeholder statement plus an
-  `UNIMPLEMENTED_POLICY_KIND` diagnostic.
-- **Selector kinds beyond byIdentity** — `byClassification`, `byScope`,
-  `byDataset`, `byComposition` all warn.
+- **Unity Catalog / Snowflake** — full ADR-024 cycle (emit / discover / extract /
+  reconcile). Emit covers `RowVisibilityConstraint` (`byIdentity`, `byScope`,
+  `byDataset`), `ColumnVisibilityConstraint` (`Redact`), and `AccessGrantConstraint`.
+  `RetentionConstraint` is expression-only (`RETENTION_EXPRESSION_ONLY`, ADR-031).
+- **custom-ACL** — emit lowers a `byDataset` `RowVisibilityConstraint` to a wrapping
+  secure view; extract lifts such a view back to IR (the selective-migration on-ramp,
+  ADR-032). Column masking in the view is a queued follow-up.
 
-Adding coverage proceeds by extending `emission.py` per adapter and adding
-parity tests against additional worked examples.
+Gaps surface as structured diagnostics, never silent output. Adding coverage proceeds
+by extending `emission.py` per adapter and adding parity tests against worked examples.

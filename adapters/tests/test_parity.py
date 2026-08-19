@@ -17,6 +17,7 @@ import json
 from pathlib import Path
 
 from adapters.contract.types import AdapterConfig
+from adapters.custom_acl import CustomACLAdapter
 from adapters.snowflake import SnowflakeAdapter
 from adapters.unity_catalog import UnityCatalogAdapter
 
@@ -194,6 +195,80 @@ def test_retention_constraint_is_expression_only_on_both_adapters():
         assert result.statements == [], f"{adapter} should emit no DDL for retention"
         assert not result.has_errors
         assert any(d.code == "RETENTION_EXPRESSION_ONLY" for d in result.diagnostics)
+
+
+def test_bydataset_acl_lowers_to_three_distinct_mechanisms():
+    """ADR-032: the same byDataset ACL IR lowers to three distinct mechanisms —
+    a UC row-filter function, a Snowflake row-access policy, and a custom-ACL
+    wrapping VIEW. All three carry the ACL EXISTS-join; none errors; the custom-ACL
+    adapter (a *pattern* adapter, not a platform) is a peer of the two native ones."""
+    policy = _load("acl-row-visibility-policy.jsonld")
+
+    uc = UnityCatalogAdapter().emit(policy)
+    sf = SnowflakeAdapter().emit(policy)
+    acl = CustomACLAdapter().emit(policy)
+
+    for name, r in (("uc", uc), ("snowflake", sf), ("custom-acl", acl)):
+        assert not r.has_errors, f"{name} emission errors: {r.diagnostics}"
+        assert r.statements, f"{name} produced no statements"
+
+    uc_sql = "\n".join(uc.statements)
+    sf_sql = "\n".join(sf.statements)
+    acl_sql = "\n".join(acl.statements)
+
+    # Each emits its own platform-native mechanism.
+    assert "ROW FILTER" in uc_sql
+    assert "ROW ACCESS POLICY" in sf_sql
+    assert "CREATE OR REPLACE VIEW" in acl_sql and "ROW FILTER" not in acl_sql
+
+    # All three carry the shared ACL EXISTS-join over the same two ACL tables.
+    for sql in (uc_sql, sf_sql, acl_sql):
+        assert "EXISTS" in sql.upper()
+        assert "rls_acl_mapping" in sql and "rls_priority_acl" in sql
+
+    # The view is the enforcement in the custom pattern — no native primitive.
+    assert "orders_rls_acl_secured" in acl_sql
+    assert "current_user()" in acl_sql
+
+
+def test_custom_acl_emit_extract_round_trips_to_equivalent_ir():
+    """The migration on-ramp (ADR-003/ADR-032): emit an ACL view, then extract it
+    back to IR. The reconstructed byDataset dataset + condition operand + protected
+    table must match the source IR — this is what lets a hand-built ACL view be
+    lifted and re-emitted to a native platform."""
+    policy = _load("acl-row-visibility-policy.jsonld")
+    adapter = CustomACLAdapter()
+
+    emitted = adapter.emit(policy)
+    assert not emitted.has_errors
+
+    artifact = {
+        "kind": "acl_view",
+        "fq_name": "acme.tpch.orders_rls_acl_secured",
+        "definition": emitted.statements[0],
+    }
+    ext = adapter.extract(artifact)
+    assert ext.policy is not None
+    assert ext.confidence >= 0.9
+    assert not any(d.severity.value == "error" for d in ext.diagnostics)
+
+    src_rule = policy["rules"][0]
+    out_rule = ext.policy["rules"][0]
+    assert out_rule["principal"]["dataset"] == src_rule["principal"]["dataset"]
+    assert out_rule["condition"]["operands"][0] == src_rule["condition"]["operands"][0]
+    assert out_rule["effect"] == src_rule["effect"]
+    assert ext.policy["appliesTo"]["resource"] == policy["appliesTo"]["resource"]
+
+
+def test_custom_acl_profile_is_pattern_adapter():
+    """The custom-ACL adapter declares itself a peer with data-driven selectors as
+    its core (SUPPORTED), and honestly UNSUPPORTED for tag/ABAC machinery."""
+    from adapters.contract.types import Capability, CapabilitySupport
+    acl = CustomACLAdapter()
+    assert acl.capability_profile.platform == "Custom ACL (view-layer)"
+    assert acl.capability_profile.support_for(Capability.ROW_VISIBILITY) == CapabilitySupport.SUPPORTED
+    assert acl.capability_profile.support_for(Capability.DATASET_DRIVEN_PRINCIPALS) == CapabilitySupport.SUPPORTED
+    assert acl.capability_profile.support_for(Capability.ATTRIBUTE_BASED_SCOPING) == CapabilitySupport.UNSUPPORTED
 
 
 def test_capability_profiles_differ_meaningfully():
