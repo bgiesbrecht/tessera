@@ -2,7 +2,7 @@
 
 **Audience:** data governance leads, platform architects, and engineers who run more than one data platform. No RDF or semantic-web background assumed.
 
-**Length:** 25–30 minutes for the full arc; a 5-minute lightning version is in the appendix.
+**Length:** 25–30 minutes for the full arc; a 5-minute lightning version is in the appendix. For a screen-recorded video, [`demo-video-transcript.md`](demo-video-transcript.md) is a timed 5–10 minute spoken transcript of this arc.
 
 **What they will see:** a governance policy authored once as a standalone artifact, checked for unintended access changes before deployment, then lowered into native enforcement on Databricks, Snowflake, and Oracle from that single source.
 
