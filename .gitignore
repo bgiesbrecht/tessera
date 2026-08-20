@@ -225,3 +225,7 @@ oracle_auth.txt
 files*.zip
 # macOS Finder metadata
 .DS_Store
+
+# Local-only demo docs (removed from repo per intent; kept on disk)
+docs/demo-script.md
+docs/demo-video-transcript.md
